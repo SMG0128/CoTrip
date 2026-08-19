@@ -1,40 +1,146 @@
 .place-detail {
-  padding-top: 24rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 28rpx 24rpx 52rpx;
+}
+
+.hero-card,
+.reason-card,
+.actions-card {
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 34rpx;
+  box-shadow: 0 10rpx 34rpx rgba(60, 90, 160, 0.09);
+}
+
+.hero-card {
+  display: flex;
+  align-items: center;
+  min-height: 220rpx;
+  padding: 32rpx;
+}
+
+.hero-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .name {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #1f2329;
-  margin-bottom: 16rpx;
+  color: #17243d;
+  font-size: 38rpx;
+  line-height: 1.35;
+  font-weight: 760;
 }
 
 .meta {
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  font-size: 28rpx;
-  color: #4e5969;
+  gap: 12rpx;
+  margin-top: 16rpx;
+  color: #687892;
+  font-size: 23rpx;
+  flex-wrap: wrap;
+}
+
+.meta text {
+  padding: 7rpx 13rpx;
+  background: #f3f6fb;
+  border-radius: 20rpx;
+}
+
+.meta .rating {
+  color: #326bff;
+  background: #eaf0ff;
+}
+
+.address {
+  display: block;
+  margin-top: 16rpx;
+  color: #8995ab;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.place-art {
+  width: 144rpx;
+  height: 144rpx;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+}
+
+.reason-card,
+.actions-card {
+  margin-top: 26rpx;
+  padding: 30rpx;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  color: #17243d;
+  font-size: 31rpx;
+  font-weight: 730;
+}
+
+.section-title-row image {
+  width: 40rpx;
+  height: 40rpx;
+  margin-left: 7rpx;
 }
 
 .reason {
-  font-size: 28rpx;
-  color: #4e5969;
+  display: block;
+  margin-top: 16rpx;
+  color: #63728d;
+  font-size: 26rpx;
   line-height: 1.7;
 }
 
 .actions {
   display: flex;
-  gap: 20rpx;
+  gap: 16rpx;
+  margin-top: 22rpx;
 }
 
 .action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
-  text-align: center;
-  padding: 22rpx 0;
-  border-radius: 20rpx;
-  background: #eef2ff;
-  color: #2f6bff;
-  font-size: 28rpx;
-  font-weight: 600;
+  min-width: 0;
+  padding: 18rpx 10rpx;
+  color: #326bff;
+  background: #f2f6ff;
+  border-radius: 24rpx;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+.action image {
+  width: 42rpx;
+  height: 42rpx;
+  margin-right: 6rpx;
+}
+
+@media (max-width: 380px) {
+  .hero-card {
+    padding: 26rpx;
+  }
+
+  .place-art {
+    width: 116rpx;
+    height: 116rpx;
+  }
+
+  .name {
+    font-size: 34rpx;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .action {
+    flex-basis: 42%;
+  }
 }

@@ -21,17 +21,32 @@ Component({
     conflictCount: 0,
     createdText: '',
     completedText: '',
+    firstTime: '',
+    lastTime: '',
+    firstEvent: '',
+    lastEvent: '',
+    firstLocation: '',
+    lastLocation: '',
   },
   observers: {
     trip(trip: Trip | null) {
       if (!trip) return;
       const conflictCount = trip.currentPlan?.conflicts.length ?? 0;
+      const events = trip.currentPlan?.events ?? [];
+      const first = events[0];
+      const last = events[events.length - 1];
       this.setData({
         participantCount: trip.participantIds.length,
         commentCount: trip.commentIds.length,
         conflictCount,
         createdText: this.formatDate(trip.createdAt),
         completedText: trip.completedAt ? this.formatDate(trip.completedAt) : '',
+        firstTime: first?.time.start?.slice(11, 16) ?? '',
+        lastTime: last?.time.start?.slice(11, 16) ?? '',
+        firstEvent: first?.title ?? '',
+        lastEvent: last?.title ?? '',
+        firstLocation: first?.location?.name ?? '',
+        lastLocation: last?.location?.name ?? '',
       });
     },
   },

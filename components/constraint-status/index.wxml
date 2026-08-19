@@ -1,1 +1,4 @@
-<view class="status" style="color: {{color}}; background: {{bg}};">{{label}}</view>
+<view class="status" style="color: {{color}}; background: {{bg}};">
+  <image src="{{icon}}" mode="aspectFit" />
+  <text>{{label}}</text>
+</view>

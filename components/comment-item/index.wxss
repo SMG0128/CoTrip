@@ -1,23 +1,38 @@
 .comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
   padding: 24rpx 0;
-  border-bottom: 1rpx solid #f2f3f5;
+  border-bottom: 1rpx solid #edf1f7;
+}
+
+.comment:last-child {
+  border-bottom: 0;
+}
+
+.comment-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12rpx;
+  gap: 14rpx;
+  margin-bottom: 8rpx;
 }
 
 .nickname {
-  font-weight: 600;
-  color: #1f2329;
-  font-size: 28rpx;
+  color: #17243d;
+  font-size: 27rpx;
+  font-weight: 700;
 }
 
 .text {
-  color: #4e5969;
-  font-size: 28rpx;
-  line-height: 1.6;
+  display: block;
+  color: #64738d;
+  font-size: 26rpx;
+  line-height: 1.55;
+  word-break: break-word;
 }

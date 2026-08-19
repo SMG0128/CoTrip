@@ -1,102 +1,323 @@
 .detail {
-  padding-top: 24rpx;
-  padding-bottom: 160rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 28rpx 0 calc(164rpx + env(safe-area-inset-bottom));
 }
 
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 32rpx 24rpx;
+  gap: 20rpx;
+  padding: 0 32rpx 26rpx;
 }
 
 .header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.title,
+.meta {
+  display: block;
 }
 
 .title {
+  overflow: hidden;
+  color: #17243d;
   font-size: 38rpx;
-  font-weight: 700;
-  color: #1f2329;
+  line-height: 1.35;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .meta {
-  font-size: 24rpx;
-  color: #9aa0a6;
+  margin-top: 8rpx;
+  color: #8492aa;
+  font-size: 23rpx;
 }
 
 .invite-btn {
-  background: #eef2ff;
-  color: #2f6bff;
-  font-size: 26rpx;
-  font-weight: 600;
-  padding: 14rpx 28rpx;
-  border-radius: 40rpx;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 12rpx 20rpx 12rpx 14rpx;
+  color: #326bff;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.09);
+  border-radius: 38rpx;
+  box-shadow: 0 8rpx 24rpx rgba(60, 90, 160, 0.09);
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+.invite-btn image {
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 6rpx;
 }
 
 .actions {
   display: flex;
-  gap: 20rpx;
-  padding: 8rpx 24rpx 24rpx;
+  padding: 4rpx 24rpx 24rpx;
 }
 
 .action-btn {
   flex: 1;
-  text-align: center;
-  padding: 22rpx 0;
-  border-radius: 20rpx;
+  padding: 20rpx 0;
+  color: #8c98ad;
   background: #ffffff;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1f2329;
-  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+  border: 1rpx solid #edf1f7;
+  text-align: center;
+  font-size: 27rpx;
+  font-weight: 650;
 }
 
-.action-btn.primary {
-  background: #2f6bff;
+.action-btn:first-child {
+  border-radius: 26rpx 0 0 26rpx;
+}
+
+.action-btn:last-child {
+  border-radius: 0 26rpx 26rpx 0;
+}
+
+.action-btn.selected {
+  z-index: 1;
   color: #ffffff;
+  background: linear-gradient(135deg, #6a5cff, #326bff 66%, #20b9ff);
+  border-color: transparent;
+  box-shadow: 0 10rpx 22rpx rgba(50, 107, 255, 0.2);
 }
 
 .route-wrap {
   padding: 0 24rpx 24rpx;
 }
 
+.ideas-card {
+  margin: 0 24rpx 28rpx;
+  padding: 30rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 36rpx;
+  box-shadow: 0 10rpx 34rpx rgba(60, 90, 160, 0.09);
+}
+
+.ideas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72rpx;
+}
+
+.ideas-title {
+  display: flex;
+  align-items: center;
+  color: #17243d;
+  font-size: 32rpx;
+  font-weight: 750;
+}
+
+.ideas-title image {
+  width: 40rpx;
+  height: 40rpx;
+  margin-left: 6rpx;
+}
+
+.chat-art {
+  width: 92rpx;
+  height: 92rpx;
+}
+
 .comments {
-  padding-top: 8rpx;
+  padding-top: 4rpx;
 }
 
 .input-bar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  z-index: 50;
+  left: 18rpx;
+  right: 18rpx;
+  bottom: calc(12rpx + env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: #ffffff;
-  box-shadow: 0 -4rpx 20rpx rgba(31, 35, 41, 0.04);
+  gap: 14rpx;
+  padding: 14rpx;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1rpx solid rgba(122, 147, 194, 0.1);
+  border-radius: 44rpx;
+  box-shadow: 0 12rpx 34rpx rgba(60, 90, 160, 0.14);
 }
 
 .input {
+  box-sizing: border-box;
   flex: 1;
-  background: #f2f3f5;
-  border-radius: 40rpx;
-  padding: 18rpx 28rpx;
-  font-size: 28rpx;
+  min-width: 0;
+  height: 78rpx;
+  padding: 0 26rpx;
+  background: #f5f7fb;
+  border-radius: 34rpx;
+  font-size: 26rpx;
 }
 
 .placeholder {
-  color: #c9cdd4;
+  color: #b3bdcd;
 }
 
 .send-btn {
-  background: #2f6bff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 142rpx;
+  height: 78rpx;
   color: #ffffff;
-  font-size: 28rpx;
-  font-weight: 600;
-  padding: 18rpx 36rpx;
-  border-radius: 40rpx;
+  background: linear-gradient(135deg, #6a5cff, #326bff 68%, #20b9ff);
+  border-radius: 34rpx;
+  box-shadow: 0 10rpx 24rpx rgba(50, 107, 255, 0.24);
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.send-btn image {
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 5rpx;
+}
+
+.debug-panel {
+  margin: 0 24rpx 28rpx;
+  overflow: hidden;
+  color: #e8edfa;
+  background: #26334f;
+  border-radius: 30rpx;
+  box-shadow: 0 12rpx 28rpx rgba(26, 40, 73, 0.18);
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+}
+
+.debug-title {
+  display: flex;
+  align-items: center;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.debug-title image {
+  width: 42rpx;
+  height: 42rpx;
+  margin-right: 10rpx;
+}
+
+.debug-toggle {
+  color: #9eabc3;
+  font-size: 22rpx;
+}
+
+.debug-body {
+  padding: 0 24rpx 24rpx;
+}
+
+.debug-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24rpx;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14rpx;
+  padding: 14rpx 0;
+  color: #b9c3d7;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.08);
+  font-size: 22rpx;
+}
+
+.debug-row.wide {
+  width: 100%;
+}
+
+.debug-subtitle {
+  margin: 22rpx 0 6rpx;
+  color: #7fa4ff;
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+.debug-query {
+  max-width: 62%;
+  color: #9eabc3;
+  text-align: right;
+  word-break: break-all;
+}
+
+.debug-constraint {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 9rpx 0;
+  flex-wrap: wrap;
+}
+
+.debug-tag {
+  padding: 4rpx 10rpx;
+  color: #dfe5f3;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9rpx;
+  font-size: 19rpx;
+}
+
+.debug-tag.hard {
+  color: #ffffff;
+  background: #d95665;
+}
+
+.debug-tag.soft {
+  color: #ffffff;
+  background: #4e7bff;
+}
+
+.debug-value {
+  color: #ffffff;
+  font-size: 21rpx;
+}
+
+.debug-reset {
+  margin-top: 18rpx;
+  padding: 14rpx 0;
+  color: #ff9aa5;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 16rpx;
+  text-align: center;
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+@media (max-width: 380px) {
+  .header {
+    padding-left: 24rpx;
+    padding-right: 24rpx;
+  }
+
+  .title {
+    font-size: 34rpx;
+  }
+
+  .invite-btn {
+    padding-right: 14rpx;
+    font-size: 22rpx;
+  }
+
+  .ideas-card {
+    padding: 24rpx;
+  }
+
+  .send-btn {
+    min-width: 124rpx;
+  }
 }

@@ -1,30 +1,48 @@
 <view class="profile">
-  <!-- 用户信息 -->
-  <view class="card user-card">
-    <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="120" />
+  <view class="user-card">
+    <view class="user-glow"></view>
+    <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="124" />
     <view class="user-info">
       <text class="nickname">{{user.nickname}}</text>
       <text class="trip-count">参与过 {{tripCount}} 个行程</text>
     </view>
+    <image class="travel-art" src="/assets/3d/travel.png" mode="aspectFit" />
   </view>
 
-  <!-- 通知设置 -->
-  <view class="card">
-    <view class="section-title">通知设置</view>
+  <view class="settings-card">
+    <view class="settings-head">
+      <image src="/assets/icons/settings/notification.svg" mode="aspectFit" />
+      <text>通知设置</text>
+    </view>
     <view wx:for="{{settings}}" wx:key="key" class="setting">
-      <text class="setting-label">{{item.label}}</text>
+      <view class="setting-main">
+        <view class="setting-icon"><image src="{{item.icon}}" mode="aspectFit" /></view>
+        <text class="setting-label">{{item.label}}</text>
+      </view>
       <switch
+        class="setting-switch"
         checked="{{item.enabled}}"
-        color="#2f6bff"
+        color="#326BFF"
         data-key="{{item.key}}"
         bind:change="onToggle"
       />
     </view>
   </view>
 
-  <!-- 其他 -->
-  <view class="card">
-    <view class="menu-item" bind:tap="onPrivacy">隐私说明</view>
-    <view class="menu-item" bind:tap="onAbout">关于 CoTrip</view>
+  <view class="other-card">
+    <view class="menu-item" bind:tap="onPrivacy">
+      <view class="menu-main">
+        <view class="menu-icon"><image src="/assets/icons/settings/privacy.svg" mode="aspectFit" /></view>
+        <text>隐私说明</text>
+      </view>
+      <image class="menu-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+    </view>
+    <view class="menu-item" bind:tap="onAbout">
+      <view class="menu-main">
+        <view class="menu-icon"><image src="/assets/icons/settings/info.svg" mode="aspectFit" /></view>
+        <text>关于 CoTrip</text>
+      </view>
+      <image class="menu-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+    </view>
   </view>
 </view>

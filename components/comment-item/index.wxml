@@ -1,7 +1,10 @@
 <view class="comment">
-  <view class="head">
-    <text class="nickname">{{nickname}}</text>
-    <constraint-status status="{{comment.aiStatus}}" />
+  <participant-avatar nickname="{{nickname}}" size="76" />
+  <view class="comment-main">
+    <view class="head">
+      <text class="nickname">{{nickname}}</text>
+      <constraint-status status="{{comment.aiStatus}}" />
+    </view>
+    <text class="text">{{comment.rawText}}</text>
   </view>
-  <text class="text">{{comment.rawText}}</text>
 </view>

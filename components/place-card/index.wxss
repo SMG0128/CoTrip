@@ -3,12 +3,13 @@
   align-items: center;
   padding: 24rpx;
   background: #ffffff;
-  border-radius: 20rpx;
+  border-radius: 24rpx;
   margin-bottom: 16rpx;
 }
 
 .pin {
-  font-size: 36rpx;
+  width: 54rpx;
+  height: 54rpx;
   margin-right: 20rpx;
 }
 
@@ -22,15 +23,15 @@
 .name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1f2329;
+  color: #17243d;
 }
 
 .sub {
   font-size: 24rpx;
-  color: #9aa0a6;
+  color: #8492aa;
 }
 
 .arrow {
-  color: #c9cdd4;
-  font-size: 40rpx;
+  width: 40rpx;
+  height: 40rpx;
 }

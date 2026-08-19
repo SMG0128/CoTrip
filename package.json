@@ -4,7 +4,8 @@
   "description": "CoTrip — AI-Powered Collaborative Trip Planner 微信小程序",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && tsc --outDir .test-dist --module commonjs && node .test-dist/tests/run-tests.js && node -e \"require('fs').rmSync('.test-dist',{recursive:true,force:true})\""
   },
   "devDependencies": {
     "miniprogram-api-typings": "^5.2.3",

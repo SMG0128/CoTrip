@@ -1,19 +1,35 @@
 <view class="home">
-  <!-- 顶部 -->
-  <view class="header">
-    <text class="brand">CoTrip</text>
+  <view class="hero">
+    <view class="hero-copy">
+      <view class="brand-row">
+        <text class="brand">CoTrip</text>
+        <image class="brand-star" src="/assets/3d/star.png" mode="aspectFit" />
+      </view>
+      <text class="tagline">AI 帮大家把想法变成共同计划</text>
+    </view>
     <view class="avatar-entry" bind:tap="onProfile">
-      <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="72" />
+      <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="92" />
     </view>
   </view>
 
-  <!-- 快捷入口 -->
   <view class="quick">
-    <view class="quick-btn primary" bind:tap="onCreateTrip">+ 新建行程</view>
-    <view class="quick-btn" bind:tap="onHistory">历史行程</view>
+    <view class="quick-btn primary" bind:tap="onCreateTrip">
+      <view class="quick-icon primary-icon"><image src="/assets/icons/utility/plus.svg" mode="aspectFit" /></view>
+      <view class="quick-copy">
+        <text class="quick-title">新建行程</text>
+        <text class="quick-subtitle">AI 智能规划行程</text>
+      </view>
+    </view>
+    <view class="quick-btn secondary" bind:tap="onHistory">
+      <view class="quick-icon"><image src="/assets/icons/utility/history.svg" mode="aspectFit" /></view>
+      <view class="quick-copy">
+        <text class="quick-title">历史行程</text>
+        <text class="quick-subtitle">查看过往旅程</text>
+      </view>
+    </view>
   </view>
 
-  <!-- 主大窗口 -->
+  <view class="section-kicker">正在进行</view>
   <view class="main">
     <block wx:if="{{hasActiveTrip && activeTrip}}">
       <trip-card trip="{{activeTrip}}" bind:tap="onEnterTrip" />
@@ -21,10 +37,12 @@
 
     <block wx:else>
       <view class="recommend">
-        <view class="rec-icons">🏸 + 🍲</view>
-        <view class="rec-title">下午打球，晚上吃饭</view>
-        <view class="rec-meta">天河 · 约 ¥80 / 人</view>
-        <view class="rec-action" bind:tap="onCreateTrip">以此新建行程</view>
+        <view class="recommend-art">
+          <image src="/assets/3d/travel.png" mode="aspectFit" />
+        </view>
+        <view class="rec-title">还没有进行中的行程</view>
+        <view class="rec-meta">邀请朋友，把大家的想法变成共同计划</view>
+        <view class="rec-action" bind:tap="onCreateTrip">新建第一个行程</view>
       </view>
     </block>
   </view>

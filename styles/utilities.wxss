@@ -1,0 +1,16 @@
+.surface-card {
+  background: var(--color-surface);
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.accent-gradient {
+  background: linear-gradient(135deg, #5f77ff 0%, #326bff 56%, #20b9ff 100%);
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

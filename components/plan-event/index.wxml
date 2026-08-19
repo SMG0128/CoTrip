@@ -1,13 +1,60 @@
 <view class="event">
-  <view class="time">{{timeText}}</view>
-  <view class="body">
-    <text class="icon">{{icon}}</text>
-    <view class="info">
-      <text class="title">{{event.title}}</text>
-      <text wx:if="{{event.location}}" class="loc">{{event.location.name}}</text>
-      <text wx:if="{{event.location.district}}" class="district">{{event.location.district}}</text>
-      <price-display wx:if="{{event.price}}" price="{{event.price}}" />
+  <view class="rail">
+    <view class="dot"></view>
+    <view wx:if="{{!isLast}}" class="line"></view>
+  </view>
+  <view class="event-body">
+    <view class="event-main" bind:tap="onPrimaryTap">
+      <view class="event-art"><image src="{{icon}}" mode="aspectFit" /></view>
+      <view class="info">
+        <text class="time">{{timeText}}</text>
+        <text class="title">{{event.title}}</text>
+        <block wx:if="{{selectedCandidate}}">
+          <text class="selected-label">当前首选</text>
+          <text class="loc">{{selectedCandidate.name}}</text>
+          <view class="entity-meta">
+            <text wx:if="{{selectedCandidate.location.district}}">{{selectedCandidate.location.district}}</text>
+            <price-display wx:if="{{selectedCandidate.price}}" price="{{selectedCandidate.price}}" />
+            <view wx:if="{{selectedCandidate.rating}}" class="event-rating">
+              <image src="/assets/icons/utility/star.svg" mode="aspectFit" />
+              <text>{{selectedCandidate.rating}}</text>
+            </view>
+            <text wx:if="{{selectedCandidate.overBudget}}" class="selected-over-budget">超预算偏好</text>
+          </view>
+        </block>
+        <block wx:else>
+          <text wx:if="{{event.location}}" class="loc">{{event.location.name}}</text>
+          <text wx:if="{{event.location.district}}" class="district">{{event.location.district}}</text>
+          <price-display wx:if="{{event.price}}" price="{{event.price}}" />
+        </block>
+      </view>
+    </view>
+
+    <view wx:if="{{alternatives.length}}" class="candidate-tray">
+      <view class="candidate-toggle" catch:tap="onToggleCandidates">
+        <text>{{expanded ? '收起备选' : '查看 ' + alternatives.length + ' 个备选'}}</text>
+        <image src="{{expanded ? '/assets/icons/utility/collapse.svg' : '/assets/icons/utility/expand.svg'}}" mode="aspectFit" />
+      </view>
+      <view wx:if="{{expanded}}" class="candidate-list">
+        <view
+          wx:for="{{alternatives}}"
+          wx:key="id"
+          class="candidate-row"
+          data-candidate="{{item}}"
+          catch:tap="onCandidateTap"
+        >
+          <text class="candidate-rank">{{item.rank}}</text>
+          <view class="candidate-copy">
+            <text class="candidate-name">{{item.name}}</text>
+            <view class="candidate-meta">
+              <text wx:if="{{item.confidence}}">匹配度 {{item.confidence}}%</text>
+              <text wx:if="{{item.location.district}}">{{item.location.district}}</text>
+            </view>
+          </view>
+          <text wx:if="{{item.overBudget}}" class="over-budget">超预算偏好</text>
+          <image class="candidate-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+        </view>
+      </view>
     </view>
   </view>
-  <view wx:if="{{!isLast}}" class="line"></view>
 </view>

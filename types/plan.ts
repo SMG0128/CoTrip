@@ -4,14 +4,32 @@
 import { PlanEvent } from './event';
 import { Price } from './price';
 
+export type PlanConflictType = 'TIME_CONFLICT' | 'LOCATION_CONFLICT' | 'BUDGET_CONFLICT' | 'OTHER';
+
 export interface PlanConflict {
   id: string;
+  type: PlanConflictType;
   /** 冲突描述 */
   description: string;
   /** 涉及的约束 id */
   constraintIds: string[];
   /** 建议的调整方案 */
   suggestions?: string[];
+}
+
+/** 计划规划上下文：由约束推导出的规划目标 */
+export interface PlanningContext {
+  /** 预算目标 */
+  budgetTarget?: {
+    maxPerPerson?: number;
+    preference?: 'LOW_COST' | 'HIGH_QUALITY';
+  };
+  /** 参与者可用时间窗口（ISO 8601） */
+  availabilityWindows?: Array<{
+    ownerId: string;
+    availableAfter?: string;
+    availableUntil?: string;
+  }>;
 }
 
 export interface Plan {
@@ -23,5 +41,7 @@ export interface Plan {
   satisfiedConstraintCount: number;
   totalConstraintCount: number;
   conflicts: PlanConflict[];
+  /** 规划上下文 */
+  planningContext?: PlanningContext;
   updatedAt: string;
 }

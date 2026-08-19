@@ -1,14 +1,19 @@
 .create {
-  padding-top: 24rpx;
-  padding-bottom: 160rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 28rpx 0 calc(152rpx + env(safe-area-inset-bottom));
+}
+
+.card {
+  border-radius: 32rpx;
 }
 
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #f2f3f5;
+  min-height: 94rpx;
+  border-bottom: 1rpx solid #edf1f7;
 }
 
 .field:last-child {
@@ -16,44 +21,54 @@
 }
 
 .field-label {
-  font-size: 28rpx;
-  color: #4e5969;
+  color: #64738d;
+  font-size: 27rpx;
 }
 
 .field-value {
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  color: #1f2329;
-  font-size: 28rpx;
+  gap: 20rpx;
+  color: #17243d;
+  font-size: 27rpx;
 }
 
 .arrow {
-  color: #c9cdd4;
-  font-size: 36rpx;
+  width: 40rpx;
+  height: 40rpx;
 }
 
 .picker-text {
-  color: #2f6bff;
+  color: #326bff;
 }
 
 .brief {
+  box-sizing: border-box;
   width: 100%;
-  min-height: 160rpx;
-  font-size: 28rpx;
+  min-height: 170rpx;
+  padding: 20rpx;
+  color: #27344c;
+  background: #f7f9fd;
+  border-radius: 22rpx;
+  font-size: 27rpx;
   line-height: 1.6;
 }
 
 .placeholder {
-  color: #c9cdd4;
+  color: #b2bdce;
 }
 
 .footer {
   position: fixed;
+  z-index: 20;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
-  background: #ffffff;
-  box-shadow: 0 -4rpx 20rpx rgba(31, 35, 41, 0.04);
+  padding: 18rpx 28rpx calc(18rpx + env(safe-area-inset-bottom));
+  background: rgba(247, 249, 253, 0.96);
+}
+
+.footer .btn-primary {
+  margin: 0;
+  border: 0;
 }

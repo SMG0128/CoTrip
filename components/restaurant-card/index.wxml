@@ -7,5 +7,5 @@
       <text wx:if="{{restaurant.rating}}"> · {{restaurant.rating.score}}</text>
     </view>
   </view>
-  <text class="arrow">›</text>
+  <image class="arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
 </view>

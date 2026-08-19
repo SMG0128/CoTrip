@@ -1,22 +1,60 @@
-<view class="trip" bind:tap="onTap">
-  <view class="title-row">
-    <text class="title">{{trip.title}}</text>
-    <text class="status">{{trip.status === 'COMPLETED' ? '已完成' : '进行中'}}</text>
-  </view>
+<view class="trip {{history ? 'history-trip' : 'active-trip'}}" bind:tap="onTap">
+  <block wx:if="{{history}}">
+    <view class="history-icon"><image src="/assets/3d/travel.png" mode="aspectFit" /></view>
+    <view class="history-content">
+      <view class="title-row">
+        <text class="title">{{trip.title}}</text>
+        <text class="status completed">已完成</text>
+      </view>
+      <view class="meta">
+        <text>{{participantCount}} 人参与</text>
+        <text wx:if="{{completedText}}">{{completedText}}</text>
+      </view>
+    </view>
+    <image class="row-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+  </block>
 
-  <view wx:if="{{history}}" class="meta">
-    <text>创建：{{createdText}}</text>
-    <text wx:if="{{completedText}}">完成：{{completedText}}</text>
-  </view>
+  <block wx:else>
+    <view class="status"><view class="status-dot"></view>进行中</view>
+    <view class="trip-head">
+      <view class="trip-copy">
+        <text class="title">{{trip.title}}</text>
+        <view class="stats">
+          <text>{{participantCount}} 人参与</text>
+          <text class="stats-divider"></text>
+          <text>AI 已整理 {{commentCount}} 条需求</text>
+        </view>
+      </view>
+      <view class="trip-art">
+        <image class="art-combo" src="/assets/icons/trip/badminton-food.svg" mode="aspectFit" />
+      </view>
+    </view>
 
-  <view class="stats">
-    <text>{{participantCount}} 人参与</text>
-    <text wx:if="{{!history}}">AI 已整理 {{commentCount}} 条需求</text>
-  </view>
+    <view class="schedule">
+      <view class="schedule-event">
+        <text class="schedule-time">{{firstTime}}</text>
+        <view class="event-main">
+          <image src="/assets/icons/trip/badminton.svg" mode="aspectFit" />
+          <view class="event-copy">
+            <text class="event-title">{{firstEvent}}</text>
+            <text class="event-place">{{firstLocation}}</text>
+          </view>
+        </view>
+      </view>
+      <image class="schedule-arrow" src="/assets/icons/utility/arrow-right.svg" mode="aspectFit" />
+      <view class="schedule-event">
+        <text class="schedule-time">{{lastTime}}</text>
+        <view class="event-main">
+          <image src="/assets/icons/trip/food.svg" mode="aspectFit" />
+          <view class="event-copy">
+            <text class="event-title">{{lastEvent}}</text>
+            <text class="event-place">{{lastLocation}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
 
-  <view wx:if="{{!history && conflictCount > 0}}" class="conflict-hint">
-    ⚠ 还有 {{conflictCount}} 项冲突待确认
-  </view>
-
-  <view class="enter">进入行程 →</view>
+    <view wx:if="{{conflictCount > 0}}" class="conflict-hint">还有 {{conflictCount}} 项冲突待确认</view>
+    <view class="enter"><text>进入行程</text><image src="/assets/icons/utility/arrow-right.svg" mode="aspectFit" /></view>
+  </block>
 </view>

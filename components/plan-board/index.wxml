@@ -1,48 +1,38 @@
 <view class="board">
   <view class="board-head">
-    <text class="board-title">AI 当前计划</text>
+    <view class="title-wrap">
+      <text class="ai-mark">AI</text>
+      <text class="board-title">{{readonly ? '最终计划' : '当前计划'}}</text>
+    </view>
     <text class="version">v{{plan.version}}</text>
   </view>
 
   <view class="events">
-    <block wx:for="{{plan.events}}" wx:key="id">
+    <block wx:for="{{eventRows}}" wx:key="id">
       <plan-event
-        event="{{item}}"
-        isLast="{{index === plan.events.length - 1}}"
+        event="{{item.event}}"
+        candidates="{{item.candidates}}"
+        isLast="{{index === eventRows.length - 1}}"
         bind:place="onEventTap"
-        data-event="{{item}}"
+        bind:candidate="onCandidateTap"
       />
     </block>
   </view>
 
-  <view wx:if="{{restaurants.length}}" class="restaurants">
-    <view class="sub-title">推荐餐厅</view>
-    <view
-      wx:for="{{restaurants}}"
-      wx:key="id"
-      class="restaurant"
-      bind:tap="onRestaurantTap"
-      data-restaurant="{{item}}"
-    >
-      <text class="r-name">{{index + 1}}. {{item.name}}</text>
-      <text class="r-meta">
-        <price-display price="{{item.averagePrice}}" />
-        <text wx:if="{{item.rating}}"> · {{item.rating.score}}</text>
-      </text>
+  <view class="budget-summary">
+    <image class="wallet" src="/assets/icons/utility/price.svg" mode="aspectFit" />
+    <view class="budget-copy">
+      <text class="budget-title">预算与需求</text>
+      <text class="satisfied">已满足 {{plan.satisfiedConstraintCount}} / {{plan.totalConstraintCount}} 条需求</text>
+      <view wx:if="{{plan.estimatedTotalPrice}}" class="total">
+        预计 <price-display price="{{plan.estimatedTotalPrice}}" />
+      </view>
     </view>
-  </view>
-
-  <view wx:if="{{plan.estimatedTotalPrice}}" class="total">
-    预计总消费
-    <price-display price="{{plan.estimatedTotalPrice}}" />
-  </view>
-
-  <view class="satisfied">
-    已满足 {{plan.satisfiedConstraintCount}} / {{plan.totalConstraintCount}} 条需求
+    <image class="tick" src="/assets/icons/status/check.svg" mode="aspectFit" />
   </view>
 
   <view wx:if="{{plan.conflicts.length}}" class="conflict">
-    <view class="conflict-title">⚠ 当前存在 {{plan.conflicts.length}} 项冲突</view>
+    <view class="conflict-title">当前存在 {{plan.conflicts.length}} 项冲突</view>
     <view wx:for="{{plan.conflicts}}" wx:key="id" class="conflict-item">
       <text>{{item.description}}</text>
     </view>

@@ -13,12 +13,21 @@ export type PlanEventType =
   | 'ENTERTAINMENT'
   | 'OTHER';
 
+/** 事件地点要求：由 Location Constraint 推导，结构化而非塞进 description */
+export interface LocationRequirement {
+  district?: string;
+  city?: string;
+  locationId?: string;
+}
+
 export interface PlanEvent {
   id: string;
   type: PlanEventType;
   title: string;
   time: TimeRange;
   location?: Location;
+  /** 地点要求（结构化） */
+  locationRequirement?: LocationRequirement;
   price?: Price;
   restaurant?: Restaurant;
   /** 备选方案描述 */

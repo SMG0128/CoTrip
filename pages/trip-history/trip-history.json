@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "历史行程",
+  "backgroundColor": "#F7F9FD",
   "usingComponents": {
     "trip-card": "../../components/trip-card/index"
   }

@@ -10,17 +10,52 @@ export type ConstraintType =
 
 export type ConstraintPriority = 'HARD' | 'SOFT';
 
+/** 约束作用范围 */
+export type ConstraintScope = 'TRIP' | 'SPORT' | 'DINING' | 'TRANSPORT' | 'ENTERTAINMENT' | 'OTHER';
+
+/** Availability / Deadline 约束值 */
+export interface AvailabilityConstraintValue {
+  /** 最早可用时间（ISO 8601） */
+  availableAfter?: string;
+  /** 最晚必须离开时间（ISO 8601） */
+  availableUntil?: string;
+}
+
+/** Location 约束值 */
+export interface LocationConstraintValue {
+  district?: string;
+  city?: string;
+  locationId?: string;
+}
+
+/** Budget 约束值 */
+export interface BudgetConstraintValue {
+  max?: number;
+  min?: number;
+  currency?: 'CNY';
+  unit?: 'TOTAL' | 'PER_PERSON' | 'PER_HOUR';
+  /** 预算偏好，如 LOW_COST */
+  preference?: 'LOW_COST' | 'HIGH_QUALITY';
+}
+
+/** Preference 约束值 */
+export interface PreferenceConstraintValue {
+  /** 偏好关键词，如 VIETNAMESE / METRO / NEARBY */
+  keyword?: string;
+  note?: string;
+}
+
 export interface Constraint {
   id: string;
   tripId: string;
   ownerId: string;
-  /** 来源评论 id */
+  /** 来源评论 id，必须可追溯 */
   sourceCommentId?: string;
   type: ConstraintType;
-  /** 作用范围，如 TRIP / EVENT */
-  scope: string;
+  /** 作用范围，如 TRIP / SPORT / DINING */
+  scope: ConstraintScope;
   priority: ConstraintPriority;
-  /** 结构化值，如 { max: 80, currency: 'CNY' } */
+  /** 结构化值 */
   value: Record<string, unknown>;
 }
 

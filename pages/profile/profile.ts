@@ -7,6 +7,7 @@ interface NotificationSetting {
   key: string;
   label: string;
   enabled: boolean;
+  icon: string;
 }
 
 Page({
@@ -14,11 +15,18 @@ Page({
     user: mockCurrentUser,
     tripCount: 2,
     settings: [
-      { key: 'trip_starting', label: '行程开始提醒', enabled: true },
-      { key: 'departure', label: '建议出发时间提醒', enabled: true },
-      { key: 'plan_changed', label: '计划重大变化提醒', enabled: true },
-      { key: 'conflict', label: '冲突提醒', enabled: false },
+      { key: 'trip_starting', label: '行程开始提醒', enabled: true, icon: '/assets/icons/settings/calendar.svg' },
+      { key: 'departure', label: '建议出发时间提醒', enabled: true, icon: '/assets/icons/settings/clock.svg' },
+      { key: 'plan_changed', label: '计划重大变化提醒', enabled: true, icon: '/assets/icons/settings/route.svg' },
+      { key: 'conflict', label: '冲突提醒', enabled: false, icon: '/assets/icons/settings/warning.svg' },
     ] as NotificationSetting[],
+  },
+
+  onShow() {
+    const tabBar = this.getTabBar();
+    if (tabBar) {
+      tabBar.setData({ selected: 1 });
+    }
   },
 
   onToggle(e: WechatMiniprogram.BaseEvent) {

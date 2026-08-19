@@ -1,41 +1,87 @@
 <view class="detail">
-  <!-- 6.1 顶部信息 -->
   <view class="header">
     <view class="header-info">
       <text class="title">{{trip.title}}</text>
       <text class="meta">{{participantCount}} 人参与 · AI 已整理 {{commentCount}} 条需求</text>
     </view>
-    <view class="invite-btn" bind:tap="onInvite">邀请好友</view>
+    <view class="invite-btn" bind:tap="onInvite">
+      <image src="/assets/icons/utility/plus.svg" mode="aspectFit" />
+      <text>邀请好友</text>
+    </view>
   </view>
 
-  <!-- 6.2 AI 当前计划大框 -->
   <plan-board
     plan="{{trip.currentPlan}}"
-    restaurants="{{restaurants}}"
+    candidateGroups="{{candidateGroups}}"
     bind:place="onPlaceTap"
     bind:restaurant="onRestaurantTap"
   />
 
-  <!-- 6.3 操作区域 -->
   <view class="actions">
     <view class="action-btn" bind:tap="onInvite">邀请好友</view>
-    <view class="action-btn primary" bind:tap="onToggleRoute">我的推荐</view>
+    <view class="action-btn {{showRoute ? 'selected' : ''}}" bind:tap="onToggleRoute">我的推荐</view>
   </view>
 
-  <!-- 6.4 我的推荐 -->
   <view wx:if="{{showRoute}}" class="route-wrap">
     <personal-route route="{{route}}" segments="{{routeSegments}}" />
   </view>
 
-  <!-- 6.5 大家的想法 -->
-  <view class="card">
-    <view class="section-title">大家的想法</view>
+  <view class="ideas-card">
+    <view class="ideas-head">
+      <view class="ideas-title">
+        <text>大家的想法</text>
+      </view>
+      <image class="chat-art" src="/assets/3d/chat-bubble.png" mode="aspectFit" />
+    </view>
     <view class="comments">
       <comment-item wx:for="{{comments}}" wx:key="id" comment="{{item}}" />
     </view>
   </view>
 
-  <!-- 6.6 底部输入框 -->
+  <view wx:if="{{debugEnabled}}" class="debug-panel {{debugExpanded ? 'expanded' : ''}}">
+    <view class="debug-header" bind:tap="onDebugToggle">
+      <view class="debug-title">
+        <image src="/assets/icons/settings/gear.svg" mode="aspectFit" />
+        <text>Debug 面板</text>
+      </view>
+      <text class="debug-toggle">{{debugExpanded ? '收起' : '展开'}}</text>
+    </view>
+    <view wx:if="{{debugExpanded}}" class="debug-body">
+      <view class="debug-grid">
+        <view class="debug-row"><text>计划版本</text><text>v{{debugPlanVersion}}</text></view>
+        <view class="debug-row"><text>约束数量</text><text>{{debugConstraints.length}}</text></view>
+        <view class="debug-row"><text>冲突数量</text><text>{{debugConflictCount}}</text></view>
+        <view class="debug-row"><text>未解析评论</text><text>{{debugUnresolved.length}}</text></view>
+      </view>
+      <view class="debug-subtitle">Provider Debug</view>
+      <view class="debug-row wide">
+        <text>Provider</text>
+        <text>{{debugProvider.provider}} {{debugProvider.configured ? '已配置' : '未配置(Seed)'}}</text>
+      </view>
+      <view class="debug-row wide">
+        <text>Search Query</text>
+        <text class="debug-query">{{debugProvider.searchQuery}}</text>
+      </view>
+      <view class="debug-row wide"><text>Raw Result Count</text><text>{{debugProvider.rawResultCount}}</text></view>
+      <view class="debug-row wide"><text>Selected Entity</text><text>{{debugProvider.selectedEntity}}</text></view>
+      <view class="debug-row wide">
+        <text>ProviderRefs</text>
+        <text>{{debugProvider.providerRefs.length ? debugProvider.providerRefs.join(', ') : '—'}}</text>
+      </view>
+      <view class="debug-row wide"><text>ExternalActions</text><text>{{debugProvider.externalActions}}</text></view>
+      <view class="debug-constraints" wx:if="{{debugConstraints.length > 0}}">
+        <view class="debug-subtitle">约束列表</view>
+        <view wx:for="{{debugConstraints}}" wx:key="id" class="debug-constraint">
+          <text class="debug-tag {{item.priority === 'HARD' ? 'hard' : 'soft'}}">{{item.priority}}</text>
+          <text class="debug-tag">{{item.type}}</text>
+          <text class="debug-tag">{{item.scope}}</text>
+          <text class="debug-value">{{item.value.note || item.value.district || item.value.max || item.value.keyword || item.value.availableAfter || item.value.availableUntil || item.value.preference || '—'}}</text>
+        </view>
+      </view>
+      <view class="debug-reset" bind:tap="onDebugReset">重置引擎</view>
+    </view>
+  </view>
+
   <view class="input-bar">
     <input
       class="input"
@@ -46,6 +92,9 @@
       confirm-type="send"
       bind:confirm="onSend"
     />
-    <view class="send-btn" bind:tap="onSend">发送</view>
+    <view class="send-btn" bind:tap="onSend">
+      <image src="/assets/icons/utility/send.svg" mode="aspectFit" />
+      <text>发送</text>
+    </view>
   </view>
 </view>

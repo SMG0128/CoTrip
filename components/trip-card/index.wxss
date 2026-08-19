@@ -1,57 +1,229 @@
 .trip {
+  box-sizing: border-box;
   background: #ffffff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin: 0 24rpx 24rpx;
-  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 36rpx;
+  margin: 0 24rpx 28rpx;
+  box-shadow: 0 10rpx 34rpx rgba(60, 90, 160, 0.09);
 }
 
-.title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16rpx;
-}
-
-.title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #1f2329;
+.active-trip {
+  padding: 30rpx;
+  overflow: hidden;
 }
 
 .status {
-  font-size: 22rpx;
-  color: #1a9e5c;
-  background: #e6f7ef;
-  padding: 4rpx 16rpx;
-  border-radius: 20rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 28rpx;
+  background: #f0edff;
+  color: #6a5cff;
+  font-size: 23rpx;
+  font-weight: 650;
 }
 
-.meta {
+.status-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #26d98f;
+}
+
+.trip-head {
   display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-  font-size: 24rpx;
-  color: #9aa0a6;
-  margin-bottom: 12rpx;
+  align-items: center;
+  min-height: 184rpx;
+}
+
+.trip-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  display: block;
+  color: #17243d;
+  font-size: 36rpx;
+  line-height: 1.35;
+  font-weight: 760;
 }
 
 .stats {
   display: flex;
-  gap: 24rpx;
-  font-size: 26rpx;
-  color: #4e5969;
+  align-items: center;
+  gap: 14rpx;
+  margin-top: 16rpx;
+  color: #7f8da8;
+  font-size: 23rpx;
+  white-space: nowrap;
+}
+
+.stats-divider {
+  width: 1rpx;
+  height: 22rpx;
+  background: #dce3ef;
+}
+
+.trip-art {
+  position: relative;
+  width: 190rpx;
+  height: 150rpx;
+  flex-shrink: 0;
+}
+
+.trip-art .art-combo {
+  width: 100%;
+  height: 100%;
+}
+
+.schedule {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx;
+  border-radius: 28rpx;
+  background: #f8faff;
+  box-shadow: inset 0 0 0 1rpx rgba(113, 143, 204, 0.07);
+}
+
+.schedule-event {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-time {
+  display: block;
   margin-bottom: 12rpx;
+  color: #326bff;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.event-main {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.event-main image {
+  width: 54rpx;
+  height: 54rpx;
+  flex-shrink: 0;
+}
+
+.event-copy {
+  min-width: 0;
+}
+
+.event-title,
+.event-place {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-title {
+  color: #17243d;
+  font-size: 27rpx;
+  font-weight: 650;
+}
+
+.event-place {
+  margin-top: 5rpx;
+  color: #8995ab;
+  font-size: 21rpx;
+}
+
+.schedule-arrow {
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
 }
 
 .conflict-hint {
-  font-size: 24rpx;
-  color: #e5484d;
-  margin-bottom: 12rpx;
+  margin-top: 18rpx;
+  color: #ef6c78;
+  font-size: 23rpx;
 }
 
 .enter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 26rpx;
+  color: #326bff;
+  background: #f2f6ff;
   font-size: 28rpx;
-  color: #2f6bff;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.enter image,
+.row-arrow {
+  width: 48rpx;
+  height: 48rpx;
+}
+
+.history-trip {
+  display: flex;
+  align-items: center;
+  padding: 28rpx;
+}
+
+.history-icon {
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 30rpx;
+  background: #f4f6ff;
+  margin-right: 24rpx;
+}
+
+.history-icon image {
+  width: 100%;
+  height: 100%;
+}
+
+.history-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.history-trip .title {
+  flex: 1;
+  font-size: 31rpx;
+}
+
+.status.completed {
+  color: #18a979;
+  background: #e9fbf4;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  gap: 18rpx;
+  margin-top: 12rpx;
+  color: #8995ab;
+  font-size: 23rpx;
+}
+
+@media (max-width: 380px) {
+  .trip-art {
+    width: 152rpx;
+  }
+
+  .stats {
+    gap: 8rpx;
+    font-size: 21rpx;
+  }
 }

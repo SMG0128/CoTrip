@@ -6,7 +6,7 @@
       <text class="field-label">区域</text>
       <view class="field-value">
         <text>{{areaText}}</text>
-        <text class="arrow">›</text>
+        <image class="arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
       </view>
     </view>
   </view>

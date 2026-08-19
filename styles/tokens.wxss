@@ -1,0 +1,21 @@
+page {
+  --color-canvas: #f7f9fd;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f5f7fb;
+  --color-primary: #326bff;
+  --color-accent-blue: #4e7bff;
+  --color-accent-purple: #6a5cff;
+  --color-accent-cyan: #20b9ff;
+  --color-success: #18c98b;
+  --color-warning: #ffb52e;
+  --color-danger: #ef6c78;
+  --color-text: #17243d;
+  --color-text-secondary: #7f8da8;
+  --color-line: #edf1f8;
+  --radius-sm: 16rpx;
+  --radius-md: 24rpx;
+  --radius-lg: 32rpx;
+  --radius-xl: 40rpx;
+  --shadow-soft: 0 8rpx 30rpx rgba(60, 90, 160, 0.08);
+  --shadow-raised: 0 14rpx 34rpx rgba(67, 92, 158, 0.12);
+}

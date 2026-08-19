@@ -1,4 +1,8 @@
 <view class="login">
+  <view class="login-art">
+    <image class="travel" src="/assets/3d/travel.png" mode="aspectFit" />
+    <image class="star" src="/assets/3d/star.png" mode="aspectFit" />
+  </view>
   <view class="logo">CoTrip</view>
   <view class="slogan">大家负责表达想法，AI 负责把想法变成共同计划。</view>
 

@@ -8,5 +8,8 @@ miniprogram_npm/
 # 编译产物
 *.js.map
 
+# 测试编译临时目录
+.test-dist/
+
 # 日志
 *.log

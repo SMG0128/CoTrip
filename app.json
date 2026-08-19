@@ -14,13 +14,12 @@
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTitleText": "CoTrip",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f6f7fb"
+    "backgroundColor": "#f7f9fd"
   },
   "tabBar": {
-    "color": "#9aa0a6",
-    "selectedColor": "#2f6bff",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
+    "custom": true,
+    "color": "#a0abc0",
+    "selectedColor": "#326bff",
     "list": [
       {
         "pagePath": "pages/home/home",

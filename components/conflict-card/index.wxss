@@ -1,20 +1,28 @@
 .conflict {
-  background: #fdecec;
-  border-radius: 20rpx;
+  background: #fff0f2;
+  border-radius: 24rpx;
   padding: 24rpx;
   margin-top: 24rpx;
 }
 
 .title {
+  display: flex;
+  align-items: center;
   font-size: 28rpx;
   font-weight: 600;
-  color: #e5484d;
+  color: #d95665;
   margin-bottom: 8rpx;
+}
+
+.title image {
+  width: 44rpx;
+  height: 44rpx;
+  margin-right: 8rpx;
 }
 
 .desc {
   font-size: 26rpx;
-  color: #4e5969;
+  color: #64738d;
   line-height: 1.5;
 }
 
@@ -24,11 +32,11 @@
 
 .s-title {
   font-size: 24rpx;
-  color: #9aa0a6;
+  color: #8a97ad;
 }
 
 .s-item {
   font-size: 26rpx;
-  color: #4e5969;
+  color: #64738d;
   margin-top: 4rpx;
 }

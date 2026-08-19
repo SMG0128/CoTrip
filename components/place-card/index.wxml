@@ -1,8 +1,8 @@
 <view class="place" bind:tap="onTap">
-  <view class="pin">📍</view>
+  <image class="pin" src="/assets/icons/utility/location.svg" mode="aspectFit" />
   <view class="info">
     <text class="name">{{location.name}}</text>
     <text wx:if="{{subtitle}}" class="sub">{{subtitle}}</text>
   </view>
-  <text class="arrow">›</text>
+  <image class="arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
 </view>

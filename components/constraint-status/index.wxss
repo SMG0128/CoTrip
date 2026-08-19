@@ -1,7 +1,16 @@
 .status {
-  display: inline-block;
-  font-size: 22rpx;
-  padding: 6rpx 16rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 7rpx;
+  font-size: 21rpx;
+  padding: 7rpx 15rpx;
   border-radius: 20rpx;
-  font-weight: 500;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status image {
+  width: 28rpx;
+  height: 28rpx;
+  flex-shrink: 0;
 }

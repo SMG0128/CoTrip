@@ -13,6 +13,11 @@ Page({
   },
 
   onShow() {
+    const tabBar = this.getTabBar();
+    if (tabBar) {
+      tabBar.setData({ selected: 0 });
+    }
+
     // Mock：直接使用固定进行中行程
     this.setData({
       activeTrip: mockActiveTrip,

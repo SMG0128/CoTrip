@@ -18,10 +18,12 @@ Component({
   },
   data: {
     initial: '',
+    fallbackUrl: '/assets/3d/boy.png',
   },
   observers: {
     nickname(nickname: string) {
-      this.setData({ initial: (nickname || '?').slice(0, 1) });
+      const fallbackUrl = nickname.includes('C') ? '/assets/3d/girl.png' : '/assets/3d/boy.png';
+      this.setData({ initial: (nickname || '?').slice(0, 1), fallbackUrl });
     },
   },
 });

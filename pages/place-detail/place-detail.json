@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "地点详情",
+  "backgroundColor": "#F7F9FD",
   "usingComponents": {
     "price-display": "../../components/price-display/index"
   }

@@ -1,5 +1,42 @@
 .history {
-  padding-top: 24rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 28rpx 0 48rpx;
+}
+
+.history-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 160rpx;
+  margin: 0 24rpx 28rpx;
+  padding: 26rpx 32rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 36rpx;
+  box-shadow: 0 10rpx 34rpx rgba(60, 90, 160, 0.09);
+}
+
+.hero-title,
+.hero-subtitle {
+  display: block;
+}
+
+.hero-title {
+  color: #17243d;
+  font-size: 36rpx;
+  font-weight: 760;
+}
+
+.hero-subtitle {
+  margin-top: 10rpx;
+  color: #8492aa;
+  font-size: 23rpx;
+}
+
+.history-hero image {
+  width: 142rpx;
+  height: 142rpx;
 }
 
 .list {

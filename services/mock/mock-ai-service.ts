@@ -1,32 +1,40 @@
 // services/mock/mock-ai-service.ts
-// AIService 的 Mock 实现：不调用任何真实大模型。
+// AIService 的本地规则实现：基于 core/ 规划引擎，不调用真实大模型。
+// 注意：AIService 接口保持抽象，未来可替换为 LLMAIService。
 
 import { AIService, ExtractConstraintsInput, GeneratePlanInput } from '../ai-service';
 import { Constraint } from '../../types/constraint';
 import { Plan } from '../../types/plan';
+import { PlanningEngine } from '../../core/planning-engine';
 import { mockPlan } from '../../mock/mock-plan';
 
-export class MockAIService implements AIService {
+export class LocalRuleBasedAIService implements AIService {
   async extractConstraints(input: ExtractConstraintsInput): Promise<Constraint[]> {
-    // Mock：根据评论数量生成占位约束
-    return input.comments.map((c, i) => ({
-      id: `constraint_${c.id}`,
-      tripId: input.tripId,
-      ownerId: c.userId,
-      sourceCommentId: c.id,
-      type: 'PREFERENCE',
-      scope: 'TRIP',
-      priority: 'SOFT',
-      value: { note: `来自评论 ${i + 1}` },
-    }));
+    const engine = new PlanningEngine({ tripId: input.tripId });
+    const result = engine.processComments(input.comments);
+    return result.constraints;
   }
 
   async generatePlan(input: GeneratePlanInput): Promise<Plan> {
-    // Mock：返回固定计划
-    return {
-      ...mockPlan,
+    // 基于约束生成计划：若没有约束，回退到 Mock 计划
+    if (input.constraints.length === 0) {
+      return {
+        ...mockPlan,
+        tripId: input.tripId,
+        totalConstraintCount: 0,
+        satisfiedConstraintCount: 0,
+      };
+    }
+    const engine = new PlanningEngine({
       tripId: input.tripId,
-      totalConstraintCount: input.constraints.length,
-    };
+      initialPlan: mockPlan,
+    });
+    // 将约束直接注入存储，再协调计划
+    engine.constraintStore.addAll(input.constraints);
+    const result = engine.processComments([]);
+    return result.plan;
   }
 }
+
+// 兼容旧引用：MockAIService 作为别名
+export const MockAIService = LocalRuleBasedAIService;

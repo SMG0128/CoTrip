@@ -1,29 +1,37 @@
 <view class="place-detail">
-  <view class="card">
-    <view class="name">{{name}}</view>
-    <view class="meta">
-      <text wx:if="{{rating}}">评分 {{rating}}</text>
-      <price-display wx:if="{{price}}" price="{{price}}" />
-      <text wx:if="{{district}}">{{district}}</text>
+  <view class="hero-card">
+    <view class="hero-copy">
+      <view class="name">{{name}}</view>
+      <view class="meta">
+        <text wx:if="{{rating}}" class="rating">评分 {{rating}}</text>
+        <text wx:if="{{price}}" class="price"><price-display price="{{price}}" /></text>
+        <text wx:if="{{district}}">{{district}}</text>
+      </view>
+      <text wx:if="{{address}}" class="address">{{address}}</text>
     </view>
+    <image class="place-art" src="/assets/3d/location.png" mode="aspectFit" />
   </view>
 
-  <view class="card">
-    <view class="section-title">AI 推荐理由</view>
+  <view class="reason-card">
+    <view class="section-title-row">
+      <text>AI 推荐理由</text>
+      <image src="/assets/icons/utility/sparkle.svg" mode="aspectFit" />
+    </view>
     <text class="reason">{{reason}}</text>
   </view>
 
-  <view class="card">
-    <view class="section-title">前往方式</view>
+  <view class="actions-card" wx:if="{{actionButtons.length}}">
+    <view class="section-title-row"><text>前往方式</text></view>
     <view class="actions">
       <view
-        wx:for="{{actions}}"
-        wx:key="id"
+        wx:for="{{actionButtons}}"
+        wx:key="key"
         class="action"
         bind:tap="onActionTap"
-        data-action="{{item}}"
+        data-button="{{item}}"
       >
-        {{item.mode === 'MAP' ? '地图' : item.mode === 'URL' ? '大众点评' : item.mode === 'API' ? '调用接口' : '打开小程序'}}
+        <image src="{{item.icon}}" mode="aspectFit" />
+        <text>{{item.label}}</text>
       </view>
     </view>
   </view>

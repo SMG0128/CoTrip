@@ -1,4 +1,3 @@
 <view class="avatar" style="width: {{size}}rpx; height: {{size}}rpx;">
-  <image wx:if="{{avatarUrl}}" class="img" src="{{avatarUrl}}" mode="aspectFill" />
-  <text wx:else class="initial">{{initial}}</text>
+  <image class="img" src="{{avatarUrl || fallbackUrl}}" mode="aspectFit" />
 </view>

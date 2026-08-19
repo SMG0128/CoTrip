@@ -1,6 +1,7 @@
 {
   "component": true,
   "usingComponents": {
-    "constraint-status": "../constraint-status/index"
+    "constraint-status": "../constraint-status/index",
+    "participant-avatar": "../participant-avatar/index"
   }
 }

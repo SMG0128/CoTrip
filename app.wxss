@@ -1,66 +1,64 @@
-/**app.wxss**/
+@import "styles/tokens.wxss";
+@import "styles/typography.wxss";
+@import "styles/utilities.wxss";
+
 page {
-  background-color: #f6f7fb;
-  color: #1f2329;
+  min-height: 100%;
+  background: var(--color-canvas);
+  color: var(--color-text);
   font-size: 28rpx;
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* 通用卡片 */
 .card {
-  background: #ffffff;
-  border-radius: 24rpx;
+  background: var(--color-surface);
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: var(--radius-lg);
   padding: 32rpx;
   margin: 0 24rpx 24rpx;
-  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+  box-shadow: var(--shadow-soft);
 }
 
-/* 通用主按钮 */
 .btn-primary {
-  background: #2f6bff;
+  background: linear-gradient(135deg, var(--color-accent-purple), var(--color-primary) 64%, var(--color-accent-cyan));
   color: #ffffff;
   border-radius: 48rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  text-align: center;
-  padding: 24rpx 0;
-}
-
-.btn-primary::after {
-  border: none;
-}
-
-/* 通用次级按钮 */
-.btn-secondary {
-  background: #eef2ff;
-  color: #2f6bff;
-  border-radius: 48rpx;
   font-size: 30rpx;
-  font-weight: 500;
+  font-weight: 650;
   text-align: center;
-  padding: 20rpx 0;
+  padding: 22rpx 0;
+  box-shadow: 0 10rpx 24rpx rgba(50, 107, 255, 0.22);
 }
 
+.btn-primary::after,
 .btn-secondary::after {
   border: none;
 }
 
-/* 区块标题 */
-.section-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #1f2329;
-  margin: 8rpx 0 20rpx;
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: 48rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  text-align: center;
+  padding: 20rpx 0;
+  box-shadow: var(--shadow-soft);
 }
 
-/* 弱化文字 */
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 4rpx 0 20rpx;
+}
+
 .text-muted {
-  color: #9aa0a6;
+  color: var(--color-text-secondary);
 }
 
 .text-strong {
-  color: #1f2329;
-  font-weight: 600;
+  color: var(--color-text);
+  font-weight: 650;
 }
