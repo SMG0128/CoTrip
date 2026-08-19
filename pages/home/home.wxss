@@ -1,0 +1,81 @@
+.home {
+  padding-top: 24rpx;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32rpx 24rpx;
+}
+
+.brand {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #2f6bff;
+}
+
+.avatar-entry {
+  padding: 8rpx;
+}
+
+.quick {
+  display: flex;
+  gap: 20rpx;
+  padding: 0 24rpx 32rpx;
+}
+
+.quick-btn {
+  flex: 1;
+  text-align: center;
+  padding: 24rpx 0;
+  border-radius: 20rpx;
+  background: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2329;
+  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+}
+
+.quick-btn.primary {
+  background: #2f6bff;
+  color: #ffffff;
+}
+
+.main {
+  padding-top: 8rpx;
+}
+
+.recommend {
+  background: #ffffff;
+  border-radius: 28rpx;
+  padding: 48rpx 40rpx;
+  margin: 0 24rpx;
+  text-align: center;
+  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+}
+
+.rec-icons {
+  font-size: 64rpx;
+  margin-bottom: 20rpx;
+}
+
+.rec-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1f2329;
+  margin-bottom: 8rpx;
+}
+
+.rec-meta {
+  font-size: 26rpx;
+  color: #9aa0a6;
+  margin-bottom: 32rpx;
+}
+
+.rec-action {
+  display: inline-block;
+  color: #2f6bff;
+  font-size: 30rpx;
+  font-weight: 600;
+}

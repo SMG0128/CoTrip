@@ -1,0 +1,12 @@
+# 依赖
+node_modules/
+
+# 微信开发者工具
+project.private.config.json
+miniprogram_npm/
+
+# 编译产物
+*.js.map
+
+# 日志
+*.log

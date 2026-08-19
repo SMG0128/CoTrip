@@ -1,0 +1,13 @@
+<view class="event">
+  <view class="time">{{timeText}}</view>
+  <view class="body">
+    <text class="icon">{{icon}}</text>
+    <view class="info">
+      <text class="title">{{event.title}}</text>
+      <text wx:if="{{event.location}}" class="loc">{{event.location.name}}</text>
+      <text wx:if="{{event.location.district}}" class="district">{{event.location.district}}</text>
+      <price-display wx:if="{{event.price}}" price="{{event.price}}" />
+    </view>
+  </view>
+  <view wx:if="{{!isLast}}" class="line"></view>
+</view>

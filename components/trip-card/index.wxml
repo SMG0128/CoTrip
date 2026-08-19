@@ -1,0 +1,22 @@
+<view class="trip" bind:tap="onTap">
+  <view class="title-row">
+    <text class="title">{{trip.title}}</text>
+    <text class="status">{{trip.status === 'COMPLETED' ? '已完成' : '进行中'}}</text>
+  </view>
+
+  <view wx:if="{{history}}" class="meta">
+    <text>创建：{{createdText}}</text>
+    <text wx:if="{{completedText}}">完成：{{completedText}}</text>
+  </view>
+
+  <view class="stats">
+    <text>{{participantCount}} 人参与</text>
+    <text wx:if="{{!history}}">AI 已整理 {{commentCount}} 条需求</text>
+  </view>
+
+  <view wx:if="{{!history && conflictCount > 0}}" class="conflict-hint">
+    ⚠ 还有 {{conflictCount}} 项冲突待确认
+  </view>
+
+  <view class="enter">进入行程 →</view>
+</view>

@@ -1,0 +1,102 @@
+.detail {
+  padding-top: 24rpx;
+  padding-bottom: 160rpx;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32rpx 24rpx;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.title {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.meta {
+  font-size: 24rpx;
+  color: #9aa0a6;
+}
+
+.invite-btn {
+  background: #eef2ff;
+  color: #2f6bff;
+  font-size: 26rpx;
+  font-weight: 600;
+  padding: 14rpx 28rpx;
+  border-radius: 40rpx;
+}
+
+.actions {
+  display: flex;
+  gap: 20rpx;
+  padding: 8rpx 24rpx 24rpx;
+}
+
+.action-btn {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 20rpx;
+  background: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2329;
+  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+}
+
+.action-btn.primary {
+  background: #2f6bff;
+  color: #ffffff;
+}
+
+.route-wrap {
+  padding: 0 24rpx 24rpx;
+}
+
+.comments {
+  padding-top: 8rpx;
+}
+
+.input-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -4rpx 20rpx rgba(31, 35, 41, 0.04);
+}
+
+.input {
+  flex: 1;
+  background: #f2f3f5;
+  border-radius: 40rpx;
+  padding: 18rpx 28rpx;
+  font-size: 28rpx;
+}
+
+.placeholder {
+  color: #c9cdd4;
+}
+
+.send-btn {
+  background: #2f6bff;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 18rpx 36rpx;
+  border-radius: 40rpx;
+}

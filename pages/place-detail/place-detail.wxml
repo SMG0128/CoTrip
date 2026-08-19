@@ -1,0 +1,30 @@
+<view class="place-detail">
+  <view class="card">
+    <view class="name">{{name}}</view>
+    <view class="meta">
+      <text wx:if="{{rating}}">评分 {{rating}}</text>
+      <price-display wx:if="{{price}}" price="{{price}}" />
+      <text wx:if="{{district}}">{{district}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">AI 推荐理由</view>
+    <text class="reason">{{reason}}</text>
+  </view>
+
+  <view class="card">
+    <view class="section-title">前往方式</view>
+    <view class="actions">
+      <view
+        wx:for="{{actions}}"
+        wx:key="id"
+        class="action"
+        bind:tap="onActionTap"
+        data-action="{{item}}"
+      >
+        {{item.mode === 'MAP' ? '地图' : item.mode === 'URL' ? '大众点评' : item.mode === 'API' ? '调用接口' : '打开小程序'}}
+      </view>
+    </view>
+  </view>
+</view>

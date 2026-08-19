@@ -1,0 +1,7 @@
+.history {
+  padding-top: 24rpx;
+}
+
+.list {
+  padding-bottom: 40rpx;
+}

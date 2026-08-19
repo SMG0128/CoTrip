@@ -1,0 +1,50 @@
+<view class="board">
+  <view class="board-head">
+    <text class="board-title">AI 当前计划</text>
+    <text class="version">v{{plan.version}}</text>
+  </view>
+
+  <view class="events">
+    <block wx:for="{{plan.events}}" wx:key="id">
+      <plan-event
+        event="{{item}}"
+        isLast="{{index === plan.events.length - 1}}"
+        bind:place="onEventTap"
+        data-event="{{item}}"
+      />
+    </block>
+  </view>
+
+  <view wx:if="{{restaurants.length}}" class="restaurants">
+    <view class="sub-title">推荐餐厅</view>
+    <view
+      wx:for="{{restaurants}}"
+      wx:key="id"
+      class="restaurant"
+      bind:tap="onRestaurantTap"
+      data-restaurant="{{item}}"
+    >
+      <text class="r-name">{{index + 1}}. {{item.name}}</text>
+      <text class="r-meta">
+        <price-display price="{{item.averagePrice}}" />
+        <text wx:if="{{item.rating}}"> · {{item.rating.score}}</text>
+      </text>
+    </view>
+  </view>
+
+  <view wx:if="{{plan.estimatedTotalPrice}}" class="total">
+    预计总消费
+    <price-display price="{{plan.estimatedTotalPrice}}" />
+  </view>
+
+  <view class="satisfied">
+    已满足 {{plan.satisfiedConstraintCount}} / {{plan.totalConstraintCount}} 条需求
+  </view>
+
+  <view wx:if="{{plan.conflicts.length}}" class="conflict">
+    <view class="conflict-title">⚠ 当前存在 {{plan.conflicts.length}} 项冲突</view>
+    <view wx:for="{{plan.conflicts}}" wx:key="id" class="conflict-item">
+      <text>{{item.description}}</text>
+    </view>
+  </view>
+</view>

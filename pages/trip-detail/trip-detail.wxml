@@ -1,0 +1,51 @@
+<view class="detail">
+  <!-- 6.1 顶部信息 -->
+  <view class="header">
+    <view class="header-info">
+      <text class="title">{{trip.title}}</text>
+      <text class="meta">{{participantCount}} 人参与 · AI 已整理 {{commentCount}} 条需求</text>
+    </view>
+    <view class="invite-btn" bind:tap="onInvite">邀请好友</view>
+  </view>
+
+  <!-- 6.2 AI 当前计划大框 -->
+  <plan-board
+    plan="{{trip.currentPlan}}"
+    restaurants="{{restaurants}}"
+    bind:place="onPlaceTap"
+    bind:restaurant="onRestaurantTap"
+  />
+
+  <!-- 6.3 操作区域 -->
+  <view class="actions">
+    <view class="action-btn" bind:tap="onInvite">邀请好友</view>
+    <view class="action-btn primary" bind:tap="onToggleRoute">我的推荐</view>
+  </view>
+
+  <!-- 6.4 我的推荐 -->
+  <view wx:if="{{showRoute}}" class="route-wrap">
+    <personal-route route="{{route}}" segments="{{routeSegments}}" />
+  </view>
+
+  <!-- 6.5 大家的想法 -->
+  <view class="card">
+    <view class="section-title">大家的想法</view>
+    <view class="comments">
+      <comment-item wx:for="{{comments}}" wx:key="id" comment="{{item}}" />
+    </view>
+  </view>
+
+  <!-- 6.6 底部输入框 -->
+  <view class="input-bar">
+    <input
+      class="input"
+      placeholder="说说你的时间、预算或想法…"
+      placeholder-class="placeholder"
+      value="{{inputText}}"
+      bind:input="onInput"
+      confirm-type="send"
+      bind:confirm="onSend"
+    />
+    <view class="send-btn" bind:tap="onSend">发送</view>
+  </view>
+</view>

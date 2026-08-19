@@ -1,0 +1,6 @@
+{
+  "component": true,
+  "usingComponents": {
+    "constraint-status": "../constraint-status/index"
+  }
+}

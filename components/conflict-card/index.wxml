@@ -1,0 +1,8 @@
+<view class="conflict">
+  <view class="title">⚠ 当前无法满足所有人的要求</view>
+  <view class="desc">{{conflict.description}}</view>
+  <view wx:if="{{conflict.suggestions.length}}" class="suggestions">
+    <view class="s-title">可尝试：</view>
+    <view wx:for="{{conflict.suggestions}}" wx:key="*this" class="s-item">{{index + 1}}. {{item}}</view>
+  </view>
+</view>

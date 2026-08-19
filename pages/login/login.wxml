@@ -1,0 +1,13 @@
+<view class="login">
+  <view class="logo">CoTrip</view>
+  <view class="slogan">大家负责表达想法，AI 负责把想法变成共同计划。</view>
+
+  <view class="desc">
+    多人共同提出时间、地点、预算、偏好等需求，
+    AI 持续维护一份可执行的共同行程计划。
+  </view>
+
+  <button class="btn-primary login-btn" bind:tap="onLogin" loading="{{loading}}">
+    微信登录
+  </button>
+</view>

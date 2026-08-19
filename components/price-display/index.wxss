@@ -1,0 +1,5 @@
+.price {
+  color: #2f6bff;
+  font-weight: 600;
+  font-size: 26rpx;
+}

@@ -1,0 +1,37 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/home/home",
+    "pages/trip-create/trip-create",
+    "pages/trip-detail/trip-detail",
+    "pages/trip-history/trip-history",
+    "pages/trip-history-detail/trip-history-detail",
+    "pages/place-detail/place-detail",
+    "pages/profile/profile"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "CoTrip",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f7fb"
+  },
+  "tabBar": {
+    "color": "#9aa0a6",
+    "selectedColor": "#2f6bff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

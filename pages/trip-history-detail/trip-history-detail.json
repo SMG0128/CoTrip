@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "历史行程",
+  "usingComponents": {
+    "plan-board": "../../components/plan-board/index",
+    "personal-route": "../../components/personal-route/index",
+    "comment-item": "../../components/comment-item/index",
+    "conflict-card": "../../components/conflict-card/index"
+  }
+}

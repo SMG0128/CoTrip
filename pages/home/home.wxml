@@ -1,0 +1,31 @@
+<view class="home">
+  <!-- 顶部 -->
+  <view class="header">
+    <text class="brand">CoTrip</text>
+    <view class="avatar-entry" bind:tap="onProfile">
+      <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="72" />
+    </view>
+  </view>
+
+  <!-- 快捷入口 -->
+  <view class="quick">
+    <view class="quick-btn primary" bind:tap="onCreateTrip">+ 新建行程</view>
+    <view class="quick-btn" bind:tap="onHistory">历史行程</view>
+  </view>
+
+  <!-- 主大窗口 -->
+  <view class="main">
+    <block wx:if="{{hasActiveTrip && activeTrip}}">
+      <trip-card trip="{{activeTrip}}" bind:tap="onEnterTrip" />
+    </block>
+
+    <block wx:else>
+      <view class="recommend">
+        <view class="rec-icons">🏸 + 🍲</view>
+        <view class="rec-title">下午打球，晚上吃饭</view>
+        <view class="rec-meta">天河 · 约 ¥80 / 人</view>
+        <view class="rec-action" bind:tap="onCreateTrip">以此新建行程</view>
+      </view>
+    </block>
+  </view>
+</view>

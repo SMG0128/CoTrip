@@ -1,0 +1,7 @@
+<view class="comment">
+  <view class="head">
+    <text class="nickname">{{nickname}}</text>
+    <constraint-status status="{{comment.aiStatus}}" />
+  </view>
+  <text class="text">{{comment.rawText}}</text>
+</view>

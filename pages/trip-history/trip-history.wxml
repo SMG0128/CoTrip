@@ -1,0 +1,11 @@
+<view class="history">
+  <view class="list">
+    <trip-card
+      wx:for="{{trips}}"
+      wx:key="id"
+      trip="{{item}}"
+      history="{{true}}"
+      bind:tap="onTripTap"
+    />
+  </view>
+</view>

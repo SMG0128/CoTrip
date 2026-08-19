@@ -1,0 +1,8 @@
+<view class="place" bind:tap="onTap">
+  <view class="pin">📍</view>
+  <view class="info">
+    <text class="name">{{location.name}}</text>
+    <text wx:if="{{subtitle}}" class="sub">{{subtitle}}</text>
+  </view>
+  <text class="arrow">›</text>
+</view>

@@ -1,0 +1,57 @@
+.trip {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin: 0 24rpx 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(31, 35, 41, 0.04);
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.status {
+  font-size: 22rpx;
+  color: #1a9e5c;
+  background: #e6f7ef;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  font-size: 24rpx;
+  color: #9aa0a6;
+  margin-bottom: 12rpx;
+}
+
+.stats {
+  display: flex;
+  gap: 24rpx;
+  font-size: 26rpx;
+  color: #4e5969;
+  margin-bottom: 12rpx;
+}
+
+.conflict-hint {
+  font-size: 24rpx;
+  color: #e5484d;
+  margin-bottom: 12rpx;
+}
+
+.enter {
+  font-size: 28rpx;
+  color: #2f6bff;
+  font-weight: 600;
+}

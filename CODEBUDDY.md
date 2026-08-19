@@ -2,15 +2,21 @@
 
 ## Project Status
 
-This repository currently contains **only a product specification document** (`AI_Coexistence_Trip_MiniProgram_V1.md`). There is no source code, build configuration, or test suite yet. The task is to build a WeChat Mini Program (微信小程序) from this spec.
+This is a **WeChat Mini Program (微信小程序)** built with **native + TypeScript**. The V1 skeleton is complete and runnable: 8 pages, 11 reusable components, 13 core type modules, 6 service interfaces (with Mock implementations), and full Mock data. The authoritative product spec is `AI_Coexistence_Trip_MiniProgram_V1.md`.
 
 ## Commands
 
-No build, lint, or test commands exist yet because there is no code. When scaffolding the project, establish the standard WeChat Mini Program toolchain:
+- **Run / preview**: Open the project root in WeChat DevTools (微信开发者工具). It compiles TypeScript via the built-in `typescript` compiler plugin (configured in `project.config.json`). No CLI build step.
+- **Type check**: `npm run typecheck` (runs `tsc --noEmit`). Requires `npm install` first (dev deps: `typescript`, `miniprogram-api-typings`).
+- **Lint / test**: None configured. If adding tests, prefer Node-based unit tests for the pure logic modules (constraint extraction, conflict detection, planning engine) that don't depend on the WeChat runtime.
 
-- **Scaffold / develop**: Use the WeChat DevTools (微信开发者工具) to open the project root. The mini program entry is `app.js` / `app.json` / `app.wxss` at the root, with pages registered in `app.json`.
-- **Build / preview**: Triggered from WeChat DevTools (compile + preview on device). There is no CLI build step by default.
-- **Lint / test**: None configured. If you add a test runner, prefer one that runs in the WeChat runtime or a Node-based unit test for the pure logic modules (constraint extraction, conflict detection, planning engine).
+## Code Layout
+
+- `types/` — core domain types (Trip, Plan, Event, Constraint, Location, Price, Route, ExternalAction, etc.). Time/Location/Price/Restaurant are always structured objects, never strings.
+- `services/` — service interfaces (`ai-service`, `trip-service`, `map-service`, `place-service`, `notification-service`, `external-action-service`) plus Mock implementations in `services/mock/`. `services/index.ts` is the single entry point; swap real backends there later.
+- `mock/` — Mock data (user, trip, comments, plan, restaurants, routes, locations).
+- `components/` — shared components (plan-board, plan-event, personal-route, comment-item, trip-card, restaurant-card, place-card, conflict-card, constraint-status, participant-avatar, price-display).
+- `pages/` — login, home, trip-create, trip-detail, trip-history, trip-history-detail, place-detail, profile. TabBar: home + profile.
 
 ## Product Overview
 

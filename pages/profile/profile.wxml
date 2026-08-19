@@ -1,0 +1,30 @@
+<view class="profile">
+  <!-- 用户信息 -->
+  <view class="card user-card">
+    <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="120" />
+    <view class="user-info">
+      <text class="nickname">{{user.nickname}}</text>
+      <text class="trip-count">参与过 {{tripCount}} 个行程</text>
+    </view>
+  </view>
+
+  <!-- 通知设置 -->
+  <view class="card">
+    <view class="section-title">通知设置</view>
+    <view wx:for="{{settings}}" wx:key="key" class="setting">
+      <text class="setting-label">{{item.label}}</text>
+      <switch
+        checked="{{item.enabled}}"
+        color="#2f6bff"
+        data-key="{{item.key}}"
+        bind:change="onToggle"
+      />
+    </view>
+  </view>
+
+  <!-- 其他 -->
+  <view class="card">
+    <view class="menu-item" bind:tap="onPrivacy">隐私说明</view>
+    <view class="menu-item" bind:tap="onAbout">关于 CoTrip</view>
+  </view>
+</view>

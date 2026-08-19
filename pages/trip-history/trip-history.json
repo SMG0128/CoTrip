@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "历史行程",
+  "usingComponents": {
+    "trip-card": "../../components/trip-card/index"
+  }
+}

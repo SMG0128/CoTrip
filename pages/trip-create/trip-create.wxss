@@ -1,0 +1,59 @@
+.create {
+  padding-top: 24rpx;
+  padding-bottom: 160rpx;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f2f3f5;
+}
+
+.field:last-child {
+  border-bottom: none;
+}
+
+.field-label {
+  font-size: 28rpx;
+  color: #4e5969;
+}
+
+.field-value {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  color: #1f2329;
+  font-size: 28rpx;
+}
+
+.arrow {
+  color: #c9cdd4;
+  font-size: 36rpx;
+}
+
+.picker-text {
+  color: #2f6bff;
+}
+
+.brief {
+  width: 100%;
+  min-height: 160rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.placeholder {
+  color: #c9cdd4;
+}
+
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -4rpx 20rpx rgba(31, 35, 41, 0.04);
+}

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "地点详情",
+  "usingComponents": {
+    "price-display": "../../components/price-display/index"
+  }
+}

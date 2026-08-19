@@ -1,0 +1,23 @@
+.comment {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f2f3f5;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.nickname {
+  font-weight: 600;
+  color: #1f2329;
+  font-size: 28rpx;
+}
+
+.text {
+  color: #4e5969;
+  font-size: 28rpx;
+  line-height: 1.6;
+}

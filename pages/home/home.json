@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "CoTrip",
+  "usingComponents": {
+    "trip-card": "../../components/trip-card/index",
+    "participant-avatar": "../../components/participant-avatar/index"
+  }
+}

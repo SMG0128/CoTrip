@@ -1,0 +1,59 @@
+<view class="create">
+  <!-- 区域限定 -->
+  <view class="card">
+    <view class="section-title">区域限定</view>
+    <view class="field" bind:tap="onAreaTap">
+      <text class="field-label">区域</text>
+      <view class="field-value">
+        <text>{{areaText}}</text>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 时间范围 -->
+  <view class="card">
+    <view class="section-title">时间范围</view>
+    <view class="field">
+      <text class="field-label">开始</text>
+      <view class="field-value">
+        <picker mode="date" bind:change="onStartDateChange">
+          <text class="picker-text">{{startDate || '选择日期'}}</text>
+        </picker>
+        <picker mode="time" bind:change="onStartTimeChange">
+          <text class="picker-text">{{startTime || '选择时间'}}</text>
+        </picker>
+      </view>
+    </view>
+    <view class="field">
+      <text class="field-label">结束</text>
+      <view class="field-value">
+        <picker mode="date" bind:change="onEndDateChange">
+          <text class="picker-text">{{endDate || '选择日期'}}</text>
+        </picker>
+        <picker mode="time" bind:change="onEndTimeChange">
+          <text class="picker-text">{{endTime || '选择时间'}}</text>
+        </picker>
+      </view>
+    </view>
+  </view>
+
+  <!-- 事件简述 -->
+  <view class="card">
+    <view class="section-title">事件简述</view>
+    <textarea
+      class="brief"
+      placeholder="例如：打两个小时羽毛球，然后去吃越南菜"
+      placeholder-class="placeholder"
+      value="{{brief}}"
+      bind:input="onBriefInput"
+      maxlength="200"
+      auto-height
+    />
+  </view>
+
+  <!-- 创建 -->
+  <view class="footer">
+    <button class="btn-primary" bind:tap="onCreate">创建行程</button>
+  </view>
+</view>

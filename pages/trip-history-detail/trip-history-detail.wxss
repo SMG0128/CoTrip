@@ -1,0 +1,43 @@
+.detail {
+  padding-top: 24rpx;
+  padding-bottom: 60rpx;
+}
+
+.sealed {
+  text-align: center;
+  font-size: 24rpx;
+  color: #9aa0a6;
+  padding: 8rpx 0 16rpx;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32rpx 24rpx;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.title {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.meta {
+  font-size: 24rpx;
+  color: #9aa0a6;
+}
+
+.route-wrap {
+  padding: 0 24rpx 24rpx;
+}
+
+.comments {
+  padding-top: 8rpx;
+}

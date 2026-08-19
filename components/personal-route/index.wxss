@@ -1,0 +1,89 @@
+.route {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.departure {
+  font-size: 26rpx;
+  color: #2f6bff;
+  font-weight: 600;
+}
+
+.steps {
+  padding-left: 8rpx;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  padding-bottom: 28rpx;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+.step-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #2f6bff;
+  margin: 10rpx 20rpx 0 0;
+  flex-shrink: 0;
+}
+
+.step:not(:last-child) .step-dot::after {
+  content: '';
+  position: absolute;
+  left: 7rpx;
+  top: 30rpx;
+  width: 2rpx;
+  height: 100%;
+  background: #e5e6eb;
+}
+
+.step-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-label {
+  font-size: 28rpx;
+  color: #1f2329;
+  font-weight: 500;
+}
+
+.step-action {
+  font-size: 24rpx;
+  color: #9aa0a6;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f2f3f5;
+  font-size: 26rpx;
+  color: #4e5969;
+}
+
+.price {
+  display: flex;
+  align-items: center;
+}

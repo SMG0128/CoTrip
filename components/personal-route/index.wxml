@@ -1,0 +1,23 @@
+<view class="route">
+  <view class="head">
+    <text class="title">我的推荐</text>
+    <text wx:if="{{departureText}}" class="departure">建议 {{departureText}} 出发</text>
+  </view>
+
+  <view class="steps">
+    <view wx:for="{{segments}}" wx:key="label" class="step">
+      <view class="step-dot"></view>
+      <view class="step-info">
+        <text class="step-label">{{item.label}}</text>
+        <text class="step-action">{{item.action}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="foot">
+    <text wx:if="{{arrivalText}}">预计 {{arrivalText}} 到达</text>
+    <text wx:if="{{route.estimatedPrice}}" class="price">
+      交通费约 <price-display price="{{route.estimatedPrice}}" />
+    </text>
+  </view>
+</view>

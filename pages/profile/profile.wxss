@@ -1,0 +1,54 @@
+.profile {
+  padding-top: 24rpx;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.nickname {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.trip-count {
+  font-size: 26rpx;
+  color: #9aa0a6;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f2f3f5;
+}
+
+.setting:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  font-size: 28rpx;
+  color: #1f2329;
+}
+
+.menu-item {
+  padding: 24rpx 0;
+  font-size: 28rpx;
+  color: #1f2329;
+  border-bottom: 1rpx solid #f2f3f5;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}

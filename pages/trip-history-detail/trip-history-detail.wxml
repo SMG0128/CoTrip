@@ -1,0 +1,35 @@
+<view class="detail">
+  <!-- 封板标识 -->
+  <view class="sealed">
+    <text>已完成 · {{completedText}} 封存</text>
+  </view>
+
+  <!-- 顶部信息 -->
+  <view class="header">
+    <view class="header-info">
+      <text class="title">{{trip.title}}</text>
+      <text class="meta">{{participantCount}} 人参与 · 已封存</text>
+    </view>
+  </view>
+
+  <!-- AI 最终计划（只读） -->
+  <plan-board
+    plan="{{trip.currentPlan}}"
+    restaurants="{{restaurants}}"
+    readonly="{{true}}"
+    bind:place="onPlaceTap"
+  />
+
+  <!-- 我的推荐（只读） -->
+  <view class="route-wrap">
+    <personal-route route="{{route}}" segments="{{routeSegments}}" />
+  </view>
+
+  <!-- 大家的想法（只读） -->
+  <view class="card">
+    <view class="section-title">大家的想法</view>
+    <view class="comments">
+      <comment-item wx:for="{{comments}}" wx:key="id" comment="{{item}}" />
+    </view>
+  </view>
+</view>

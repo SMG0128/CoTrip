@@ -1,0 +1,52 @@
+.event {
+  position: relative;
+  padding: 20rpx 0;
+}
+
+.time {
+  font-size: 24rpx;
+  color: #9aa0a6;
+  margin-bottom: 8rpx;
+}
+
+.body {
+  display: flex;
+  align-items: flex-start;
+}
+
+.icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+  line-height: 1.2;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.loc {
+  font-size: 26rpx;
+  color: #4e5969;
+}
+
+.district {
+  font-size: 24rpx;
+  color: #9aa0a6;
+}
+
+.line {
+  position: absolute;
+  left: 20rpx;
+  top: 100%;
+  width: 2rpx;
+  height: 24rpx;
+  background: #e5e6eb;
+}

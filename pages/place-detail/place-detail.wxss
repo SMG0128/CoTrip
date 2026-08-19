@@ -1,0 +1,40 @@
+.place-detail {
+  padding-top: 24rpx;
+}
+
+.name {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1f2329;
+  margin-bottom: 16rpx;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  font-size: 28rpx;
+  color: #4e5969;
+}
+
+.reason {
+  font-size: 28rpx;
+  color: #4e5969;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.action {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 20rpx;
+  background: #eef2ff;
+  color: #2f6bff;
+  font-size: 28rpx;
+  font-weight: 600;
+}
