@@ -8,9 +8,9 @@
 
 export const authConfig = {
   /** 认证模式：'mock' | 'real' */
-  mode: 'mock' as 'mock' | 'real',
+  mode: 'real' as 'mock' | 'real',
   /** 后端服务地址，例如 'https://api.example.com'（仅 real 模式使用） */
-  baseUrl: '',
+  baseUrl: 'https://api.yipziwun.asia',
   /** 登录态在本地缓存的 key */
   tokenStorageKey: 'cotrip_auth_token',
   userStorageKey: 'cotrip_auth_user',

@@ -37,7 +37,8 @@ export function createApp() {
 if (require.main === module) {
   const config = loadConfig();
   const app = createApp();
-  app.listen(config.port, () => {
-    console.log(`CoTrip Backend V0.1 listening on http://localhost:${config.port}`);
+  const host = '127.0.0.1';
+  app.listen(config.port, host, () => {
+    console.log(`CoTrip Backend V0.1 listening on http://${host}:${config.port}`);
   });
 }
