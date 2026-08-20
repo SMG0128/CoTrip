@@ -3,6 +3,7 @@
 
 import { mockActiveTrip } from '../../mock/mock-trip';
 import { Trip } from '../../types/trip';
+import { hydrateTripWithCurrentUser } from '../../utils/current-user';
 
 Page({
   data: {
@@ -19,11 +20,12 @@ Page({
 
     // 从全局读取当前登录用户
     const app = getApp<IAppOption>();
-    this.setData({ user: app.globalData.currentUser });
+    const currentUser = app.globalData.currentUser;
+    this.setData({ user: currentUser });
 
-    // Mock：直接使用固定进行中行程
+    // Mock：直接使用固定进行中行程，运行时将“自己”槽位替换为当前用户
     this.setData({
-      activeTrip: mockActiveTrip,
+      activeTrip: hydrateTripWithCurrentUser(mockActiveTrip, currentUser),
       hasActiveTrip: true,
     });
   },

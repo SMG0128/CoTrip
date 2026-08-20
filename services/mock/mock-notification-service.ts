@@ -3,12 +3,13 @@
 
 import { NotificationService } from '../notification-service';
 import { Notification } from '../../types/notification';
+import { mockDevCurrentUser } from '../../mock/mock-user';
 
 const mockNotifications: Notification[] = [
   {
     id: 'notif_001',
     tripId: 'trip_active',
-    userId: 'user_A',
+    userId: mockDevCurrentUser.id,
     type: 'DEPARTURE_REMINDER',
     title: '该出发啦',
     body: '距离羽毛球馆预计 47 分钟，建议现在出发。',

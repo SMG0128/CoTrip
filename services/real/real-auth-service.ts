@@ -5,6 +5,7 @@
 import { AuthService, LoginResult } from '../auth-service';
 import { authConfig } from '../../config/auth';
 import { Participant } from '../../types/participant';
+import { currentUserToParticipant } from '../../utils/current-user';
 
 interface PublicUser {
   id: string;
@@ -76,11 +77,8 @@ export class RealAuthService implements AuthService {
   }
 
   private toParticipant(user: PublicUser): Participant {
-    return {
-      id: user.id,
-      nickname: user.nickname,
-      avatarUrl: user.avatarUrl,
-    };
+    // 统一走当前用户身份转换边界：真实 ID 保留，nickname/avatarUrl 映射为业务参与者字段
+    return currentUserToParticipant(user);
   }
 
   private getWxLoginCode(): Promise<string> {

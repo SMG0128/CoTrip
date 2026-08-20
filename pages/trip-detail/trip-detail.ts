@@ -5,17 +5,25 @@
 import { mockActiveTrip } from '../../mock/mock-trip';
 import { mockComments } from '../../mock/mock-comments';
 import { mockPersonalRoute, mockRouteSegments } from '../../mock/mock-routes';
-import { mockCurrentUser } from '../../mock/mock-user';
 import { realRestaurants } from '../../mock/mock-real-places';
 import { Comment } from '../../types/comment';
 import { Trip } from '../../types/trip';
 import { Constraint } from '../../types/constraint';
 import { Restaurant } from '../../types/restaurant';
+import { Participant } from '../../types/participant';
+import { Plan } from '../../types/plan';
 import { PlanningEngine } from '../../core/planning-engine';
 import { rankCandidates } from '../../core/candidate-ranker';
 import { tencentMapProvider } from '../../services/providers/tencent-map-provider';
+import { tripService } from '../../services/index';
 import { EventCandidateGroup } from '../../types/event-candidate';
 import { buildEventCandidateGroups } from '../../utils/event-candidates';
+import {
+  buildUserComment,
+  hydrateRouteOwner,
+  hydrateTripWithCurrentUser,
+  requireCurrentUser,
+} from '../../utils/current-user';
 
 // Debug 仅在开发版/体验版显示，正式版自动隐藏。
 function isDebugEnabled(): boolean {
@@ -27,6 +35,20 @@ function isDebugEnabled(): boolean {
 }
 
 const DEBUG_ENABLED = isDebugEnabled();
+
+/** 新 Trip 无初始计划时生成空骨架，避免 PlanBoard 空引用 */
+function buildEmptyPlan(tripId: string): Plan {
+  return {
+    id: `plan_${tripId}`,
+    tripId,
+    version: 0,
+    events: [],
+    satisfiedConstraintCount: 0,
+    totalConstraintCount: 0,
+    conflicts: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 Page({
   data: {
@@ -62,22 +84,56 @@ Page({
 
   engine: null as PlanningEngine | null,
 
-  onLoad() {
+  onLoad(options?: Record<string, string | undefined>) {
+    const app = getApp<IAppOption>();
+    const currentUser = app.globalData.currentUser;
+    const requestedTripId = options?.tripId;
+
+    if (requestedTripId) {
+      // 新创建的真实 Trip 通过 tripId 加载：creatorId/participantIds 天然属于 currentUser，
+      // 不需要 Mock 占位身份；hydrate 对其幂等（no-op）。
+      tripService.getTrip(requestedTripId).then((t) => {
+        if (t) {
+          this.bootstrapTrip(t, currentUser, false);
+        } else {
+          // 找不到（异常/旧 fixture id）则回退 Mock 示例行程
+          this.bootstrapTrip(mockActiveTrip, currentUser, true);
+        }
+      });
+      return;
+    }
+
+    // 默认进入 Mock 示例行程：运行时把旧 mock self 槽位替换为真实 currentUser
+    this.bootstrapTrip(mockActiveTrip, currentUser, true);
+  },
+
+  /** 初始化行程视图 + 规划引擎 */
+  bootstrapTrip(baseTrip: Trip, currentUser: Participant | null, seedDemoComments: boolean) {
+    // 旧 Mock fixture 的“自己”槽位在此替换为真实 currentUser；
+    // 新 Trip 本来就是 currentUser.id，hydrate 不产生任何变化。
+    const trip = hydrateTripWithCurrentUser(baseTrip, currentUser);
+    const comments = seedDemoComments ? (mockComments as Comment[]) : ([] as Comment[]);
+    const tripDate = trip.timeRange?.start?.slice(0, 10) ?? '2026-08-22';
+    const timezone = trip.timeRange?.timezone ?? 'Asia/Shanghai';
+
     this.setData({
-      participantCount: mockActiveTrip.participantIds.length,
-      commentCount: mockActiveTrip.commentIds.length,
+      trip: trip.currentPlan ? trip : { ...trip, currentPlan: buildEmptyPlan(trip.id) },
+      comments,
+      route: hydrateRouteOwner(mockPersonalRoute, currentUser),
+      participantCount: trip.participantIds.length,
+      commentCount: trip.commentIds.length,
     });
 
     // 初始化规划引擎，注入初始计划
     this.engine = new PlanningEngine({
-      tripId: mockActiveTrip.id,
-      tripDate: '2026-08-22',
-      timezone: 'Asia/Shanghai',
-      initialPlan: mockActiveTrip.currentPlan,
+      tripId: trip.id,
+      tripDate,
+      timezone,
+      initialPlan: trip.currentPlan,
     });
 
-    // 用已有评论初始化约束
-    this.runPipeline(mockComments);
+    // 用已有评论初始化约束（新 Trip 无评论，引擎生成空计划骨架）
+    this.runPipeline(comments);
   },
 
   /** 运行完整规划管线 */
@@ -150,14 +206,16 @@ Page({
     const text = this.data.inputText.trim();
     if (!text) return;
 
-    const newComment: Comment = {
-      id: `comment_${Date.now()}`,
-      tripId: mockActiveTrip.id,
-      userId: mockCurrentUser.id,
-      rawText: text,
-      createdAt: new Date().toISOString(),
-      aiStatus: 'processing',
-    };
+    // 登录态守卫：无 currentUser 时禁止发送，绝不回退到 Mock 用户
+    const app = getApp<IAppOption>();
+    const guard = requireCurrentUser(app.globalData.currentUser);
+    if (!guard.ok) {
+      wx.showToast({ title: '登录状态失效，请重新登录', icon: 'none' });
+      wx.navigateTo({ url: '/pages/login/login' });
+      return;
+    }
+
+    const newComment: Comment = buildUserComment(this.data.trip.id, text, guard.user);
 
     this.setData({
       comments: [...this.data.comments, newComment],

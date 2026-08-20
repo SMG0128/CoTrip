@@ -1,5 +1,5 @@
 <view class="comment">
-  <participant-avatar nickname="{{nickname}}" size="76" />
+  <participant-avatar nickname="{{nickname}}" avatarUrl="{{avatarUrl}}" size="76" />
   <view class="comment-main">
     <view class="head">
       <text class="nickname">{{nickname}}</text>

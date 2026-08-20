@@ -1,9 +1,12 @@
 // pages/trip-create/trip-create.ts
 // 新建行程页：区域限定、时间范围、事件简述、创建。
+// 所有权：新 Trip 的 creatorId / 默认 participant 一律来自当前真实登录用户 currentUser.id，
+// 绝不使用 Mock 占位身份（user_A / mockDevCurrentUser）。
 
 import { AreaConstraint } from '../../types/constraint';
 import { TimeRange } from '../../types/time';
-import { mockCurrentUser } from '../../mock/mock-user';
+import { tripService } from '../../services/index';
+import { requireCurrentUser } from '../../utils/current-user';
 
 Page({
   data: {
@@ -65,12 +68,32 @@ Page({
           }
         : undefined;
 
-    // Mock 创建：直接进入行程详情
-    console.log('[MockCreate]', { brief, areaConstraint, timeRange });
+    // 登录守卫：NO AUTH → NO REAL USER OWNERSHIP ACTION
+    // 无 currentUser 时禁止创建，绝不回退到 user_A / mockDevCurrentUser。
+    const app = getApp<IAppOption>();
+    const guard = requireCurrentUser(app.globalData.currentUser);
+    if (!guard.ok) {
+      wx.showToast({ title: '登录状态失效，请先登录', icon: 'none' });
+      wx.navigateTo({ url: '/pages/login/login' });
+      return;
+    }
 
-    wx.showToast({ title: '行程已创建', icon: 'success' });
-    setTimeout(() => {
-      wx.navigateTo({ url: '/pages/trip-detail/trip-detail' });
-    }, 500);
+    // 真实创建：creatorId = currentUser.id，默认 participant = [currentUser.id]
+    // 新 Trip 天然属于真实用户，无需任何 Mock 身份或 runtime hydration。
+    const title = brief.trim() ? brief.trim() : '新行程';
+    tripService
+      .createTrip({
+        title,
+        creatorId: guard.user.id,
+        initialBrief: brief.trim(),
+        areaConstraint,
+        timeRange,
+      })
+      .then((trip) => {
+        wx.showToast({ title: '行程已创建', icon: 'success' });
+        setTimeout(() => {
+          wx.navigateTo({ url: `/pages/trip-detail/trip-detail?tripId=${trip.id}` });
+        }, 500);
+      });
   },
 });

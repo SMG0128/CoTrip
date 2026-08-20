@@ -4,24 +4,16 @@
 import { TripService, CreateTripInput } from '../trip-service';
 import { Trip } from '../../types/trip';
 import { mockActiveTrip, mockHistoryTrip } from '../../mock/mock-trip';
+import { buildOwnedTrip } from '../../utils/current-user';
 
 export class MockTripService implements TripService {
   private trips: Trip[] = [mockActiveTrip, mockHistoryTrip];
 
   async createTrip(input: CreateTripInput): Promise<Trip> {
-    const trip: Trip = {
-      id: `trip_${Date.now()}`,
-      title: input.title,
-      status: 'ACTIVE',
-      creatorId: input.creatorId,
-      participantIds: [input.creatorId],
-      createdAt: new Date().toISOString(),
-      initialBrief: input.initialBrief,
-      areaConstraint: input.areaConstraint,
-      timeRange: input.timeRange,
-      commentIds: [],
-      constraintIds: [],
-    };
+    // 所有权构造统一走 buildOwnedTrip：
+    // creatorId 来自调用方传入的当前用户身份，默认 participant 仅创建者本人，
+    // 新 Trip 天然属于真实用户，无任何 Mock 占位身份。
+    const trip = buildOwnedTrip(input, { id: input.creatorId, nickname: '' });
     this.trips.unshift(trip);
     return trip;
   }
