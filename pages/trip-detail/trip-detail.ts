@@ -96,15 +96,19 @@ Page({
         if (t) {
           this.bootstrapTrip(t, currentUser, false);
         } else {
-          // 找不到（异常/旧 fixture id）则回退 Mock 示例行程
-          this.bootstrapTrip(mockActiveTrip, currentUser, true);
+          this.handleTripUnavailable('行程不存在');
         }
-      });
+      }).catch(() => this.handleTripUnavailable('行程加载失败'));
       return;
     }
 
     // 默认进入 Mock 示例行程：运行时把旧 mock self 槽位替换为真实 currentUser
     this.bootstrapTrip(mockActiveTrip, currentUser, true);
+  },
+
+  handleTripUnavailable(message: string) {
+    wx.showToast({ title: message, icon: 'none' });
+    setTimeout(() => wx.navigateBack(), 800);
   },
 
   /** 初始化行程视图 + 规划引擎 */

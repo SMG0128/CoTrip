@@ -94,6 +94,9 @@ Page({
         setTimeout(() => {
           wx.navigateTo({ url: `/pages/trip-detail/trip-detail?tripId=${trip.id}` });
         }, 500);
+      })
+      .catch(() => {
+        wx.showToast({ title: '行程创建失败，请稍后重试', icon: 'none' });
       });
   },
 });

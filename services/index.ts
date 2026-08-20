@@ -19,6 +19,7 @@ import { MockNotificationService } from './mock/mock-notification-service';
 import { MockExternalActionService } from './mock/mock-external-action-service';
 import { MockAuthService } from './mock/mock-auth-service';
 import { RealAuthService } from './real/real-auth-service';
+import { RealTripService } from './real/real-trip-service';
 
 import { authConfig } from '../config/auth';
 
@@ -27,7 +28,8 @@ export const authService: AuthService =
   authConfig.mode === 'real' ? new RealAuthService() : new MockAuthService();
 
 export const aiService: AIService = new MockAIService();
-export const tripService: TripService = new MockTripService();
+export const tripService: TripService =
+  authConfig.mode === 'real' ? new RealTripService() : new MockTripService();
 export const mapService: MapService = new MockMapService();
 export const placeService: PlaceService = new MockPlaceService();
 export const notificationService: NotificationService = new MockNotificationService();

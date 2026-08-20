@@ -12,6 +12,7 @@
       wx:key="id"
       trip="{{item}}"
       history="{{true}}"
+      data-trip-id="{{item.id}}"
       bind:tap="onTripTap"
     />
   </view>

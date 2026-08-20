@@ -1,8 +1,8 @@
 // pages/home/home.ts
 // 首页：展示进行中行程或推荐模式。
 
-import { mockActiveTrip } from '../../mock/mock-trip';
 import { Trip } from '../../types/trip';
+import { tripService } from '../../services/index';
 import { hydrateTripWithCurrentUser } from '../../utils/current-user';
 
 Page({
@@ -23,11 +23,18 @@ Page({
     const currentUser = app.globalData.currentUser;
     this.setData({ user: currentUser });
 
-    // Mock：直接使用固定进行中行程，运行时将“自己”槽位替换为当前用户
-    this.setData({
-      activeTrip: hydrateTripWithCurrentUser(mockActiveTrip, currentUser),
-      hasActiveTrip: true,
-    });
+    tripService
+      .listActiveTrips()
+      .then((trips) => {
+        const activeTrip = trips[0]
+          ? hydrateTripWithCurrentUser(trips[0], currentUser)
+          : null;
+        this.setData({ activeTrip, hasActiveTrip: activeTrip !== null });
+      })
+      .catch(() => {
+        this.setData({ activeTrip: null, hasActiveTrip: false });
+        wx.showToast({ title: '行程加载失败，请稍后重试', icon: 'none' });
+      });
   },
 
   onCreateTrip() {
@@ -39,7 +46,11 @@ Page({
   },
 
   onEnterTrip() {
-    wx.navigateTo({ url: '/pages/trip-detail/trip-detail' });
+    const activeTrip = this.data.activeTrip;
+    if (!activeTrip) return;
+    wx.navigateTo({
+      url: `/pages/trip-detail/trip-detail?tripId=${encodeURIComponent(activeTrip.id)}`,
+    });
   },
 
   onProfile() {

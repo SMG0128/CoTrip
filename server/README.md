@@ -1,6 +1,6 @@
-# CoTrip Backend V0.1 — Real WeChat Authentication
+# CoTrip Backend V0.2 — Real Trip Persistence
 
-CoTrip 的第一个真实后端，实现完整的微信登录链路：
+CoTrip 后端提供真实微信登录与按用户隔离的 Trip shell 持久化：
 
 ```
 小程序 → wx.login() → code → CoTrip Backend → 微信 code2Session → openid
@@ -29,6 +29,7 @@ WECHAT_APPID=你的小程序AppID
 WECHAT_SECRET=你的小程序AppSecret
 AUTH_TOKEN_SECRET=一段足够长的随机字符串
 PORT=3000
+# 可选：TRIP_DATA_FILE=/自定义路径/trips.json
 ```
 
 > 切勿提交真实凭据。`.env` 已在 `.gitignore` 中忽略。
@@ -79,6 +80,9 @@ export const authConfig = {
 | POST | `/auth/login` | 用 `wx.login` 的 code 登录，返回 `{ token, user }` |
 | GET | `/auth/profile` | 校验 token，返回公开用户信息 |
 | PATCH | `/auth/profile` | 更新昵称/头像（需登录） |
+| POST | `/trips` | 创建当前用户拥有的 Trip shell（需登录） |
+| GET | `/trips?status=ACTIVE` | 列出当前用户参与的 Trip（需登录） |
+| GET | `/trips/:id` | 读取当前用户参与的单个 Trip（需登录） |
 
 错误统一返回：
 
@@ -91,6 +95,8 @@ export const authConfig = {
 - `WECHAT_SECRET` / `session_key` / `openid` 仅存在于后端，绝不暴露给小程序。
 - 小程序只持有 CoTrip token 与 CoTrip userId。
 - 业务代码统一使用 `User.id`，不使用 openid。
+- Trip 的 `creatorId` / `participantIds` 只来自已校验 token，客户端提交的身份字段会被忽略。
+- `server/data/users.json` 与 `server/data/trips.json` 均在 Git 忽略范围内。
 
 ## 测试
 
@@ -98,4 +104,4 @@ export const authConfig = {
 npm test
 ```
 
-运行 TypeScript 检查与聚焦的认证单元测试（token 签发/校验、用户仓库、登录流程）。
+运行 TypeScript 检查，以及认证、Trip 身份隔离和 JSON 重启持久化测试。

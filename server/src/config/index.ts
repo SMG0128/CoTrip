@@ -14,6 +14,8 @@ export interface AppConfig {
   port: number;
   /** 用户数据持久化文件路径 */
   dataFile: string;
+  /** Trip shell 数据持久化文件路径 */
+  tripDataFile: string;
 }
 
 function required(name: string): string {
@@ -31,5 +33,7 @@ export function loadConfig(): AppConfig {
     authTokenSecret: required('AUTH_TOKEN_SECRET'),
     port: Number(process.env.PORT || 3000),
     dataFile: process.env.DATA_FILE || path.resolve(__dirname, '../../data/users.json'),
+    tripDataFile:
+      process.env.TRIP_DATA_FILE || path.resolve(__dirname, '../../data/trips.json'),
   };
 }

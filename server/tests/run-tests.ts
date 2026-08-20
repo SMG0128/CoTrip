@@ -2,6 +2,7 @@
 // 极简测试运行器：逐个执行测试文件，汇总结果。
 
 import { runAuthTests } from './auth.test';
+import { runTripTests } from './trips.test';
 
 interface TestResult {
   name: string;
@@ -24,6 +25,7 @@ export async function record(name: string, fn: () => void | Promise<void>): Prom
 
 async function main(): Promise<void> {
   await runAuthTests();
+  await runTripTests();
 
   let failed = 0;
   for (const r of results) {

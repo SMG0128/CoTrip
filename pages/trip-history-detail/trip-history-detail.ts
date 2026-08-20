@@ -11,6 +11,21 @@ import { rankCandidates } from '../../core/candidate-ranker';
 import { EventCandidateGroup } from '../../types/event-candidate';
 import { buildEventCandidateGroups } from '../../utils/event-candidates';
 import { hydrateRouteOwner, hydrateTripWithCurrentUser } from '../../utils/current-user';
+import { tripService } from '../../services/index';
+import { Plan } from '../../types/plan';
+
+function buildEmptyPlan(tripId: string): Plan {
+  return {
+    id: `plan_${tripId}`,
+    tripId,
+    version: 0,
+    events: [],
+    satisfiedConstraintCount: 0,
+    totalConstraintCount: 0,
+    conflicts: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 Page({
   data: {
@@ -24,20 +39,52 @@ Page({
     participantCount: 0,
   },
 
-  onLoad() {
-    // 运行时 hydrate：Mock 行程中的“自己”槽位替换为当前用户
+  onLoad(options?: Record<string, string | undefined>) {
     const app = getApp<IAppOption>();
     const currentUser = app.globalData.currentUser;
-    const trip = hydrateTripWithCurrentUser(mockHistoryTrip, currentUser);
+    const requestedTripId = options?.tripId;
+    if (requestedTripId) {
+      tripService
+        .getTrip(requestedTripId)
+        .then((trip) => {
+          if (!trip) {
+            this.handleTripUnavailable('行程不存在');
+            return;
+          }
+          this.bootstrapTrip(trip, false);
+        })
+        .catch(() => this.handleTripUnavailable('行程加载失败'));
+      return;
+    }
+
+    // 无 tripId 时保留旧 Mock Demo 入口。
+    this.bootstrapTrip(hydrateTripWithCurrentUser(mockHistoryTrip, currentUser), true);
+  },
+
+  bootstrapTrip(baseTrip: Trip, seedDemoData: boolean) {
+    const currentUser = getApp<IAppOption>().globalData.currentUser;
+    const hydratedTrip = hydrateTripWithCurrentUser(baseTrip, currentUser);
+    const trip = hydratedTrip.currentPlan
+      ? hydratedTrip
+      : { ...hydratedTrip, currentPlan: buildEmptyPlan(hydratedTrip.id) };
     const completedAt = trip.completedAt ?? '';
-    const rankedRestaurants = rankCandidates({ restaurants: mockRestaurants, constraints: [] });
+    const restaurants = seedDemoData ? mockRestaurants : [];
+    const comments = seedDemoData ? mockComments : [];
+    const rankedRestaurants = rankCandidates({ restaurants, constraints: [] });
     this.setData({
       trip,
+      comments,
+      restaurants,
       route: hydrateRouteOwner(mockPersonalRoute, currentUser),
       completedText: completedAt ? completedAt.slice(0, 16).replace('T', ' ') : '',
       participantCount: trip.participantIds.length,
       candidateGroups: buildEventCandidateGroups(trip.currentPlan, rankedRestaurants),
     });
+  },
+
+  handleTripUnavailable(message: string) {
+    wx.showToast({ title: message, icon: 'none' });
+    setTimeout(() => wx.navigateBack(), 800);
   },
 
   onPlaceTap(e: WechatMiniprogram.CustomEvent) {

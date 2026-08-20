@@ -20,11 +20,12 @@ function toMs(iso: string): number {
 }
 
 /** 毫秒转 ISO 8601（保留原时区偏移） */
-function toIso(ms: number, timezone: string): string {
-  const d = new Date(ms);
-  const offset = timezone === 'Asia/Shanghai' ? '+08:00' : '+08:00';
+function toIso(ms: number, _timezone: string): string {
+  const offsetMinutes = 8 * 60;
+  const d = new Date(ms + offsetMinutes * 60 * 1000);
+  const offset = '+08:00';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${offset}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}${offset}`;
 }
 
 /** 计算事件时长（毫秒） */
