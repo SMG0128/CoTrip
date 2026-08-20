@@ -2,12 +2,11 @@
 // 首页：展示进行中行程或推荐模式。
 
 import { mockActiveTrip } from '../../mock/mock-trip';
-import { mockCurrentUser } from '../../mock/mock-user';
 import { Trip } from '../../types/trip';
 
 Page({
   data: {
-    user: mockCurrentUser,
+    user: null as import('../../types/participant').Participant | null,
     activeTrip: null as Trip | null,
     hasActiveTrip: false,
   },
@@ -17,6 +16,10 @@ Page({
     if (tabBar) {
       tabBar.setData({ selected: 0 });
     }
+
+    // 从全局读取当前登录用户
+    const app = getApp<IAppOption>();
+    this.setData({ user: app.globalData.currentUser });
 
     // Mock：直接使用固定进行中行程
     this.setData({

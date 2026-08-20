@@ -20,5 +20,5 @@
     "typeRoots": ["./typings", "./node_modules/miniprogram-api-typings"]
   },
   "include": ["./**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "server"]
 }

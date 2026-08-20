@@ -1,7 +1,9 @@
 // pages/login/login.ts
-// 登录页：当前仅 Mock 登录，不接真实 wx.login 后端。
+// 登录页：调用 AuthService 完成微信登录。
+// 认证模式由 config/auth.ts 的 mode 决定：mock 或 real。
+// real 模式下后端不可用会明确失败并提示，绝不产生伪造登录态。
 
-import { mockCurrentUser } from '../../mock/mock-user';
+import { authService } from '../../services/index';
 
 Page({
   data: {
@@ -12,12 +14,21 @@ Page({
     if (this.data.loading) return;
     this.setData({ loading: true });
 
-    // Mock 登录：设置全局用户后跳转首页
-    const app = getApp<IAppOption>();
-    app.globalData.currentUser = mockCurrentUser;
-
-    setTimeout(() => {
-      wx.switchTab({ url: '/pages/home/home' });
-    }, 400);
+    authService
+      .login()
+      .then((session) => {
+        const app = getApp<IAppOption>();
+        app.globalData.currentUser = session.user;
+        wx.switchTab({ url: '/pages/home/home' });
+      })
+      .catch((err: Error) => {
+        wx.showToast({
+          title: err.message || '登录失败，请重试',
+          icon: 'none',
+        });
+      })
+      .finally(() => {
+        this.setData({ loading: false });
+      });
   },
 });

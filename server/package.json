@@ -1,0 +1,24 @@
+{
+  "name": "cotrip-server",
+  "version": "0.1.0",
+  "description": "CoTrip Backend V0.1 — Real WeChat Authentication",
+  "private": true,
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/app.js",
+    "dev": "ts-node src/app.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json && node dist-test/tests/run-tests.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}

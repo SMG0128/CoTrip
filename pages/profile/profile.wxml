@@ -45,4 +45,14 @@
       <image class="menu-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
     </view>
   </view>
+
+  <view class="other-card">
+    <view class="menu-item logout" bind:tap="onLogout">
+      <view class="menu-main">
+        <view class="menu-icon"><image src="/assets/icons/settings/gear.svg" mode="aspectFit" /></view>
+        <text>退出登录</text>
+      </view>
+      <image class="menu-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+    </view>
+  </view>
 </view>

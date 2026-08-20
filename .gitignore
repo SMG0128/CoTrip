@@ -13,3 +13,10 @@ miniprogram_npm/
 
 # 日志
 *.log
+
+# 后端
+server/node_modules/
+server/dist/
+server/dist-test/
+server/.env
+server/data/

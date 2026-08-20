@@ -157,6 +157,10 @@
   flex-shrink: 0;
 }
 
+.logout .menu-main text {
+  color: #e5484d;
+}
+
 @media (max-width: 380px) {
   .user-card {
     padding: 26rpx;

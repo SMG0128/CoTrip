@@ -1,7 +1,8 @@
 // pages/profile/profile.ts
 // 我的页：极简，展示微信信息与通知设置。
 
-import { mockCurrentUser } from '../../mock/mock-user';
+import { Participant } from '../../types/participant';
+import { authService } from '../../services/index';
 
 interface NotificationSetting {
   key: string;
@@ -12,7 +13,7 @@ interface NotificationSetting {
 
 Page({
   data: {
-    user: mockCurrentUser,
+    user: null as Participant | null,
     tripCount: 2,
     settings: [
       { key: 'trip_starting', label: '行程开始提醒', enabled: true, icon: '/assets/icons/settings/calendar.svg' },
@@ -27,6 +28,10 @@ Page({
     if (tabBar) {
       tabBar.setData({ selected: 1 });
     }
+
+    // 从全局读取当前登录用户
+    const app = getApp<IAppOption>();
+    this.setData({ user: app.globalData.currentUser });
   },
 
   onToggle(e: WechatMiniprogram.BaseEvent) {
@@ -50,6 +55,21 @@ Page({
       title: '隐私说明',
       content: '个人出发地点默认只用于计算个人路线，不向其他参与者公开。',
       showCancel: false,
+    });
+  },
+
+  onLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '确定要退出当前账号吗？',
+      success: (res) => {
+        if (!res.confirm) return;
+        authService.logout().then(() => {
+          const app = getApp<IAppOption>();
+          app.globalData.currentUser = null;
+          wx.reLaunch({ url: '/pages/login/login' });
+        });
+      },
     });
   },
 });
