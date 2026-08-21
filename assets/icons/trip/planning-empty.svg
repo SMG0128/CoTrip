@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- 伪 3D 厚度层：浅蓝描边略向右下偏移，营造轻微浮起 -->
+  <g transform="translate(3 4)" opacity="0.85">
+    <path d="M30 64h24M62 64h28" stroke="#d8e6ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="1 13"/>
+    <circle cx="26" cy="64" r="9.5" fill="#eef3ff" stroke="#d8e6ff" stroke-width="5"/>
+    <circle cx="94" cy="64" r="9.5" fill="#eef3ff" stroke="#d8e6ff" stroke-width="5"/>
+    <circle cx="60" cy="27" r="7.5" fill="#eef3ff" stroke="#d8e6ff" stroke-width="5"/>
+  </g>
+  <!-- 主体：路线节点 + 虚线连接，表达 generic planning -->
+  <path d="M30 64h24M62 64h28" stroke="#326BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 13"/>
+  <circle cx="26" cy="64" r="9.5" fill="#ffffff" stroke="#326BFF" stroke-width="4.5"/>
+  <circle cx="94" cy="64" r="9.5" fill="#ffffff" stroke="#326BFF" stroke-width="4.5"/>
+  <circle cx="60" cy="27" r="7.5" fill="#ffffff" stroke="#326BFF" stroke-width="4"/>
+  <circle cx="60" cy="64" r="5.5" fill="#326BFF"/>
+</svg>

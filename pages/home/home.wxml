@@ -12,9 +12,27 @@
     </view>
   </view>
 
+  <!-- 房间码加入入口：轻量搜索栏，位于 Hero 与 Quick 之间，不抢新建行程主入口 -->
+  <view class="room-entry">
+    <image class="room-entry-icon" src="/assets/icons/utility/link.svg" mode="aspectFit" />
+    <input
+      class="room-input"
+      placeholder="输入房间号加入行程"
+      placeholder-class="room-input-placeholder"
+      value="{{roomCodeInput}}"
+      bind:input="onRoomCodeInput"
+      confirm-type="go"
+      bind:confirm="onJoinByRoomCode"
+      maxlength="16"
+    />
+    <view class="room-join {{roomCodeInput ? 'enabled' : ''}}" bind:tap="onJoinByRoomCode">
+      加入
+    </view>
+  </view>
+
   <view class="quick">
     <view class="quick-btn primary" bind:tap="onCreateTrip">
-      <view class="quick-icon primary-icon"><image src="/assets/icons/utility/plus.svg" mode="aspectFit" /></view>
+      <view class="quick-icon primary-icon"><image src="/assets/icons/utility/plus-3d.svg" mode="aspectFit" /></view>
       <view class="quick-copy">
         <text class="quick-title">新建行程</text>
         <text class="quick-subtitle">AI 智能规划行程</text>
@@ -31,8 +49,13 @@
 
   <view class="section-kicker">正在进行</view>
   <view class="main">
-    <block wx:if="{{hasActiveTrip && activeTrip}}">
-      <trip-card trip="{{activeTrip}}" bind:tap="onEnterTrip" />
+    <block wx:if="{{hasActiveTrips}}">
+      <trip-card
+        wx:for="{{activeTrips}}"
+        wx:key="id"
+        trip="{{item}}"
+        bind:tap="onEnterTrip"
+      />
     </block>
 
     <block wx:else>

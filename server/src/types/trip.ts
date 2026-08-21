@@ -10,6 +10,8 @@ export interface Trip {
   participantIds: string[];
   createdAt: string;
   completedAt?: string;
+  /** V0.3 Room Identity：房间号由服务器生成，所有持久化 Trip 必须存在。 */
+  roomCode: string;
   initialBrief: string;
   areaConstraint?: unknown;
   timeRange?: unknown;

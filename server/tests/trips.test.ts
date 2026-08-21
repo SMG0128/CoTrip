@@ -23,6 +23,7 @@ function fixture(overrides: Partial<Trip> = {}): Trip {
     creatorId: 'usr_123',
     participantIds: ['usr_123'],
     createdAt: '2026-08-20T10:00:00.000Z',
+    roomCode: 'ABCDEFG',
     initialBrief: 'fixture',
     commentIds: [],
     constraintIds: [],
@@ -55,6 +56,8 @@ export async function runTripTests(): Promise<void> {
       assert.deepStrictEqual(trip.participantIds, ['usr_123']);
       assert.strictEqual(trip.status, 'ACTIVE');
       assert.ok(trip.id.startsWith('trip_'));
+      assert.ok(trip.roomCode, 'createTrip 必须生成 roomCode');
+      assert.strictEqual(trip.roomCode.length, 7, 'roomCode 长度必须为 7');
       assert.deepStrictEqual(trip.commentIds, []);
       assert.deepStrictEqual(trip.constraintIds, []);
     } finally {

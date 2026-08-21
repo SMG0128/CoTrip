@@ -11,9 +11,13 @@ import './tencent-map-adapter.test';
 import './external-action-resolver.test';
 import './current-user.test';
 import './trip-ownership.test';
+import './trip-share.test';
+import './trip-card.test';
+import { runHomeMultiTripsTests } from './home-multi-trips.test';
 import { runRealTripServiceTests } from './real-trip-service.test';
 
 async function main(): Promise<void> {
+  await runHomeMultiTripsTests();
   await runRealTripServiceTests();
   console.log('\n🎉 全部核心逻辑测试通过');
 }

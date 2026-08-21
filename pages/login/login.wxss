@@ -15,17 +15,34 @@
   height: 210rpx;
 }
 
+/* 柔和光晕底座：与 CoTrip 蓝呼应，衬托伪 3D 插画 */
+.art-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 240rpx;
+  height: 240rpx;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(50, 107, 255, 0.13) 0%, rgba(50, 107, 255, 0) 72%);
+  border-radius: 50%;
+}
+
 .travel {
+  position: relative;
+  z-index: 1;
   width: 220rpx;
   height: 220rpx;
+  filter: drop-shadow(0 14rpx 24rpx rgba(50, 107, 255, 0.2));
 }
 
 .star {
   position: absolute;
+  z-index: 2;
   top: 0;
   right: -12rpx;
   width: 64rpx;
   height: 64rpx;
+  filter: drop-shadow(0 8rpx 14rpx rgba(50, 107, 255, 0.22));
 }
 
 .logo {
@@ -55,7 +72,29 @@
   text-align: center;
 }
 
+/* 微信登录按钮：白底 + 蓝描边 + 蓝字，内部一圈细腻内阴影，轻微外阴影。
+   气质 = 白底蓝边现代按钮：清爽、轻盈、有层次、轻微凹陷感。 */
 .login-btn {
+  box-sizing: border-box;
   width: 100%;
-  border: 0;
+  padding: 22rpx 0;
+  color: #326bff;
+  background: #ffffff;
+  border: 2rpx solid #326bff;
+  border-radius: 48rpx;
+  box-shadow:
+    inset 0 2rpx 10rpx rgba(50, 107, 255, 0.1),
+    0 12rpx 28rpx rgba(50, 107, 255, 0.14);
+  font-size: 30rpx;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+.login-btn[loading] {
+  opacity: 0.72;
 }

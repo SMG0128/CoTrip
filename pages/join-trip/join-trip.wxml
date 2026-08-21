@@ -1,0 +1,15 @@
+<view class="join-page">
+  <view class="join-card">
+    <view class="brand">CoTrip</view>
+    <view class="headline">你收到一个行程邀请</view>
+    <view class="subhead">输入房间号加入，和大家一起规划</view>
+
+    <view class="room-box">
+      <text class="room-label">房间号</text>
+      <text class="room-code">{{roomCode}}</text>
+    </view>
+
+    <button class="join-btn" bind:tap="onJoin">加入行程</button>
+    <text class="hint">多人加入功能即将接通</text>
+  </view>
+</view>

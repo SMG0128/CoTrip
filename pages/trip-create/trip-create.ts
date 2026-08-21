@@ -92,7 +92,10 @@ Page({
       .then((trip) => {
         wx.showToast({ title: '行程已创建', icon: 'success' });
         setTimeout(() => {
-          wx.navigateTo({ url: `/pages/trip-detail/trip-detail?tripId=${trip.id}` });
+          // V0.3：创建页被详情页替换，返回时直达 Home，不再回到「创建行程」页。
+          wx.redirectTo({
+            url: `/pages/trip-detail/trip-detail?tripId=${encodeURIComponent(trip.id)}`,
+          });
         }, 500);
       })
       .catch(() => {

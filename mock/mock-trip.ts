@@ -9,6 +9,8 @@ export const mockActiveTrip: Trip = {
   id: 'trip_active',
   title: '周六羽毛球 + 越南菜',
   status: 'ACTIVE',
+  /** 开发房间号：仅用于 Mock / 本地 UI 预览，不作为真实 Trip identity */
+  roomCode: '7K4M9XQ',
   creatorId: 'user_A',
   participantIds: ['user_A', 'user_B', 'user_C', 'user_D'],
   createdAt: '2026-08-16T08:30:00+08:00',

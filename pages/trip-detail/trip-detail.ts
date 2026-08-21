@@ -19,6 +19,12 @@ import { tripService } from '../../services/index';
 import { EventCandidateGroup } from '../../types/event-candidate';
 import { buildEventCandidateGroups } from '../../utils/event-candidates';
 import {
+  buildTripSharePayload,
+  normalizeRoomCode,
+  resolveRoomCodeDisplay,
+  roomCopyFeedback,
+} from '../../utils/trip-share';
+import {
   buildUserComment,
   hydrateRouteOwner,
   hydrateTripWithCurrentUser,
@@ -63,6 +69,9 @@ Page({
     inputText: '',
     participantCount: 0,
     commentCount: 0,
+    // V0.3 Room UI：展示值 + 是否存在有效房间号（控制复制/分享能力）
+    roomCode: resolveRoomCodeDisplay(mockActiveTrip.roomCode),
+    hasRoomCode: !!normalizeRoomCode(mockActiveTrip.roomCode),
     // Debug 面板
     debugEnabled: DEBUG_ENABLED,
     debugExpanded: false,
@@ -126,6 +135,8 @@ Page({
       route: hydrateRouteOwner(mockPersonalRoute, currentUser),
       participantCount: trip.participantIds.length,
       commentCount: trip.commentIds.length,
+      roomCode: resolveRoomCodeDisplay(trip.roomCode),
+      hasRoomCode: !!normalizeRoomCode(trip.roomCode),
     });
 
     // 初始化规划引擎，注入初始计划
@@ -194,8 +205,23 @@ Page({
     return `keyword=${keyword}, boundary=region(广州市, 0)${district ? `, district=${district}` : ''}`;
   },
 
-  onInvite() {
-    wx.showToast({ title: '邀请功能开发中', icon: 'none' });
+  /** 复制房间号：仅复制真实 roomCode，缺失时明确提示 */
+  onCopyRoomCode() {
+    const roomCode = normalizeRoomCode(this.data.trip.roomCode);
+    if (!roomCode) {
+      wx.showToast({ title: roomCopyFeedback(roomCode), icon: 'none' });
+      return;
+    }
+    wx.setClipboardData({
+      data: roomCode,
+      success: () => wx.showToast({ title: roomCopyFeedback(roomCode), icon: 'none' }),
+    });
+  },
+
+  /** 微信原生分享：有 roomCode 分享加入页，缺失时安全回退首页，绝不伪造 */
+  onShareAppMessage(): WechatMiniprogram.Page.ICustomShareContent {
+    const payload = buildTripSharePayload(this.data.trip);
+    return { title: payload.title, path: payload.path };
   },
 
   onToggleRoute() {

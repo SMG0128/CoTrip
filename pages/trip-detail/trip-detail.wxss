@@ -4,6 +4,47 @@
   padding: 28rpx 0 calc(164rpx + env(safe-area-inset-bottom));
 }
 
+/* ---- V0.3 Room Strip：弱视觉小行，位于 header 上方，不喧宾夺主 ---- */
+.room-strip {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin: 0 32rpx 14rpx;
+  padding: 10rpx 18rpx;
+  background: #f6f8fc;
+  border: 1rpx solid rgba(122, 147, 194, 0.09);
+  border-radius: 20rpx;
+}
+
+.room-label {
+  color: #95a1b5;
+  font-size: 21rpx;
+  font-weight: normal;
+}
+
+.room-code {
+  color: #326bff;
+  font-size: 23rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+.room-copy {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 4rpx 16rpx;
+  color: #326bff;
+  background: rgba(50, 107, 255, 0.08);
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+}
+
+.room-copy.disabled {
+  color: #a5b0c2;
+  background: rgba(122, 147, 194, 0.1);
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -37,16 +78,25 @@
   font-size: 23rpx;
 }
 
+/* 微信 <button> 默认样式重置：保持与 <view> 版本视觉一致 */
+button::after {
+  border: none;
+}
+
 .invite-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  box-sizing: border-box;
+  margin: 0;
   padding: 12rpx 20rpx 12rpx 14rpx;
   color: #326bff;
   background: #ffffff;
   border: 1rpx solid rgba(122, 147, 194, 0.09);
   border-radius: 38rpx;
   box-shadow: 0 8rpx 24rpx rgba(60, 90, 160, 0.09);
+  line-height: 1.2;
   font-size: 24rpx;
   font-weight: 650;
 }
@@ -63,11 +113,15 @@
 }
 
 .action-btn {
+  box-sizing: border-box;
   flex: 1;
+  width: 100%;
+  margin: 0;
   padding: 20rpx 0;
   color: #8c98ad;
   background: #ffffff;
   border: 1rpx solid #edf1f7;
+  line-height: 1.4;
   text-align: center;
   font-size: 27rpx;
   font-weight: 650;
@@ -299,6 +353,11 @@
 }
 
 @media (max-width: 380px) {
+  .room-strip {
+    margin-left: 24rpx;
+    margin-right: 24rpx;
+  }
+
   .header {
     padding-left: 24rpx;
     padding-right: 24rpx;

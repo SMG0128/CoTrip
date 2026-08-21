@@ -5,6 +5,7 @@ import path from 'path';
 import { TripRepository } from './trip-repository';
 import { Trip, TripStatus } from '../types/trip';
 import { AppError } from '../types/errors';
+import { generateRoomCode, isValidRoomCode } from '../utils/room-code';
 
 interface Store {
   trips: Trip[];
@@ -16,7 +17,14 @@ export class JsonTripRepository implements TripRepository {
 
   constructor(file: string) {
     this.file = file;
-    this.store = this.load();
+    const loaded = this.load();
+    const migrated = this.migrate(loaded);
+    this.store = migrated.store;
+    if (migrated.backfilled > 0) {
+      // 安全迁移：仅补 roomCode，不重建、不覆盖其它字段；写失败沿用 TRIP_PERSISTENCE_FAILURE。
+      this.save(this.store);
+      console.log(`[room-code] backfilled ${migrated.backfilled} legacy trip(s)`);
+    }
   }
 
   async create(trip: Trip): Promise<Trip> {
@@ -30,12 +38,52 @@ export class JsonTripRepository implements TripRepository {
     return this.store.trips.find((trip) => trip.id === id) ?? null;
   }
 
+  async findByRoomCode(roomCode: string): Promise<Trip | null> {
+    if (!isValidRoomCode(roomCode)) {
+      return null;
+    }
+    return this.store.trips.find((trip) => trip.roomCode === roomCode) ?? null;
+  }
+
+  async backfillRoomCodes(): Promise<number> {
+    const migrated = this.migrate(this.store);
+    this.store = migrated.store;
+    if (migrated.backfilled > 0) {
+      this.save(this.store);
+    }
+    return migrated.backfilled;
+  }
+
   async listForUser(userId: string, status?: TripStatus): Promise<Trip[]> {
     return this.store.trips
       .filter(
         (trip) => trip.participantIds.includes(userId) && (!status || trip.status === status),
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  /**
+   * V0.3 迁移：为缺失 / 非法 roomCode 的 Trip 生成唯一房间号。
+   * 保留原 id / creatorId / participantIds / createdAt 及其它全部字段，只补 roomCode。
+   */
+  private migrate(store: Store): { store: Store; backfilled: number } {
+    const used = new Set(store.trips.map((trip) => trip.roomCode).filter(isValidRoomCode));
+    let backfilled = 0;
+    const trips = store.trips.map((trip) => {
+      if (isValidRoomCode(trip.roomCode)) {
+        return trip;
+      }
+      let code = generateRoomCode();
+      let guard = 0;
+      while (used.has(code) && guard < 100) {
+        code = generateRoomCode();
+        guard++;
+      }
+      used.add(code);
+      backfilled++;
+      return { ...trip, roomCode: code };
+    });
+    return { store: { trips }, backfilled };
   }
 
   private load(): Store {

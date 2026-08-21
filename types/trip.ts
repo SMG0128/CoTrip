@@ -22,4 +22,10 @@ export interface Trip {
   currentPlan?: Plan;
   commentIds: string[];
   constraintIds: string[];
+  /**
+   * 房间号（V0.3 UI Foundation，前端仅预留）。
+   * 真实云端 Trip 当前不返回该字段；由后续服务器 Room API 正式生成。
+   * 前端禁止自行从 trip.id / userId / timestamp 伪造。
+   */
+  roomCode?: string;
 }

@@ -1,0 +1,85 @@
+.join-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 120rpx 48rpx 80rpx;
+  background: #f7f9fd;
+}
+
+.join-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 72rpx 40rpx 56rpx;
+  background: #ffffff;
+  border-radius: 32rpx;
+  box-shadow: 0 16rpx 48rpx rgba(60, 90, 160, 0.07);
+}
+
+.brand {
+  color: #326bff;
+  font-size: 30rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+
+.headline {
+  margin-top: 36rpx;
+  color: #1f2937;
+  font-size: 38rpx;
+  font-weight: 650;
+}
+
+.subhead {
+  margin-top: 14rpx;
+  color: #95a1b5;
+  font-size: 24rpx;
+}
+
+.room-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 56rpx;
+  padding: 32rpx 0;
+  background: #f6f8fc;
+  border: 1rpx solid rgba(122, 147, 194, 0.09);
+  border-radius: 24rpx;
+}
+
+.room-label {
+  color: #95a1b5;
+  font-size: 22rpx;
+}
+
+.room-code {
+  margin-top: 10rpx;
+  color: #326bff;
+  font-size: 52rpx;
+  font-weight: 700;
+  letter-spacing: 6rpx;
+}
+
+.join-btn {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 56rpx 0 0;
+  padding: 24rpx 0;
+  color: #ffffff;
+  background: #326bff;
+  border-radius: 999rpx;
+  line-height: 1.4;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 650;
+}
+
+.join-btn::after {
+  border: none;
+}
+
+.hint {
+  margin-top: 24rpx;
+  color: #b3bdcd;
+  font-size: 21rpx;
+}

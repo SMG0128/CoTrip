@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { TripRepository } from '../repositories/trip-repository';
 import { CreateTripInput, Trip, TripStatus } from '../types/trip';
 import { AppError } from '../types/errors';
+import { generateRoomCode } from '../utils/room-code';
 
 export interface TripService {
   createTrip(authenticatedUserId: string, input: CreateTripInput): Promise<Trip>;
@@ -12,7 +13,21 @@ export interface TripService {
 }
 
 export class RealTripService implements TripService {
-  constructor(private readonly trips: TripRepository) {}
+  constructor(
+    private readonly trips: TripRepository,
+    private readonly random: () => number = Math.random,
+  ) {}
+
+  /** 服务器生成房间号；与已有 roomCode 碰撞时重新生成（上限 50 次）。 */
+  private async generateUniqueRoomCode(): Promise<string> {
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const code = generateRoomCode(this.random);
+      if (!(await this.trips.findByRoomCode(code))) {
+        return code;
+      }
+    }
+    throw new AppError(500, 'ROOM_CODE_GENERATION_FAILED', '房间号生成失败，请重试');
+  }
 
   async createTrip(authenticatedUserId: string, input: CreateTripInput): Promise<Trip> {
     const title = typeof input.title === 'string' ? input.title.trim() : '';
@@ -32,6 +47,7 @@ export class RealTripService implements TripService {
       creatorId: authenticatedUserId,
       participantIds: [authenticatedUserId],
       createdAt: new Date().toISOString(),
+      roomCode: await this.generateUniqueRoomCode(),
       initialBrief,
       areaConstraint: input.areaConstraint,
       timeRange: input.timeRange,

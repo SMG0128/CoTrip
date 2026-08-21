@@ -25,16 +25,35 @@
           <text>AI 已整理 {{commentCount}} 条需求</text>
         </view>
       </view>
-      <view class="trip-art">
-        <image class="art-combo" src="/assets/icons/trip/badminton-food.svg" mode="aspectFit" />
-      </view>
     </view>
 
-    <view class="schedule">
+    <!-- EMPTY：真实空状态，不出现任何 Mock 活动图标 -->
+    <view wx:if="{{state === 'EMPTY'}}" class="empty-state">
+      <view class="empty-art"><image src="{{emptyPlaceholderIcon}}" mode="aspectFit" /></view>
+      <text class="empty-title">还没有具体安排</text>
+      <text class="empty-desc">进入行程，说说你的第一条想法</text>
+    </view>
+
+    <!-- SINGLE_EVENT：只渲染真实的一个事件 -->
+    <view wx:elif="{{state === 'SINGLE_EVENT'}}" class="schedule">
       <view class="schedule-event">
         <text class="schedule-time">{{firstTime}}</text>
         <view class="event-main">
-          <image src="/assets/icons/trip/badminton.svg" mode="aspectFit" />
+          <image src="{{firstIcon}}" mode="aspectFit" />
+          <view class="event-copy">
+            <text class="event-title">{{firstEvent}}</text>
+            <text class="event-place">{{firstLocation}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- MULTI_EVENT：>=2 个事件时展示 first → last -->
+    <view wx:else class="schedule">
+      <view class="schedule-event">
+        <text class="schedule-time">{{firstTime}}</text>
+        <view class="event-main">
+          <image src="{{firstIcon}}" mode="aspectFit" />
           <view class="event-copy">
             <text class="event-title">{{firstEvent}}</text>
             <text class="event-place">{{firstLocation}}</text>
@@ -45,7 +64,7 @@
       <view class="schedule-event">
         <text class="schedule-time">{{lastTime}}</text>
         <view class="event-main">
-          <image src="/assets/icons/trip/food.svg" mode="aspectFit" />
+          <image src="{{lastIcon}}" mode="aspectFit" />
           <view class="event-copy">
             <text class="event-title">{{lastEvent}}</text>
             <text class="event-place">{{lastLocation}}</text>

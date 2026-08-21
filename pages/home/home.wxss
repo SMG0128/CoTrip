@@ -51,6 +51,57 @@
   box-shadow: 0 10rpx 28rpx rgba(65, 92, 155, 0.08);
 }
 
+/* 房间码加入入口：圆弧矩形轻量搜索栏，视觉弱于新建行程 */
+.room-entry {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  margin: 0 24rpx 34rpx;
+  height: 88rpx;
+  padding: 0 12rpx 0 26rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.09);
+  border-radius: 44rpx;
+  box-shadow: 0 10rpx 26rpx rgba(60, 90, 160, 0.07);
+}
+
+.room-entry-icon {
+  flex-shrink: 0;
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 14rpx;
+  opacity: 0.85;
+}
+
+.room-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  color: #17243d;
+  font-size: 27rpx;
+}
+
+.room-input-placeholder {
+  color: #aab6c8;
+}
+
+.room-join {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+  padding: 10rpx 26rpx;
+  border-radius: 999rpx;
+  color: #aab6c8;
+  background: #eef1f6;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+.room-join.enabled {
+  color: #326bff;
+  background: #e8efff;
+  box-shadow: 0 6rpx 14rpx rgba(50, 107, 255, 0.16);
+}
+
 .quick {
   display: flex;
   gap: 20rpx;
@@ -63,15 +114,20 @@
   align-items: center;
   min-width: 0;
   min-height: 174rpx;
-  border-radius: 34rpx;
+  border-radius: 40rpx;
   padding: 24rpx;
 }
 
+/* 新建行程入口：与登录页「微信登录」按钮同源 —— 白底 + 蓝描边 + 蓝字，
+   内部一圈均匀细腻的内阴影，外部克制柔和的外阴影，轻微凹陷但不厚重 */
 .quick-btn.primary {
   flex: 1.15;
-  color: #ffffff;
-  background: linear-gradient(145deg, #6674ff 0%, #326bff 58%, #20b9ff 125%);
-  box-shadow: 0 16rpx 32rpx rgba(50, 107, 255, 0.25);
+  color: #326bff;
+  background: #ffffff;
+  border: 2rpx solid #326bff;
+  box-shadow:
+    inset 0 2rpx 12rpx rgba(50, 107, 255, 0.08),
+    0 12rpx 28rpx rgba(50, 107, 255, 0.12);
 }
 
 .quick-btn.secondary {
@@ -89,9 +145,11 @@
   background: #f2f5ff;
 }
 
+/* 伪 3D 加号底座：浅蓝底圆角小胶囊，轻微描边 + 轻外阴影，仿佛被轻轻托起 */
 .primary-icon {
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8rpx 20rpx rgba(35, 65, 163, 0.18);
+  background: #eef3ff;
+  border: 1rpx solid rgba(50, 107, 255, 0.16);
+  box-shadow: 0 10rpx 22rpx rgba(50, 107, 255, 0.14);
 }
 
 .quick-icon image {
@@ -117,7 +175,7 @@
 }
 
 .primary .quick-title {
-  color: #ffffff;
+  color: #326bff;
 }
 
 .quick-subtitle {
@@ -127,7 +185,7 @@
 }
 
 .primary .quick-subtitle {
-  color: rgba(255, 255, 255, 0.78);
+  color: #7f90b8;
 }
 
 .section-kicker {

@@ -1,7 +1,24 @@
 <view class="create">
+  <!-- 页头：轻盈的创建空间，与登录页同一套伪 3D 视觉 -->
+  <view class="create-head">
+    <view class="head-copy">
+      <view class="head-kicker">发起一趟共同出行</view>
+      <text class="head-title">创建行程</text>
+      <text class="head-sub">先定范围和时间，AI 帮大家把想法变成共同计划</text>
+    </view>
+    <view class="head-art">
+      <view class="head-glow"></view>
+      <image class="head-travel" src="/assets/3d/travel.png" mode="aspectFit" />
+      <image class="head-star" src="/assets/3d/star.png" mode="aspectFit" />
+    </view>
+  </view>
+
   <!-- 区域限定 -->
   <view class="card">
-    <view class="section-title">区域限定</view>
+    <view class="section-head">
+      <image class="section-icon" src="/assets/3d/location.png" mode="aspectFit" />
+      <text class="section-title">区域限定</text>
+    </view>
     <view class="field" bind:tap="onAreaTap">
       <text class="field-label">区域</text>
       <view class="field-value">
@@ -13,7 +30,10 @@
 
   <!-- 时间范围 -->
   <view class="card">
-    <view class="section-title">时间范围</view>
+    <view class="section-head">
+      <image class="section-icon" src="/assets/3d/calender.png" mode="aspectFit" />
+      <text class="section-title">时间范围</text>
+    </view>
     <view class="field">
       <text class="field-label">开始</text>
       <view class="field-value">
@@ -40,7 +60,10 @@
 
   <!-- 事件简述 -->
   <view class="card">
-    <view class="section-title">事件简述</view>
+    <view class="section-head">
+      <image class="section-icon" src="/assets/3d/chat-bubble.png" mode="aspectFit" />
+      <text class="section-title">事件简述</text>
+    </view>
     <textarea
       class="brief"
       placeholder="例如：打两个小时羽毛球，然后去吃越南菜"
@@ -54,6 +77,6 @@
 
   <!-- 创建 -->
   <view class="footer">
-    <button class="btn-primary" bind:tap="onCreate">创建行程</button>
+    <button class="btn-primary create-btn" bind:tap="onCreate">创建行程</button>
   </view>
 </view>

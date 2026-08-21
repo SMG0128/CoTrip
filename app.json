@@ -7,7 +7,8 @@
     "pages/trip-history/trip-history",
     "pages/trip-history-detail/trip-history-detail",
     "pages/place-detail/place-detail",
-    "pages/profile/profile"
+    "pages/profile/profile",
+    "pages/join-trip/join-trip"
   ],
   "window": {
     "backgroundTextStyle": "light",

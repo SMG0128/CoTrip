@@ -72,7 +72,9 @@ export function buildOwnedTrip(
   now: Date = new Date()
 ): Trip {
   return {
-    id: `trip_${now.getTime()}`,
+    // 时间戳 + 随机后缀：保证同一毫秒内连续创建多个 Trip 时 id 不碰撞
+    // （多进行中 Trip 场景下，重复 id 会导致首页卡片 key 冲突、导航错乱）。
+    id: `trip_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`,
     title: input.title,
     status: 'ACTIVE',
     creatorId: currentUser.id,

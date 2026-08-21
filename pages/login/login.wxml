@@ -1,5 +1,6 @@
 <view class="login">
   <view class="login-art">
+    <view class="art-glow"></view>
     <image class="travel" src="/assets/3d/travel.png" mode="aspectFit" />
     <image class="star" src="/assets/3d/star.png" mode="aspectFit" />
   </view>
@@ -11,7 +12,7 @@
     AI 持续维护一份可执行的共同行程计划。
   </view>
 
-  <button class="btn-primary login-btn" bind:tap="onLogin" loading="{{loading}}">
+  <button class="login-btn" bind:tap="onLogin" loading="{{loading}}">
     微信登录
   </button>
 </view>

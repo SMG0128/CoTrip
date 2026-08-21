@@ -8,8 +8,9 @@ import { hydrateTripWithCurrentUser } from '../../utils/current-user';
 Page({
   data: {
     user: null as import('../../types/participant').Participant | null,
-    activeTrip: null as Trip | null,
-    hasActiveTrip: false,
+    activeTrips: [] as Trip[],
+    hasActiveTrips: false,
+    roomCodeInput: '',
   },
 
   onShow() {
@@ -23,16 +24,15 @@ Page({
     const currentUser = app.globalData.currentUser;
     this.setData({ user: currentUser });
 
+    // 多进行中行程：返回多少展示多少（最新在前，较旧在后）。
     tripService
       .listActiveTrips()
       .then((trips) => {
-        const activeTrip = trips[0]
-          ? hydrateTripWithCurrentUser(trips[0], currentUser)
-          : null;
-        this.setData({ activeTrip, hasActiveTrip: activeTrip !== null });
+        const activeTrips = trips.map((trip) => hydrateTripWithCurrentUser(trip, currentUser));
+        this.setData({ activeTrips, hasActiveTrips: activeTrips.length > 0 });
       })
       .catch(() => {
-        this.setData({ activeTrip: null, hasActiveTrip: false });
+        this.setData({ activeTrips: [], hasActiveTrips: false });
         wx.showToast({ title: '行程加载失败，请稍后重试', icon: 'none' });
       });
   },
@@ -45,15 +45,34 @@ Page({
     wx.navigateTo({ url: '/pages/trip-history/trip-history' });
   },
 
-  onEnterTrip() {
-    const activeTrip = this.data.activeTrip;
-    if (!activeTrip) return;
+  /** 每张 Trip 卡各自导航到自己的详情（依赖 component event detail.trip）。 */
+  onEnterTrip(e: WechatMiniprogram.CustomEvent) {
+    const trip = e.detail?.trip as Trip | undefined;
+    if (!trip?.id) return;
     wx.navigateTo({
-      url: `/pages/trip-detail/trip-detail?tripId=${encodeURIComponent(activeTrip.id)}`,
+      url: `/pages/trip-detail/trip-detail?tripId=${encodeURIComponent(trip.id)}`,
     });
   },
 
   onProfile() {
     wx.switchTab({ url: '/pages/profile/profile' });
+  },
+
+  /** 房间码输入：轻量归一化（trim + 去空格 + uppercase）。不自动生成房间码。 */
+  onRoomCodeInput(e: WechatMiniprogram.Input) {
+    const normalized = (e.detail.value || '').replace(/\s+/g, '').toUpperCase();
+    this.setData({ roomCodeInput: normalized });
+  },
+
+  /** 手动加入：仅导航到 Join Landing，绝不伪造加入成功。 */
+  onJoinByRoomCode() {
+    const code = this.data.roomCodeInput.trim();
+    if (!code) {
+      wx.showToast({ title: '请输入房间号', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/join-trip/join-trip?roomCode=${encodeURIComponent(code)}`,
+    });
   },
 });
