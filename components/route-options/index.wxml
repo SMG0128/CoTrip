@@ -1,13 +1,12 @@
-<view class="route-options">
-  <!-- Loading：三张灰色 skeleton 摘要卡（不用大 spinner） -->
+<view class="route-panel">
+  <!-- Loading：面板内三组骨架行（不用大 spinner） -->
   <block wx:if="{{loading}}">
-    <view wx:for="{{[0, 1, 2]}}" wx:key="*this" class="skeleton-card">
+    <view wx:for="{{[0, 1, 2]}}" wx:key="*this" class="skeleton-item">
       <view class="skeleton-row">
         <view class="skeleton-line skeleton-badge"></view>
         <view class="skeleton-line skeleton-duration"></view>
       </view>
       <view class="skeleton-line skeleton-modes"></view>
-      <view class="skeleton-line skeleton-schedule"></view>
     </view>
   </block>
 
@@ -18,51 +17,109 @@
   </view>
 
   <!-- 空态：服务层保证 1..3 条，此分支仅防御性兜底 -->
-  <view wx:elif="{{summaries.length === 0}}" class="error-state">
+  <view wx:elif="{{rows.length === 0}}" class="error-state">
     <text class="error-text">暂无可用路线方案</text>
   </view>
 
-  <!-- 方案列表：手风琴，同一时刻只有一条展开 -->
+  <!-- Route Picker：三条 route 同级，均使用完全一致的 option-summary 行结构：
+       左列（minmax(0,1fr)）：route-meta + summary；右列（固定宽）：duration / price。
+       推荐 badge（Route 1 专属）不改变行结构——它只是 label 后的可选 status badge。
+       展开详情（浅灰圆角面板）只覆盖 detail 区；summary 区域始终无底色。
+       不绘制 timeline / 贯穿式 connector；顺序由纵向排列天然表达。
+       divider 唯一来源：row 之间（wxml 对 index < length-1 渲染），summary 内零横线。 -->
   <block wx:else>
     <view
-      wx:for="{{summaries}}"
+      wx:for="{{rows}}"
       wx:key="id"
-      class="option-card {{index === expandedIndex ? 'expanded' : ''}}"
+      class="option-item {{index === expandedIndex ? 'expanded' : ''}}"
     >
-      <!-- 折叠摘要卡（整体可点切换展开） -->
+      <!-- 行主体（整体可点：展开/切换/收起）——
+           行结构不因 badge / 展开状态变化，collapsed 时三条完全等高；
+           recommended 只是 label 后的可选 status badge，不改变行 geometry -->
       <view class="option-summary" data-index="{{index}}" bind:tap="onCardTap">
-        <view class="summary-top">
-          <text class="badge {{index === 0 ? 'badge-recommend' : 'badge-plain'}}">{{item.badgeText}}</text>
-          <text class="duration">{{item.durationText}}</text>
+        <view class="summary-left">
+          <view class="route-meta">
+            <text class="route-label">{{item.labelText}}</text>
+            <text wx:if="{{item.recommended}}" class="badge-recommend">推荐</text>
+          </view>
+          <view class="summary-chain">
+            <block
+              wx:for="{{item.summarySegments}}"
+              wx:for-item="segment"
+              wx:for-index="segmentIndex"
+              wx:key="key"
+            >
+              <view class="summary-segment">
+                <view
+                  wx:if="{{segment.badge}}"
+                  class="transit-badge transit-badge-{{segment.badge.kind === 'BUS' ? 'bus' : 'metro'}}"
+                  style="background-color: {{segment.badge.backgroundColor}}; color: {{segment.badge.foregroundColor}};"
+                >
+                  <text class="transit-badge-text">{{segment.badge.text}}</text>
+                </view>
+                <text wx:else class="summary-walk">{{segment.compactText}}</text>
+              </view>
+              <text wx:if="{{segmentIndex < item.summarySegments.length - 1}}" class="summary-separator">›</text>
+            </block>
+          </view>
         </view>
-        <text class="modes">{{item.modesLine}}</text>
-        <text class="schedule">{{item.scheduleLine}}</text>
-        <text wx:if="{{item.summary}}" class="remark">{{item.summary}}</text>
+        <!-- 右列：固定宽，duration / price 右对齐，不随左侧内容漂移 -->
+        <view class="summary-right">
+          <text class="duration">{{item.durationText}}</text>
+          <text wx:if="{{item.costText}}" class="cost">{{item.costText}}</text>
+        </view>
       </view>
 
-      <!-- 展开详情：竖向时间轴 + 到达/导航行（点详情区域不触发收起） -->
-      <view wx:if="{{index === expandedIndex}}" class="option-detail">
-        <view class="timeline">
+      <!-- 展开详情：Travel Legs 自然延伸（点详情区域不触发收起；auto height，不进 header 尺寸） -->
+      <view wx:if="{{index === expandedIndex && expandedDetail}}" class="option-detail">
+        <view class="legs">
           <view
-            wx:for="{{steps}}"
-            wx:for-item="step"
-            wx:for-index="stepIndex"
+            wx:for="{{expandedDetail.legs}}"
+            wx:for-item="leg"
             wx:key="key"
-            class="step"
+            class="leg"
           >
-            <view class="step-dot {{step.isArrival ? 'arrival' : ''}}"></view>
-            <view class="step-body">
-              <text class="step-title">{{step.title}}</text>
-              <text wx:if="{{step.subtitle}}" class="step-subtitle">{{step.subtitle}}</text>
-              <text class="step-desc">{{step.descText}}</text>
+            <view
+              wx:if="{{leg.transitBadge}}"
+              class="leg-transit-badge"
+              style="background-color: {{leg.transitBadge.backgroundColor}}; color: {{leg.transitBadge.foregroundColor}};"
+            >
+              <text class="leg-transit-badge-text">{{leg.transitBadge.text}}</text>
+            </view>
+            <image wx:else class="leg-icon {{leg.toneClass}}" src="{{leg.iconPath}}" mode="aspectFit" />
+            <view class="leg-body">
+              <view class="leg-title-row">
+                <text class="leg-title">{{leg.titleText}}</text>
+                <text wx:if="{{leg.durationText}}" class="leg-duration">{{leg.durationText}}</text>
+              </view>
+              <text wx:if="{{leg.metricText}}" class="leg-metric">{{leg.metricText}}</text>
+              <text wx:if="{{leg.detailText}}" class="leg-detail">{{leg.detailText}}</text>
             </view>
           </view>
         </view>
-        <view class="detail-foot">
-          <text class="arrival">{{arrivalText}}</text>
-          <view class="nav-btn" data-option="{{item.raw}}" bind:tap="onNavTap">去导航 →</view>
+
+        <!-- 统一目的地脚注：目的地 + ETA + 低权重导航文字链接（catch:tap 防冒泡） -->
+        <view class="dest-foot">
+          <view class="dest-info">
+            <image
+              class="dest-icon"
+              src="/assets/icons/route/destination.svg"
+              mode="aspectFit"
+            />
+            <view class="dest-texts">
+              <text wx:if="{{expandedDetail.destinationText}}" class="dest-name">{{expandedDetail.destinationText}}</text>
+              <text class="dest-eta">{{expandedDetail.arrivalText}}</text>
+            </view>
+          </view>
+          <view class="nav-link" data-option="{{expandedDetail.raw}}" catch:tap="onNavTap">
+            <image class="nav-icon" src="/assets/icons/route/navigation.svg" mode="aspectFit" />
+            <text>导航</text>
+          </view>
         </view>
       </view>
+
+      <!-- 子项分隔线（最后一项之后不加） -->
+      <view wx:if="{{index < rows.length - 1}}" class="option-divider"></view>
     </view>
   </block>
 </view>

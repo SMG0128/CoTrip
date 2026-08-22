@@ -75,9 +75,10 @@ Page({
     rankedRestaurants: [] as ReturnType<typeof rankCandidates>,
     candidateGroups: [] as EventCandidateGroup[],
     showRoute: false,
-    // 我的推荐：路线方案选择器状态（懒加载——首次打开分段时才定位并规划）
+    // 我的推荐：路线方案选择器状态（懒加载——首次打开分段时才定位并规划）；
+    // expandedRouteIndex: null 表示全部收起（不变量：同一时刻展开数 ∈ {0, 1}）
     routeOptions: [] as RouteOption[],
-    expandedRouteIndex: 0,
+    expandedRouteIndex: 0 as number | null,
     routeLoading: false,
     routeErrorText: '',
     routesLoaded: false,
@@ -384,7 +385,7 @@ Page({
     }
   },
 
-  /** 组件 toggle 事件：手风琴状态机（utils/route-options-ui.ts），同一时刻只有一条展开 */
+  /** 组件 toggle 事件：手风琴状态机（utils/route-options-ui.ts）——最多一条展开，点已展开项全部收起 */
   onRouteToggle(e: WechatMiniprogram.CustomEvent) {
     const clickedIndex = Number(e.detail?.index);
     if (!Number.isInteger(clickedIndex)) return;

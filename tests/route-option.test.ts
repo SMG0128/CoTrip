@@ -62,7 +62,14 @@ function transitResponseFixture(): unknown {
               mode: 'WALKING',
               duration: 10,
               distance: 700,
-              steps: [{ instruction: '沿体育东路向南步行至体育西路站入口' }],
+              steps: [
+                {
+                  instruction: '沿体育东路向南步行至体育西路站入口',
+                  road_name: '体育东路',
+                  dir_desc: '向南',
+                  act_desc: '直行',
+                },
+              ],
               // 压缩折线一维数组：首点为原值 [lat0, lng0, ...]
               polyline: [23.1212, 113.3187, -120, 30],
             },
@@ -70,13 +77,18 @@ function transitResponseFixture(): unknown {
               mode: 'TRANSIT',
               lines: [
                 {
+                  id: 'gz_line_3',
                   title: '地铁3号线',
                   vehicle: 'SUBWAY',
+                  station_count: 7,
+                  run_status: 1,
                   duration: 30,
                   distance: 11000,
-                  price: -1,
+                  // 分段票价：price_unit=1 时单位为分；300 分 = ¥3
+                  price: 300,
                   geton: { title: '体育西路', location: { lat: 23.12916, lng: 113.32062 } },
                   getoff: { title: '广州塔', location: { lat: 23.106644, lng: 113.324658 } },
+                  destination: { title: '广州东站' },
                 },
               ],
             },
@@ -105,12 +117,63 @@ function transitResponseFixture(): unknown {
               mode: 'TRANSIT',
               lines: [
                 {
+                  id: 105, // 数字形态的线路 id：应字符串化为 '105'
                   title: '地铁5号线',
                   vehicle: 'SUBWAY',
+                  run_status: '1', // 字符串形态的运行状态：原样保留
                   duration: 40,
                   distance: 13000,
                   geton: { title: '珠江新城', location: { lat: 23.119, lng: 113.322 } },
                   getoff: { title: '广州塔', location: { lat: 23.106644, lng: 113.324658 } },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+/** transit 响应：route 级无 price，但线路级有正票价 → 汇总到 route 级（不丢票价） */
+function transitLinePriceOnlyFixture(): unknown {
+  return {
+    status: 0,
+    result: {
+      routes: [
+        {
+          duration: 44,
+          distance: 13000,
+          // 无 route 级 price：腾讯可能仅在线路级给出票价
+          steps: [
+            {
+              mode: 'TRANSIT',
+              lines: [
+                {
+                  title: '地铁3号线',
+                  vehicle: 'SUBWAY',
+                  duration: 18,
+                  distance: 8000,
+                  price: 200, // 200 分 = ¥2
+                  geton: { title: '体育西路', location: { lat: 23.12916, lng: 113.32062 } },
+                  getoff: { title: '广州塔', location: { lat: 23.106644, lng: 113.324658 } },
+                },
+                {
+                  title: '地铁APM线',
+                  vehicle: 'SUBWAY',
+                  duration: 6,
+                  distance: 2000,
+                  price: 300, // 300 分 = ¥3
+                  geton: { title: '广州塔', location: { lat: 23.106644, lng: 113.324658 } },
+                  getoff: { title: '广州东站', location: { lat: 23.1519, lng: 113.3225 } },
+                },
+                {
+                  title: '观光巴士夜班线',
+                  vehicle: 'BUS',
+                  duration: 6,
+                  distance: 2000,
+                  price: -1, // -1 = 无票价：不得参与汇总
+                  geton: { title: '广州塔西', location: { lat: 23.1059, lng: 113.330097 } },
                 },
               ],
             },
@@ -139,7 +202,15 @@ function walkingResponseFixture(): unknown {
               distance: 1900,
               duration: 24,
             },
-            { instruction: '沿阅江西路向西步行', polyline: [], distance: 1900, duration: 21 },
+            {
+              instruction: '沿阅江西路向西步行',
+              road_name: '阅江西路',
+              dir_desc: '向西',
+              act_desc: '直行',
+              polyline: [],
+              distance: 1900,
+              duration: 21,
+            },
           ],
         },
       ],
@@ -244,12 +315,92 @@ export async function runRouteOptionTests(): Promise<void> {
     noPriceOption.estimatedCost === undefined && noPriceOption.durationMinutes === 58,
     '无 route.price 的路线 estimatedCost 必须为 undefined 且正常映射其余字段'
   );
+  // 线路级票价汇总兜底：route 级 price 缺失时不得丢票价（「有地铁却无票价显示」的根因回归）
+  const linePriceOptions = adapter.toRouteOptions(transitLinePriceOnlyFixture(), 'transit', {
+    destinationName: '广州塔',
+  });
+  assert(linePriceOptions.length === 1, '仅线路级票价的路线应正常映射');
+  assert(
+    linePriceOptions[0].estimatedCost !== undefined &&
+      linePriceOptions[0].estimatedCost.amount === 5 &&
+      linePriceOptions[0].estimatedCost.currency === 'CNY',
+    'route 级 price 缺失时由线路级票价（200+300=500 分，-1 不计）汇总为 ¥5，不得丢票价'
+  );
+  // 纯步行路线恒无票价：不得出现「步行 ¥N」
+  const walkWithoutPrice = adapter.toRouteOptions(walkingResponseFixture(), 'walking', {
+    destinationName: '广州塔',
+  });
+  assert(
+    walkWithoutPrice.length === 1 && walkWithoutPrice[0].estimatedCost === undefined,
+    '纯步行路线不得携带票价（estimatedCost 恒为 undefined）'
+  );
   assert(transit.summary === undefined, '数字策略编码不得翻译为 summary 文案');
   assert(
     transit.departureTime === undefined && transit.arrivalTime === undefined,
     '未提供出发时刻时不得推算出发/到达时间'
   );
   assert(transit.recommended === false, 'adapter 不做推荐标记，交给 selectTopRouteOptions 归一化');
+
+  // ---- Adapter：Provider 字段信息保留（有值才保留，缺失即 undefined）----
+  const metroLineStep = transit.steps[1];
+  assert(
+    metroLineStep.lineTitle === '地铁3号线' && metroLineStep.transportMode === 'METRO',
+    '乘车段应保留线路名与子模式（vehicle=SUBWAY → METRO）'
+  );
+  assert(
+    metroLineStep.getonStation === '体育西路' && metroLineStep.getoffStation === '广州塔',
+    '上下车站名应结构化保留'
+  );
+  assert(metroLineStep.stationCount === 7, 'station_count 应结构化保留');
+  assert(
+    metroLineStep.towardsStation === '广州东站',
+    'destination.title 应解析为运行方向终点站'
+  );
+  assert(metroLineStep.lineId === 'gz_line_3', '线路 id 应字符串化保留');
+  assert(
+    metroLineStep.runStatus === '1',
+    'run_status 数字原始值应原样字符串化保留（不做语义解读）'
+  );
+  assert(
+    metroLineStep.estimatedCost !== undefined &&
+      metroLineStep.estimatedCost.amount === 3 &&
+      metroLineStep.estimatedCost.currency === 'CNY',
+    '分段票价 300 分（price_unit=1）应换算为 ¥3'
+  );
+
+  // 步行段：完整指引原文 + 道路/方向/动作描述保留
+  const walkSegment = transit.steps[0];
+  assert(
+    walkSegment.instruction === '沿体育东路向南步行至体育西路站入口',
+    '步行指引完整原文必须保留（标题截断不等于丢弃原文）'
+  );
+  assert(
+    walkSegment.roadName === '体育东路' &&
+      walkSegment.directionDesc === '向南' &&
+      walkSegment.actionDesc === '直行',
+    'road_name/dir_desc/act_desc 应结构化保留'
+  );
+
+  // 缺失字段防御：无 station_count/destination/run_status/正票价的线路一律 undefined
+  const busLineStep = transit.steps[3];
+  assert(busLineStep.transportMode === 'BUS', '非地铁线路按 BUS 分类');
+  assert(
+    busLineStep.stationCount === undefined &&
+      busLineStep.towardsStation === undefined &&
+      busLineStep.runStatus === undefined &&
+      busLineStep.lineId === undefined &&
+      busLineStep.estimatedCost === undefined,
+    'provider 未返回的字段必须保持 undefined，绝不伪造'
+  );
+
+  // 第二条路线：数字 id 与字符串 run_status 的读取路径
+  const line5Step = noPriceOption.steps[0];
+  assert(line5Step.lineId === '105', '数字形态线路 id 应字符串化为 id');
+  assert(line5Step.runStatus === '1', '字符串形态 run_status 原样保留');
+  assert(
+    line5Step.towardsStation === undefined && line5Step.stationCount === undefined,
+    '未返回的方向/站数保持 undefined'
+  );
 
   // ---- Adapter：出发时刻推算 ----
   const timedOptions = adapter.toRouteOptions(walkingResponseFixture(), 'walking', {
@@ -277,6 +428,15 @@ export async function runRouteOptionTests(): Promise<void> {
     '步行节点应从 path 折线首点解析坐标'
   );
   assert(
+    walkOnly[0].steps[0].instruction === '沿体育东路向东步行' &&
+      walkOnly[0].steps[0].roadName === undefined,
+    '纯步行节点保留完整指引原文；未返回的道路描述保持 undefined'
+  );
+  assert(
+    walkOnly[0].steps[1].directionDesc === '向西' && walkOnly[0].steps[1].roadName === '阅江西路',
+    '第二个步行节点的道路/方向描述应结构化保留'
+  );
+  assert(
     walkOnly[0].steps[walkOnly[0].steps.length - 1].title === '广州塔' &&
       walkOnly[0].steps[walkOnly[0].steps.length - 1].type === 'ARRIVAL',
     '步行路线同样以 ARRIVAL 结尾'
@@ -302,17 +462,25 @@ export async function runRouteOptionTests(): Promise<void> {
   assert(noTimeline.length === 0, 'transit 无可构造时间轴（无 steps 内容）时不展示');
 
   // ---- Real 服务失败语义：未配置 Key 必须真实抛错，绝不 resolve 假路线 ----
-  assert(!isTencentMapConfigured(), '测试前提：仓库内置腾讯 Key 应为占位符');
-  const realService = new RealRouteOptionService();
-  await expectReject(
-    () =>
-      realService.planRoutes({
-        destinationName: '广州塔',
-        origin: { latitude: 23.1212, longitude: 113.3187 },
-      }),
-    (error) => error.code === 'NOT_CONFIGURED',
-    '未配置 Key 时 planRoutes 必须 reject NOT_CONFIGURED，绝不 resolve 出假路线'
-  );
+  // 前提说明：仓库内 Key 为占位符时才可触发 NOT_CONFIGURED；开发者本地填入真实 Key
+  // （config/tencent-map.ts，git-ignored 语义上的本地改动）后此路径不可达且 Node 无 wx.request，
+  // 因此仅在「Key 未配置」环境下执行该断言，占位符 CI 环境始终覆盖。
+  if (!isTencentMapConfigured()) {
+    const realService = new RealRouteOptionService();
+    await expectReject(
+      () =>
+        realService.planRoutes({
+          destinationName: '广州塔',
+          origin: { latitude: 23.1212, longitude: 113.3187 },
+        }),
+      (error) => error.code === 'NOT_CONFIGURED',
+      '未配置 Key 时 planRoutes 必须 reject NOT_CONFIGURED，绝不 resolve 出假路线'
+    );
+  } else {
+    console.log(
+      'ℹ️ 检测到本地已配置真实腾讯 Key：跳过 NOT_CONFIGURED 断言（该语义由占位符环境覆盖）'
+    );
+  }
 
   // ---- Mock 服务：resolve 出 1..3 条且第一条 recommended ----
   const mockService = new MockRouteOptionService();

@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 32/32、前端 16 个测试文件全绿）：
+当前已实际实现并通过测试的能力（后端 32/32、前端 17 个测试文件全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -26,29 +26,43 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Multiple active trips** —— 首页展示全部进行中行程（最新在前），每张卡独立导航。
 - **Native WeChat sharing** —— 分享卡片直达 Join 落地页（携带 roomCode）。
 - **Navigation-style route recommendations** —— 见下节。
-- **Tencent Location Service integration** —— POI 检索 + 路线规划直连 WebService API。
+- **Tencent Location Service integration** —— POI Search + Direction（walking / transit）已真实配置并跑通，直连 WebService API。
+- **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
 
 尚未实现：真实多人加入（`POST /trips/join`）、实时同步 / WebSocket、评论与计划的后端持久化。
 
 ## Route Recommendations
 
-行程详情「我的推荐」已从静态演示路线升级为导航风格的**路线方案选择器**：
+行程详情「我的推荐」是导航风格的 **Route Picker**：最多 3 条方案并排比较，三条同级、结构统一——**Provider 返回几条就展示几条，绝不伪造补足**。
 
-- 最多展示 **3 条路线方案**（provider 排序即推荐序，近似重复方案自动剔除；只有 1 条就只显示 1 条，不伪造补足）。
-- 第一条默认标记「推荐」并展开；**任意时刻最多展开 1 条**，点击其他方案自动切换。
-- 折叠摘要可直接比较时长 / 交通方式 / 出发到达时间 / 票价；展开后显示完整站点级时间轴。
-- 数据来源：腾讯位置服务 WebService Direction API（**transit + walking** 并行请求），目的地经 POI 检索解析坐标。
-- 导航通过 `wx.openLocation` 交由微信内置地图完成，CoTrip 不自行实现导航。
-- **API 失败不回退假路线**：定位拒绝 / 地点解析失败 / 无路线 / 网络错误均显示明确失败态与重试入口。
+### 方案选择（Route Picker）
+
+- **统一行结构**：Route 1 / 2 / 3 使用同一套行布局（左侧「路线 N」+ 折叠摘要，右侧总时长 / 总价）；Route 1 额外带「推荐」徽章（推荐由 provider 排序决定，只是第 1 条的可选徽章，不改变行结构）。
+- **手风琴交互**：默认展开第一条；点击已展开项可**全部收起**；任意时刻**最多展开一条**。
+- **折叠摘要（compact route summary）**：按真实 leg 顺序的分段链（步行时长 › 线路名 › …），单行受控、超长自动裁切，不撑高行。
+- **展开详情（travel-leg details）**：逐腿展示图标、标题、时长、距离 / 上车站→下车站、方向终点站、站数、步行指引原文，以及统一目的地脚注（目的地 + 预计到达 + 导航）。
+
+### 交通方式展示
+
+- **WALK / METRO / BUS 独立呈现**：各自使用专属图标与文案（步行=指引 + 距离；乘车=线路名 + 上下车站）。
+- **广州地铁徽章（本地 presentation registry）**：`utils/guangzhou-metro.ts` 本地维护广州线路色与徽章文本——编号线路徽章仅显示数字、**APM 显示「APM」、广佛线显示「广佛」**；无网络依赖，不写回 provider DTO。
+- **公交徽章**：使用 Provider 返回的**真实线路名**，蓝底白字，绝不编造线路。
+- **票价（fare）**：只展示 Provider 真实价格（route 级票价，缺失时以线路级票价多程汇总兜底）；**未知价格直接隐藏**，不显示假占位符。
+
+### 数据与降级
+
+- 数据来源：腾讯位置服务 WebService API（**POI Search** 解析目的地坐标 + **Direction walking / transit** 并行请求）。
+- 导航通过 `wx.openLocation` 交给微信内置地图完成，CoTrip 不自行实现导航。
+- **失败不回退假路线**：Provider / 地点解析 / 定位失败均显示明确失败态与重试入口；绝不伪造路线、票价或到达时间。
 
 ## Tencent Map Setup
 
-腾讯位置服务需要本地配置。当前代码使用占位符 `YOUR_TENCENT_MAP_KEY`（见 `config/tencent-map.ts`）：
+腾讯位置服务 WebService API（POI Search + Direction walking/transit）已**真实配置并在本地跑通**。真实 Key **不进入 Git**，仓库内始终为占位符：
 
 1. 在 [腾讯位置服务控制台](https://lbs.qq.com/) 创建应用并申请 Key，勾选所需 **WebService API** 能力（PlaceSearch / Direction），建议配置配额限额与用量告警。
-2. 在小程序管理后台「开发设置 → 服务器域名」添加 request 合法域名 `https://apis.map.qq.com`。
-3. 在微信小程序控制台配置位置权限与《用户隐私保护指引》（`permission.scope.userLocation` 与 `requiredPrivateInfos` 已在 `app.json` 声明）。
-4. 将 Key 填入 `config/tencent-map.ts` 替换占位符（仅本地修改，勿提交真实 Key）。
+2. 将 Key 填入 `config/tencent-map.ts` 替换占位符 `YOUR_TENCENT_MAP_KEY`（仅本地修改，**勿提交真实 Key**）。
+3. 在小程序管理后台「开发设置 → 服务器域名」添加 request 合法域名 `https://apis.map.qq.com`。
+4. 在微信小程序控制台配置位置权限与《用户隐私保护指引》（`permission.scope.userLocation` 与 `requiredPrivateInfos` 已在 `app.json` 声明）。
 
 **Never commit production/private keys.** 未配置 Key 时路线功能显示「暂未配置地图服务」，不会伪造数据。
 
@@ -102,7 +116,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 ├── core/                           # 纯规划逻辑（约束解析→冲突检测→规划引擎）
 ├── services/                       # 服务接口 + mock/ 与 real/ 实现
 ├── config/auth.ts                  # 认证模式切换（mock | real）
-├── utils/                          # 纯函数工具（trip-share、trip-card…）
+├── utils/                          # 纯函数工具（trip-share、trip-card、route-options-ui、guangzhou-metro…）
 ├── mock/                           # Mock 数据
 ├── tests/                          # 前端单元测试（自研轻量运行器）
 └── server/                         # Node.js + Express 后端

@@ -1,201 +1,371 @@
 /* components/route-options/index.wxss
-   路线方案选择器：延续页面「白卡 + 轻描边 + 轻阴影」语言；
-   展开项边框略带蓝（rgba(50,107,255,.28)），非展开项更安静。 */
+   Route Picker（Native 语义，本轮结构简化）：
+   - 固定两列网格：左列 minmax(0,1fr)（route-meta 路线 N + 推荐 badge / 折叠态分段链）+
+     右列固定宽（duration / price 右对齐）；三条 route 同一套 DOM，collapsed 等高
+   - 折叠态摘要 = 按真实 leg 顺序的单行链；地铁/公交使用原生小徽章
+   - 展开详情面板（浅灰圆角底板，仅覆盖 detail 区；summary 始终无底色）
+   - 不绘制 timeline / 贯穿式 connector；顺序由纵向排列天然表达
+   - divider 唯一来源：row 之间（wxml 对 index < length-1 渲染），summary 内零横线
+   - 折叠摘要的广州地铁 badge 使用集中本地注册表；公交和未识别地铁使用 CoTrip 蓝
+   - 展开腿仍保持通用 CoTrip accent，不在详情层扩大本轮改动
+   - 导航为低权重文字链接（不打扰行内摘要） */
 
-.route-options {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-/* ---- 方案卡 ---- */
-.option-card {
+.route-panel {
+  padding: 0 28rpx;
   background: #ffffff;
   border: 1rpx solid rgba(122, 147, 194, 0.12);
   border-radius: 30rpx;
-  padding: 28rpx;
   box-shadow: 0 8rpx 26rpx rgba(60, 90, 160, 0.06);
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
 }
 
-/* 展开项：边框略带蓝，聚焦当前方案 */
-.option-card.expanded {
-  border-color: rgba(50, 107, 255, 0.28);
-  box-shadow: 0 10rpx 30rpx rgba(50, 107, 255, 0.1);
+/* ---- 方案子项（同一容器内，三条同级；无卡片套卡片） ---- */
+.option-item {
+  position: relative;
+  padding: 0 4rpx;
 }
+/* 注意：row 自身永不铺底色（无 .expanded 背景）；灰色底只属于展开详情面板 */
 
+/* ---- 固定两列网格行主体 ----
+   左列（minmax(0,1fr)）：route-meta + summary；右列（固定宽）：duration / price。
+   三条 route 同一套 DOM，仅推荐 badge 条件出现；header 不因展开状态变化 */
 .option-summary {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120rpx;
+  column-gap: 20rpx;
+  height: 126rpx;
+  padding: 22rpx 0;
   min-width: 0;
 }
 
-.summary-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
+.summary-left {
+  display: grid;
+  grid-template-rows: 34rpx 42rpx;
+  row-gap: 6rpx;
+  min-width: 0;
 }
 
-/* 左上标签：第 0 条「推荐」小胶囊（轻蓝底蓝字），其余「路线 N/M」灰字 */
-.badge {
+/* route-meta：路线身份（路线 1/2/3）+ 可选推荐 badge，单行、badge 不 shrink、固定 gap */
+.route-meta {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+/* 路线身份（所有行一致显示「路线 N」）：弱化灰字 identity，低于 summary / duration */
+.route-label {
   flex-shrink: 0;
+  color: #95a1b5;
   font-size: 21rpx;
+  font-weight: 500;
   line-height: 1.5;
 }
 
+/* 推荐 status badge（Route 1 专属，紧跟「路线 1」）
+   - 视觉权重 Level 3：低于 route-label / summary / duration
+   - 小胶囊：浅底 + 蓝字 + 极浅描边，无 shadow / glow；不撑行高、不改变 row 高度 */
 .badge-recommend {
-  padding: 4rpx 16rpx;
+  flex-shrink: 0;
+  padding: 1rpx 10rpx;
   color: #326bff;
-  background: #eef3ff;
+  background: rgba(50, 107, 255, 0.06);
+  border: 1rpx solid rgba(50, 107, 255, 0.1);
   border-radius: 999rpx;
-  font-weight: 650;
-}
-
-.badge-plain {
-  color: #95a1b5;
+  font-size: 19rpx;
   font-weight: 500;
+  line-height: 1.35;
 }
 
-/* 右上大字时长 */
+/* 摘要始终占左下固定槽；子项链整体裁切，绝不挤压右侧 metrics。 */
+.summary-chain {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.summary-segment {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.summary-walk {
+  color: #3d4c66;
+  font-size: 22rpx;
+  font-weight: 550;
+  line-height: 42rpx;
+  white-space: nowrap;
+}
+
+.summary-separator {
+  flex-shrink: 0;
+  color: #a8b3c5;
+  font-size: 22rpx;
+  line-height: 42rpx;
+}
+
+/* 原生交通标记：颜色全部来自展示 VM，WXSS 不散落任何线色知识。 */
+.transit-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 34rpx;
+  max-width: 112rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
+  border-radius: 7rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 30rpx;
+}
+
+.transit-badge-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transit-badge-bus {
+  max-width: 128rpx;
+}
+
+/* 右列 metrics：固定宽、右对齐，不随左侧内容漂移；三条 duration 右边缘垂直对齐 */
+.summary-right {
+  display: grid;
+  grid-template-rows: 34rpx 42rpx;
+  row-gap: 6rpx;
+  width: 120rpx;
+  min-width: 0;
+}
+
+/* 总时长（Level 1：行内最高视觉权重） */
 .duration {
   color: #17243d;
   font-size: 34rpx;
   font-weight: 760;
+  line-height: 34rpx;
+  text-align: right;
+  white-space: nowrap;
 }
 
-.modes {
+/* 总价（Level 3）：与总时长构成右侧信息组（紧随 duration 下方）
+   - 弱于 duration、强于最轻辅助说明（remark/dest-eta）
+   - 缺失时由 wxml 隐藏，不显示 ¥-- / 假占位符 */
+.cost {
+  color: #5a6a86;
+  font-size: 23rpx;
+  line-height: 42rpx;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 子项分隔线：hairline，弱分离而非卡片化
+   - 唯一 row 间 divider 来源（wxml 只对 index < length-1 渲染）
+   - margin 0 4rpx 左右对称，与 option-item 内容区 padding 对齐（不左缩进右顶满） */
+.option-divider {
+  position: absolute;
+  right: 4rpx;
+  bottom: 0;
+  left: 4rpx;
+  height: 1rpx;
+  background: #edf1f7;
+}
+
+/* ---- 第三层：展开详情面板（仅展开项）
+   浅灰圆角底板只覆盖 detail 区：完整、对齐、不铺到 summary
+   面板左右边界 = option-item 内容区边界（与 divider 同 4rpx 缩进），互不打架 */
+.option-detail {
+  margin: 0 0 22rpx;
+  padding: 18rpx 20rpx 16rpx;
+  background: #f6f8fc;
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 24rpx;
+}
+
+.legs {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 腿：独立信息块，仅用垂直留白分隔，不 rounded / 不 border / 不 shadow */
+.leg {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+  padding: 14rpx 0;
+}
+
+/* 腿图标：步行 neutral 浅底 / 乘车统一 CoTrip 蓝 accent（禁止线路色映射） */
+.leg-icon {
+  width: 44rpx;
+  height: 44rpx;
+  margin-top: 2rpx;
+  flex-shrink: 0;
+  padding: 6rpx;
+  box-sizing: border-box;
+  border-radius: 12rpx;
+}
+
+.leg-icon.walk {
+  background: #f2f5fa;
+}
+
+.leg-icon.accent {
+  background: rgba(50, 107, 255, 0.1);
+}
+
+/* 乘车腿左侧直接显示线路徽章，替代泛化地铁/公交图标。
+   详情标题仍保留 Provider 完整线路名，badge 只用于快速识别。 */
+.leg-transit-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 44rpx;
+  max-width: 100rpx;
+  height: 36rpx;
+  margin-top: 6rpx;
+  padding: 0 9rpx;
+  border-radius: 8rpx;
+  font-size: 21rpx;
+  font-weight: 750;
+  line-height: 36rpx;
+}
+
+.leg-transit-badge-text {
   display: block;
+  min-width: 0;
   overflow: hidden;
-  margin-top: 14rpx;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leg-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 腿头：标题（Level 1）+ 时长（右侧稳定列） */
+.leg-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.leg-title {
+  overflow: hidden;
+  color: #27344c;
+  font-size: 28rpx;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leg-duration {
+  flex-shrink: 0;
   color: #3d4c66;
-  font-size: 27rpx;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+/* 第二行（Level 2）：WALK=距离；乘车=上车 → 下车 */
+.leg-metric {
+  margin-top: 6rpx;
+  color: #3d4c66;
+  font-size: 24rpx;
+  font-weight: 550;
+  line-height: 1.5;
+}
+
+/* 第三行（Level 3）：WALK=指引原文；乘车=往 X 方向 · 乘 N 站 */
+.leg-detail {
+  margin-top: 4rpx;
+  color: #8492aa;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+/* ---- 统一目的地脚注：目的地 + ETA + 低权重导航（详情自然结尾） ----
+   无 border：展开详情内零横线，横线唯一来源 = row 间的 option-divider */
+.dest-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.dest-info {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  gap: 12rpx;
+}
+
+.dest-icon {
+  width: 34rpx;
+  height: 34rpx;
+  margin-top: 2rpx;
+  flex-shrink: 0;
+}
+
+.dest-texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dest-name {
+  overflow: hidden;
+  color: #27344c;
+  font-size: 25rpx;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.schedule {
-  display: block;
-  margin-top: 8rpx;
+.dest-eta {
+  margin-top: 2rpx;
   color: #64738d;
-  font-size: 24rpx;
+  font-size: 23rpx;
 }
 
-/* summary 小灰字附加行 */
-.remark {
-  display: block;
-  margin-top: 10rpx;
-  color: #8492aa;
-  font-size: 22rpx;
-}
-
-/* ---- 展开详情：竖向时间轴 ---- */
-.option-detail {
-  margin-top: 26rpx;
-  padding-top: 24rpx;
-  border-top: 1rpx solid #edf1f7;
-}
-
-.step {
-  position: relative;
+/* 导航：透明文字链接，降权（小字 + 常规字重），catch:tap 防冒泡由 wxml 处理 */
+.nav-link {
   display: flex;
-  align-items: flex-start;
-  padding-bottom: 26rpx;
-}
-
-.step:last-child {
-  padding-bottom: 0;
-}
-
-.step-dot {
-  box-sizing: border-box;
+  align-items: center;
   flex-shrink: 0;
-  width: 18rpx;
-  height: 18rpx;
-  margin: 10rpx 20rpx 0 2rpx;
-  background: #326bff;
-  border-radius: 50%;
-}
-
-/* 到达节点：空心圆点 */
-.step-dot.arrival {
-  background: #ffffff;
-  border: 5rpx solid #326bff;
-}
-
-/* 节点连接线：圆点中心 x = 2 + 9 = 11rpx，线宽 2rpx → left 10rpx */
-.step:not(:last-child) .step-dot::after {
-  content: '';
-  position: absolute;
-  left: 10rpx;
-  top: 32rpx;
-  width: 2rpx;
-  height: 100%;
-  background: #dce7fa;
-}
-
-.step-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.step-title {
-  color: #27344c;
-  font-size: 28rpx;
-  font-weight: 550;
-}
-
-.step-subtitle {
-  margin-top: 4rpx;
+  gap: 4rpx;
+  padding: 6rpx 2rpx;
   color: #326bff;
   font-size: 23rpx;
   font-weight: 500;
 }
 
-.step-desc {
-  margin-top: 4rpx;
-  color: #8492aa;
-  font-size: 23rpx;
+.nav-icon {
+  width: 24rpx;
+  height: 24rpx;
 }
 
-/* 详情底部：到达行 + 去导航 */
-.detail-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  margin-top: 24rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid #edf1f7;
-}
-
-.arrival {
-  color: #64738d;
-  font-size: 26rpx;
-  font-weight: 600;
-}
-
-/* 主操作沿用页面品牌渐变胶囊（与发送按钮同语言） */
-.nav-btn {
-  flex-shrink: 0;
-  padding: 12rpx 26rpx;
-  color: #ffffff;
-  background: linear-gradient(135deg, #6a5cff, #326bff 68%, #20b9ff);
-  border-radius: 999rpx;
-  box-shadow: 0 8rpx 18rpx rgba(50, 107, 255, 0.22);
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-/* ---- Loading skeleton：灰色摘要卡形状 ---- */
-.skeleton-card {
-  padding: 28rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(122, 147, 194, 0.1);
-  border-radius: 30rpx;
-  box-shadow: 0 8rpx 26rpx rgba(60, 90, 160, 0.05);
+/* ---- Loading skeleton：面板内骨架行 ---- */
+.skeleton-item {
+  padding: 24rpx 4rpx;
 }
 
 .skeleton-row {
@@ -225,11 +395,6 @@
   margin-top: 24rpx;
 }
 
-.skeleton-schedule {
-  width: 70%;
-  margin-top: 16rpx;
-}
-
 @keyframes skeleton-pulse {
   0%,
   100% {
@@ -241,16 +406,13 @@
   }
 }
 
-/* ---- 错误态 / 空态 ---- */
+/* ---- 错误态 / 空态（容器内扁平呈现） ---- */
 .error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 22rpx;
-  padding: 46rpx 32rpx;
-  background: #ffffff;
-  border: 1rpx dashed rgba(122, 147, 194, 0.35);
-  border-radius: 30rpx;
+  padding: 44rpx 32rpx;
 }
 
 .error-text {

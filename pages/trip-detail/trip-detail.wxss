@@ -251,6 +251,9 @@ button::after {
   color: #b3bdcd;
 }
 
+/* 发送按钮：与「新建行程」按钮（home .quick-btn.primary）同源视觉语言
+   —— 白卡 + 极细品牌渐变描边（双背景层实现，圆角正常裁切）+ 浅阴影；
+   身份靠描边与轻量蓝字表达，不做大面积铺色 */
 .send-btn {
   display: flex;
   align-items: center;
@@ -258,12 +261,15 @@ button::after {
   flex-shrink: 0;
   min-width: 142rpx;
   height: 78rpx;
-  color: #ffffff;
-  background: linear-gradient(135deg, #6a5cff, #326bff 68%, #20b9ff);
+  color: #326bff;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(135deg, #6a5cff, #326bff 55%, #20b9ff) border-box;
+  border: 2rpx solid transparent;
   border-radius: 34rpx;
-  box-shadow: 0 10rpx 24rpx rgba(50, 107, 255, 0.24);
-  font-size: 27rpx;
-  font-weight: 700;
+  box-shadow: 0 8rpx 18rpx rgba(50, 107, 255, 0.12);
+  font-size: 26rpx;
+  font-weight: 650;
 }
 
 .send-btn image {

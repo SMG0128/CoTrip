@@ -23,6 +23,49 @@ export interface RouteStep {
   distanceMeters?: number;
   latitude?: number;
   longitude?: number;
+
+  // ---- Provider 信息保留区 ----
+  // 以下字段仅当腾讯 Direction API 真实返回时才有值；缺失即保持 undefined，
+  // 由 UI 有意义地隐藏。禁止在数据层或展示层编造任何取值。
+
+  /** 步行段：完整指引原文（未截断），如「沿体育东路向南步行至体育西路站入口」 */
+  instruction?: string;
+  /** 步行段：道路名（road_name） */
+  roadName?: string;
+  /** 步行段：方向描述（dir_desc），如「向南」 */
+  directionDesc?: string;
+  /** 步行段：动作描述（act_desc），如「左转」 */
+  actionDesc?: string;
+
+  /** 乘车段：线路 ID（provider 原始值的字符串形式） */
+  lineId?: string;
+  /** 乘车段：线路名（lines[].title，如「地铁3号线」） */
+  lineTitle?: string;
+  /** 乘车段：运行方向终点站（destination/direction 字段的站名），如「广州东站」 */
+  towardsStation?: string;
+  /** 乘车段：上车站名（geton.title） */
+  getonStation?: string;
+  /** 乘车段：下车站名（getoff.title） */
+  getoffStation?: string;
+  /** 乘车段：乘坐站数（station_count） */
+  stationCount?: number;
+  /**
+   * 乘车段：交通子模式（provider vehicle 字段的语义化结果：
+   * SUBWAY → METRO，含「地铁/号线」名称启发式 → METRO，其余 BUS）。
+   * UI 据此选择地铁/公交图标。
+   */
+  transportMode?: RouteTransportMode;
+  /**
+   * 乘车段：线路运行状态原始值（run_status）。
+   * 仅原样保存 provider 取值；官方枚举语义确认之前 UI 不解读、不展示，
+   * 防止把未知编码误报为异常（产品不变量 2/8：不虚构、不推断）。
+   */
+  runStatus?: string;
+  /** 分段票价：provider 返回且为正数时换算填充（与 RouteOption.estimatedCost 同构） */
+  estimatedCost?: {
+    amount: number;
+    currency: string;
+  };
 }
 
 /** 一条完整路线方案 */

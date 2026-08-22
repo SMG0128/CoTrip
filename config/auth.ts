@@ -8,7 +8,7 @@
 
 export const authConfig = {
   /** 认证模式：'mock' | 'real' */
-  mode: 'real' as 'mock' | 'real',
+  mode: 'mock' as 'mock' | 'real',
   /** 后端服务地址，例如 'https://api.example.com'（仅 real 模式使用） */
   baseUrl: 'https://api.yipziwun.asia',
   /** 登录态在本地缓存的 key */

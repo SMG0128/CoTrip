@@ -2,6 +2,9 @@
 // 腾讯路线规划 Provider：direction v1（步行 / 公交地铁）→ RouteOption[]。
 // 边界：腾讯原始响应只在本文件内消化，经 TencentDirectionAdapter 防御式映射为
 // types/route-option.ts 的 ViewModel，禁止把原始 DTO 暴露给页面。
+// 信息保留原则（Provider-first）：provider 真实返回且对用户有价值的字段
+// （线路名/方向/上下车站/站数/分段票价/步行指引全文等）语义化保留；
+// 未返回的字段一律 undefined，绝不伪造；不做 raw response dump。
 // 失败语义：网络层失败 → NETWORK_ERROR；API/解析异常 → PROVIDER_ERROR；
 // 绝不伪造兜底路线（产品不变量 8：优雅降级 ≠ 编造数据）。
 
@@ -90,6 +93,12 @@ interface TencentRouteDto {
 /** walking 路线的单个指引步（也用于 transit WALKING 段的内部 steps） */
 interface TencentWalkInstructionDto {
   instruction?: unknown;
+  /** 道路名 */
+  road_name?: unknown;
+  /** 方向描述，如「向南」 */
+  dir_desc?: unknown;
+  /** 动作描述，如「左转」 */
+  act_desc?: unknown;
 }
 
 /** transit 路线的单个分段：mode 决定内部结构 */
@@ -106,6 +115,8 @@ interface TencentRouteStepDto {
 }
 
 interface TencentLineDto {
+  /** 线路 ID（provider 原始值，可能为字符串或数字） */
+  id?: unknown;
   /** 线路名，如「地铁3号线」 */
   title?: unknown;
   vehicle?: unknown;
@@ -115,6 +126,18 @@ interface TencentLineDto {
   price?: unknown;
   geton?: unknown;
   getoff?: unknown;
+  /** 乘坐站数（station_count）；缺失/非有限数时不保留 */
+  station_count?: unknown;
+  /** 运行状态原始值（run_status）：仅原样保存，官方枚举确认前 UI 不解读 */
+  run_status?: unknown;
+  /**
+   * 运行方向终点站：lines[] 上的方向信息（destination / direction 键，
+   * 取值为 {title} 形态或字符串）。两键防御式读取，官方未返回即 undefined。
+   * 注意：腾讯 WebService transit 响应未提供线路颜色等 styling 元数据，
+   * 本适配器不含也不猜测任何颜色字段（presentation 由 CoTrip UI 层负责）。
+   */
+  destination?: unknown;
+  direction?: unknown;
 }
 
 interface TencentStopDto {
@@ -149,6 +172,44 @@ function toLatLng(value: unknown): { latitude: number; longitude: number } | und
   const lat = toFiniteNumber(record.lat);
   const lng = toFiniteNumber(record.lng);
   return lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : undefined;
+}
+
+/** 标识符读取：字符串去空白；有限数字转字符串（provider 的线路 id 可能是数字） */
+function toIdentifier(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  const num = toFiniteNumber(value);
+  return num !== undefined ? String(num) : undefined;
+}
+
+/** 状态原始值读取：字符串/数字原样字符串化，其余丢弃（绝不做语义解读） */
+function toStatusString(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  const num = toFiniteNumber(value);
+  return num !== undefined ? String(num) : undefined;
+}
+
+/** 步行指引的 Provider 字段组（全部可选；缺一不影响其他，绝不补造） */
+interface WalkInstructionFields {
+  instruction?: string;
+  roadName?: string;
+  directionDesc?: string;
+  actionDesc?: string;
+}
+
+/** 从 walking 指引步记录提取完整指引字段（未截断原文 + 道路/方向/动作描述） */
+function readWalkInstruction(step: Record<string, unknown> | null): WalkInstructionFields {
+  if (!step) return {};
+  const dto: TencentWalkInstructionDto = step;
+  const fields: WalkInstructionFields = {};
+  const instruction = toTrimmedString(dto.instruction);
+  if (instruction !== undefined) fields.instruction = instruction;
+  const roadName = toTrimmedString(dto.road_name);
+  if (roadName !== undefined) fields.roadName = roadName;
+  const directionDesc = toTrimmedString(dto.dir_desc);
+  if (directionDesc !== undefined) fields.directionDesc = directionDesc;
+  const actionDesc = toTrimmedString(dto.act_desc);
+  if (actionDesc !== undefined) fields.actionDesc = actionDesc;
+  return fields;
 }
 
 /** 站点名兼容读取：现行字段为 title，旧版为 name */
@@ -195,7 +256,8 @@ export type TencentDirectionMode = 'transit' | 'walking';
  * 防御式假设：
  * - duration/distance 缺失或非有限数 → 整条路线丢弃（宁缺毋假）；
  * - transit 无有效 segments 可构造时间轴 → 丢弃该条；
- * - estimatedCost：direction v1 不提供可信票价字段，恒为 undefined，绝不猜测；
+ * - estimatedCost：transit 时 route.price（分）换算为元；route 级票价缺失/非正时
+ *   由线路级票价（lines[].price 多程求和）汇总兜底；纯步行路线恒为 undefined，绝不猜测；
  * - summary：仅当 strategy 为非空字符串标签时透传；数字策略编码含义不明，不翻译；
  * - departureTime/arrivalTime：仅当请求带 departureTime 才按 duration 推算（ISO-8601 UTC），
  *   否则两者皆 undefined（UI 呈现「尽快出发」语义）。
@@ -244,14 +306,15 @@ export class TencentDirectionAdapter {
         const step = asRecord(rawStep);
         if (!step) continue;
         const stepDistance = toFiniteNumber(step.distance);
-        const instruction = toTrimmedString(step.instruction);
+        const walk = readWalkInstruction(step);
         const coords = firstPolylinePoint(step.polyline);
         steps.push({
           type: 'WALK',
-          title: instruction ? truncateText(instruction) : '步行',
+          title: walk.instruction ? truncateText(walk.instruction) : '步行',
           subtitle: stepDistance !== undefined ? `约 ${Math.round(stepDistance)} 米` : undefined,
           durationMinutes: toFiniteNumber(step.duration),
           distanceMeters: stepDistance,
+          ...walk,
           ...(coords ?? {}),
         });
       }
@@ -285,6 +348,8 @@ export class TencentDirectionAdapter {
     const pushMode = (mode: RouteTransportMode): void => {
       if (!modes.includes(mode)) modes.push(mode);
     };
+    // 线路级正票价（分）收集：route.price 缺失/非正时汇总为 route 级票价兜底
+    const linePriceFens: number[] = [];
 
     for (const rawStep of toArray(route.steps)) {
       const step = asRecord(rawStep);
@@ -293,7 +358,7 @@ export class TencentDirectionAdapter {
       if (mode === 'WALKING') {
         this.appendWalkingNode(step, steps, pushMode);
       } else if (mode === 'TRANSIT') {
-        this.appendLineNodes(step, steps, pushMode);
+        this.appendLineNodes(step, steps, pushMode, linePriceFens);
       }
       // 其他/未知 mode：跳过，不编造展示内容
     }
@@ -308,6 +373,7 @@ export class TencentDirectionAdapter {
       steps,
       rawStrategy: route.strategy,
       rawPrice: route.price,
+      linePriceFens,
       context,
     });
   }
@@ -330,20 +396,26 @@ export class TencentDirectionAdapter {
       (durationMinutes !== undefined && durationMinutes > 0);
     if (!hasContent) return;
 
-    const firstInstruction = innerSteps
-      .map(asRecord)
-      .map((record) => toTrimmedString((record as TencentWalkInstructionDto | null)?.instruction))
-      .find((value): value is string => value !== undefined);
+    // 聚合第一条含指引信息的内部步：完整 instruction + 道路/方向/动作描述原样保留
+    let walk: WalkInstructionFields = {};
+    for (const rawInner of innerSteps) {
+      const fields = readWalkInstruction(asRecord(rawInner));
+      if (Object.keys(fields).length > 0) {
+        walk = fields;
+        break;
+      }
+    }
     const coords = firstPolylinePoint(step.polyline);
     steps.push({
       type: 'WALK',
-      title: firstInstruction ? truncateText(firstInstruction) : '步行',
+      title: walk.instruction ? truncateText(walk.instruction) : '步行',
       subtitle:
         distanceMeters !== undefined && distanceMeters > 0
           ? `约 ${Math.round(distanceMeters)} 米`
           : undefined,
       durationMinutes,
       distanceMeters,
+      ...walk,
       ...(coords ?? {}),
     });
     pushMode('WALK');
@@ -353,11 +425,16 @@ export class TencentDirectionAdapter {
    * TRANSIT 段的乘车线路（可能多程）；vehicle=SUBWAY 归 METRO，
    * 其余按线路名兜底启发式（含「地铁/号线」→ METRO），再否则 BUS。
    * 节点标题=线路名，副标题=「上车站 → 下车站」，坐标=上车站位置。
+   * 信息保留（全部仅在 provider 实际返回时填充）：线路 id、运行方向终点站、
+   * 上下车站名、乘坐站数、分段票价（分→元）、run_status 原始值。
+   * linePriceFens：收集每条线路的正票价（分），供 route 级票价汇总兜底
+   * （route.price 缺失/非正时，避免「有地铁却无票价显示」）。
    */
   private appendLineNodes(
     step: Record<string, unknown>,
     steps: RouteStep[],
-    pushMode: (mode: RouteTransportMode) => void
+    pushMode: (mode: RouteTransportMode) => void,
+    linePriceFens?: number[]
   ): void {
     for (const rawLine of toArray(step.lines)) {
       const line = asRecord(rawLine);
@@ -373,6 +450,29 @@ export class TencentDirectionAdapter {
       const onLocation = geton ? toLatLng(geton.location) : undefined;
       const subtitle = onName && offName ? `${onName} → ${offName}` : undefined;
 
+      // 分段票价：price_unit=1 时单位「分」，-1/缺失表示无票价，绝不猜测
+      const priceFen = toFiniteNumber(dto.price);
+      if (priceFen !== undefined && priceFen > 0) linePriceFens?.push(priceFen);
+      const estimatedCost =
+        priceFen !== undefined && priceFen > 0
+          ? { amount: Number((priceFen / 100).toFixed(2)), currency: 'CNY' }
+          : undefined;
+
+      // 运行方向终点站：destination / direction 两键防御式读取（{title} 形态或字符串）
+      const towardsStation =
+        readStopName(asRecord(dto.destination)) ??
+        toTrimmedString(dto.destination) ??
+        readStopName(asRecord(dto.direction)) ??
+        toTrimmedString(dto.direction);
+
+      const lineId = toIdentifier(dto.id);
+      const stationCount = toFiniteNumber(dto.station_count);
+      const runStatus = toStatusString(dto.run_status);
+      const lineTransportMode = this.classifyLineMode(
+        displayName,
+        toTrimmedString(dto.vehicle)
+      );
+
       steps.push({
         type: 'TRANSIT',
         title: displayName,
@@ -380,8 +480,17 @@ export class TencentDirectionAdapter {
         durationMinutes: toFiniteNumber(dto.duration),
         distanceMeters: toFiniteNumber(dto.distance),
         ...(onLocation ?? {}),
+        lineTitle: displayName,
+        transportMode: lineTransportMode,
+        ...(lineId !== undefined ? { lineId } : {}),
+        ...(towardsStation !== undefined ? { towardsStation } : {}),
+        ...(onName !== undefined ? { getonStation: onName } : {}),
+        ...(offName !== undefined ? { getoffStation: offName } : {}),
+        ...(stationCount !== undefined ? { stationCount } : {}),
+        ...(runStatus !== undefined ? { runStatus } : {}),
+        ...(estimatedCost !== undefined ? { estimatedCost } : {}),
       });
-      pushMode(this.classifyLineMode(displayName, toTrimmedString(dto.vehicle)));
+      pushMode(lineTransportMode);
     }
   }
 
@@ -405,8 +514,9 @@ export class TencentDirectionAdapter {
 
   /**
    * 组装 RouteOption：
-   * - estimatedCost：仅 transit 且 route.price 为正数时填充。请求已带 price_unit=1
-   *   （官方参数：票价统一为「分」），故换算 /100 为元；缺失/非正数一律 undefined，绝不猜测；
+   * - estimatedCost：transit 时 route.price 优先（price_unit=1，单位「分」，/100 为元）；
+   *   route.price 缺失/非正时，由线路级票价（lines[].price，多程求和）汇总兜底；
+   *   两者皆无 → undefined，绝不猜测；
    * - summary：strategy 仅在为字符串标签时透传，数字编码不解读；
    * - departureTime/arrivalTime：仅有请求出发时刻时按 duration 推算（UTC ISO-8601，
    *   展示层统一换算东八区）。
@@ -419,11 +529,20 @@ export class TencentDirectionAdapter {
     steps: RouteStep[];
     rawStrategy: unknown;
     rawPrice?: unknown;
+    linePriceFens?: number[];
     context?: DirectionAdapterContext;
   }): RouteOption {
     const times = this.computeTimes(input.durationMinutes, input.context);
-    const priceFen =
+    const routePriceFen =
       input.rawPrice !== undefined ? toFiniteNumber(input.rawPrice) : undefined;
+    // 线路级票价汇总：仅取正票价（-1/缺失表示无票价，不参与），多程换乘求和
+    const lineFens = (input.linePriceFens ?? []).filter((v) => v > 0);
+    const priceFen =
+      routePriceFen !== undefined && routePriceFen > 0
+        ? routePriceFen
+        : lineFens.length > 0
+          ? lineFens.reduce((sum, v) => sum + v, 0)
+          : undefined;
     const estimatedCost =
       priceFen !== undefined && priceFen > 0
         ? { amount: Number((priceFen / 100).toFixed(2)), currency: 'CNY' }
