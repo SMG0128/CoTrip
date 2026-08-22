@@ -1,0 +1,68 @@
+<view class="route-options">
+  <!-- Loading：三张灰色 skeleton 摘要卡（不用大 spinner） -->
+  <block wx:if="{{loading}}">
+    <view wx:for="{{[0, 1, 2]}}" wx:key="*this" class="skeleton-card">
+      <view class="skeleton-row">
+        <view class="skeleton-line skeleton-badge"></view>
+        <view class="skeleton-line skeleton-duration"></view>
+      </view>
+      <view class="skeleton-line skeleton-modes"></view>
+      <view class="skeleton-line skeleton-schedule"></view>
+    </view>
+  </block>
+
+  <!-- 错误态：失败文案 + 「重新规划」（绝不伪造路线数据兜底） -->
+  <view wx:elif="{{errorText}}" class="error-state">
+    <text class="error-text">{{errorText}}</text>
+    <view class="retry-btn" bind:tap="onRetryTap">重新规划</view>
+  </view>
+
+  <!-- 空态：服务层保证 1..3 条，此分支仅防御性兜底 -->
+  <view wx:elif="{{summaries.length === 0}}" class="error-state">
+    <text class="error-text">暂无可用路线方案</text>
+  </view>
+
+  <!-- 方案列表：手风琴，同一时刻只有一条展开 -->
+  <block wx:else>
+    <view
+      wx:for="{{summaries}}"
+      wx:key="id"
+      class="option-card {{index === expandedIndex ? 'expanded' : ''}}"
+    >
+      <!-- 折叠摘要卡（整体可点切换展开） -->
+      <view class="option-summary" data-index="{{index}}" bind:tap="onCardTap">
+        <view class="summary-top">
+          <text class="badge {{index === 0 ? 'badge-recommend' : 'badge-plain'}}">{{item.badgeText}}</text>
+          <text class="duration">{{item.durationText}}</text>
+        </view>
+        <text class="modes">{{item.modesLine}}</text>
+        <text class="schedule">{{item.scheduleLine}}</text>
+        <text wx:if="{{item.summary}}" class="remark">{{item.summary}}</text>
+      </view>
+
+      <!-- 展开详情：竖向时间轴 + 到达/导航行（点详情区域不触发收起） -->
+      <view wx:if="{{index === expandedIndex}}" class="option-detail">
+        <view class="timeline">
+          <view
+            wx:for="{{steps}}"
+            wx:for-item="step"
+            wx:for-index="stepIndex"
+            wx:key="key"
+            class="step"
+          >
+            <view class="step-dot {{step.isArrival ? 'arrival' : ''}}"></view>
+            <view class="step-body">
+              <text class="step-title">{{step.title}}</text>
+              <text wx:if="{{step.subtitle}}" class="step-subtitle">{{step.subtitle}}</text>
+              <text class="step-desc">{{step.descText}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="detail-foot">
+          <text class="arrival">{{arrivalText}}</text>
+          <view class="nav-btn" data-option="{{item.raw}}" bind:tap="onNavTap">去导航 →</view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

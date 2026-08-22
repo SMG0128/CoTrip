@@ -54,6 +54,10 @@ class CollisionOnceRepo implements TripRepository {
   async create(trip: Trip): Promise<Trip> {
     return trip;
   }
+  async update(_trip: Trip): Promise<Trip> {
+    // 该桩仅覆盖房间号生成路径，update 不应被调用。
+    throw new Error('CollisionOnceRepo 不支持 update');
+  }
   async findById(_id: string): Promise<Trip | null> {
     return null;
   }

@@ -67,11 +67,12 @@ export class RealTripService implements TripService {
     return response.trips;
   }
 
-  async completeTrip(_tripId: string): Promise<Trip> {
-    throw new RealTripServiceError(
-      '当前版本暂不支持完成行程',
-      'TRIP_OPERATION_NOT_IMPLEMENTED'
+  async completeTrip(tripId: string): Promise<Trip> {
+    const response = await this.request<TripResponse>(
+      `/trips/${encodeURIComponent(tripId)}/complete`,
+      'POST'
     );
+    return response.trip;
   }
 
   private request<T>(

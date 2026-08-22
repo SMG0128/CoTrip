@@ -10,6 +10,7 @@ import { PlaceService } from './place-service';
 import { NotificationService } from './notification-service';
 import { ExternalActionService } from './external-action-service';
 import { AuthService } from './auth-service';
+import { RouteOptionService } from '../types/route-option';
 
 import { MockAIService } from './mock/mock-ai-service';
 import { MockTripService } from './mock/mock-trip-service';
@@ -20,6 +21,7 @@ import { MockExternalActionService } from './mock/mock-external-action-service';
 import { MockAuthService } from './mock/mock-auth-service';
 import { RealAuthService } from './real/real-auth-service';
 import { RealTripService } from './real/real-trip-service';
+import { MockRouteOptionService, RealRouteOptionService } from './route-option-service';
 
 import { authConfig } from '../config/auth';
 
@@ -35,6 +37,10 @@ export const placeService: PlaceService = new MockPlaceService();
 export const notificationService: NotificationService = new MockNotificationService();
 export const externalActionService: ExternalActionService = new MockExternalActionService();
 
+// 路线方案服务：「我的推荐」路线选择。real 模式直连腾讯地图，失败真实抛错不回退。
+export const routeOptionService: RouteOptionService =
+  authConfig.mode === 'real' ? new RealRouteOptionService() : new MockRouteOptionService();
+
 export type {
   AIService,
   TripService,
@@ -43,4 +49,5 @@ export type {
   NotificationService,
   ExternalActionService,
   AuthService,
+  RouteOptionService,
 };

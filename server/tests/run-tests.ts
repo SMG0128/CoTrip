@@ -4,6 +4,7 @@
 import { runAuthTests } from './auth.test';
 import { runRoomCodeTests } from './room-code.test';
 import { runTripTests } from './trips.test';
+import { runTripCompleteTests } from './trip-complete.test';
 
 interface TestResult {
   name: string;
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
   await runAuthTests();
   await runRoomCodeTests();
   await runTripTests();
+  await runTripCompleteTests();
 
   let failed = 0;
   for (const r of results) {

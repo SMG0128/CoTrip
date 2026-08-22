@@ -10,6 +10,10 @@ export interface TencentMapConfig {
   uriBase: string;
   /** 地点搜索 API */
   placeSearchUrl: string;
+  /** 路线规划（步行）WebService API（direction v1） */
+  directionWalkingUrl: string;
+  /** 路线规划（公交/地铁）WebService API（direction v1） */
+  directionTransitUrl: string;
   /** 默认城市 */
   defaultCity: string;
   /** referer（用于 URI 校验） */
@@ -24,6 +28,8 @@ export const tencentMapConfig: TencentMapConfig = {
   key: 'YOUR_TENCENT_MAP_KEY',
   uriBase: 'https://apis.map.qq.com/uri/v1/',
   placeSearchUrl: 'https://apis.map.qq.com/ws/place/v1/search',
+  directionWalkingUrl: 'https://apis.map.qq.com/ws/direction/v1/walking/',
+  directionTransitUrl: 'https://apis.map.qq.com/ws/direction/v1/transit/',
   defaultCity: '广州市',
   referer: 'cotrip-miniprogram',
 };

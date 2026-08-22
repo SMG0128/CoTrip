@@ -4,7 +4,6 @@
 
 import { mockActiveTrip } from '../../mock/mock-trip';
 import { mockComments } from '../../mock/mock-comments';
-import { mockPersonalRoute, mockRouteSegments } from '../../mock/mock-routes';
 import { realRestaurants } from '../../mock/mock-real-places';
 import { Comment } from '../../types/comment';
 import { Trip } from '../../types/trip';
@@ -15,9 +14,15 @@ import { Plan } from '../../types/plan';
 import { PlanningEngine } from '../../core/planning-engine';
 import { rankCandidates } from '../../core/candidate-ranker';
 import { tencentMapProvider } from '../../services/providers/tencent-map-provider';
-import { tripService } from '../../services/index';
+import { routeOptionService, tripService } from '../../services/index';
 import { EventCandidateGroup } from '../../types/event-candidate';
+import { ResolvedDestination, RouteOption } from '../../types/route-option';
 import { buildEventCandidateGroups } from '../../utils/event-candidates';
+import {
+  extractNavigateTarget,
+  resolveNextExpandedIndex,
+  resolveRouteErrorText,
+} from '../../utils/route-options-ui';
 import {
   buildTripSharePayload,
   normalizeRoomCode,
@@ -26,10 +31,16 @@ import {
 } from '../../utils/trip-share';
 import {
   buildUserComment,
-  hydrateRouteOwner,
   hydrateTripWithCurrentUser,
+  isTripOwner,
   requireCurrentUser,
 } from '../../utils/current-user';
+import {
+  buildCompleteTripModal,
+  resolveCompleteTripPermission,
+  runCompleteTripFlow,
+} from '../../utils/trip-complete';
+import { RealTripServiceError } from '../../services/real/real-trip-service';
 
 // Debug 仅在开发版/体验版显示，正式版自动隐藏。
 function isDebugEnabled(): boolean {
@@ -63,12 +74,21 @@ Page({
     restaurants: realRestaurants as Restaurant[],
     rankedRestaurants: [] as ReturnType<typeof rankCandidates>,
     candidateGroups: [] as EventCandidateGroup[],
-    route: mockPersonalRoute,
-    routeSegments: mockRouteSegments,
     showRoute: false,
+    // 我的推荐：路线方案选择器状态（懒加载——首次打开分段时才定位并规划）
+    routeOptions: [] as RouteOption[],
+    expandedRouteIndex: 0,
+    routeLoading: false,
+    routeErrorText: '',
+    routesLoaded: false,
+    /** 目的地解析结果（去导航的坐标兜底；来自服务返回，不本地伪造） */
+    routeResolvedDestination: null as ResolvedDestination | null,
     inputText: '',
     participantCount: 0,
     commentCount: 0,
+    // 完成行程：仅 owner + ACTIVE 展示入口；请求进行中防重复点击
+    canCompleteTrip: false,
+    isCompletingTrip: false,
     // V0.3 Room UI：展示值 + 是否存在有效房间号（控制复制/分享能力）
     roomCode: resolveRoomCodeDisplay(mockActiveTrip.roomCode),
     hasRoomCode: !!normalizeRoomCode(mockActiveTrip.roomCode),
@@ -132,11 +152,12 @@ Page({
     this.setData({
       trip: trip.currentPlan ? trip : { ...trip, currentPlan: buildEmptyPlan(trip.id) },
       comments,
-      route: hydrateRouteOwner(mockPersonalRoute, currentUser),
       participantCount: trip.participantIds.length,
       commentCount: trip.commentIds.length,
       roomCode: resolveRoomCodeDisplay(trip.roomCode),
       hasRoomCode: !!normalizeRoomCode(trip.roomCode),
+      // 完成行程入口：仅创建者 + 进行中可见（按 id 判断，禁止昵称判断）
+      canCompleteTrip: isTripOwner(trip, currentUser) && trip.status === 'ACTIVE',
     });
 
     // 初始化规划引擎，注入初始计划
@@ -224,8 +245,178 @@ Page({
     return { title: payload.title, path: payload.path };
   },
 
+  /**
+   * 完成行程入口：登录态守卫后走统一流程（权限/二次确认/防重复在 utils/trip-complete.ts）。
+   * real 模式失败真实抛错：仅 toast 错误信息，绝不本地伪造 status/completedAt，绝不跳首页。
+   */
+  onCompleteTripTap() {
+    // 登录态守卫：无 currentUser 时禁止操作，绝不回退到 Mock 用户
+    const app = getApp<IAppOption>();
+    const guard = requireCurrentUser(app.globalData.currentUser);
+    if (!guard.ok) {
+      wx.showToast({ title: '登录状态失效，请重新登录', icon: 'none' });
+      wx.navigateTo({ url: '/pages/login/login' });
+      return;
+    }
+
+    runCompleteTripFlow({
+      permission: resolveCompleteTripPermission(
+        this.data.trip,
+        guard.user,
+        this.data.isCompletingTrip
+      ),
+      confirm: () =>
+        new Promise<boolean>((resolve) =>
+          wx.showModal({
+            ...buildCompleteTripModal(),
+            success: (res) => resolve(!!res.confirm),
+            fail: () => resolve(false),
+          })
+        ),
+      complete: () => {
+        this.setData({ isCompletingTrip: true });
+        return tripService.completeTrip(this.data.trip.id);
+      },
+      onSuccess: (completed) => {
+        this.setData({ isCompletingTrip: false, trip: completed });
+        wx.showToast({ title: '行程已完成', icon: 'success' });
+        // 先让用户看到成功提示，再回首页
+        setTimeout(() => wx.switchTab({ url: '/pages/home/home' }), 1500);
+      },
+      onError: (error) => {
+        this.setData({ isCompletingTrip: false });
+        wx.showToast({
+          title:
+            error instanceof RealTripServiceError ? error.message : '操作失败，请稍后重试',
+          icon: 'none',
+        });
+      },
+    });
+  },
+
   onToggleRoute() {
-    this.setData({ showRoute: !this.data.showRoute });
+    const nextShow = !this.data.showRoute;
+    this.setData({ showRoute: nextShow });
+    // 懒加载：首次打开「我的推荐」时才定位并规划路线；失败后保留错误态，由「重新规划」显式重试
+    if (
+      nextShow &&
+      !this.data.routesLoaded &&
+      !this.data.routeLoading &&
+      !this.data.routeErrorText
+    ) {
+      this.loadRouteOptions();
+    }
+  },
+
+  /** wx.getLocation 包装为 Promise；用户拒绝/失败一律 reject，绝不伪造位置兜底 */
+  getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
+    return new Promise((resolve, reject) => {
+      wx.getLocation({
+        type: 'gcj02',
+        success: (res) => resolve({ latitude: res.latitude, longitude: res.longitude }),
+        fail: () => reject(new Error('LOCATION_UNAVAILABLE')),
+      });
+    });
+  },
+
+  /**
+   * 推导路线规划目的地名称：
+   * 优先 currentPlan 第一个带地点 event 的 location.name；
+   * 回退 trip.title 作为 POI 检索关键词；
+   * 都没有则使用 V1 演示目的地「广州羽毛球中心羽毛球馆」（仅作为检索词传给服务，
+   * 路线数据仍由地图 Provider 真实返回，不属于伪造路线数据兜底）。
+   */
+  resolveRouteDestinationName(): string {
+    const events = this.data.trip.currentPlan?.events ?? [];
+    const located = events.find((event) => !!event.location?.name);
+    if (located?.location?.name) return located.location.name;
+    const title = this.data.trip.title.trim();
+    if (title) return title;
+    // V1 演示目的地：与 Mock 场景一致的羽毛球馆
+    return '广州羽毛球中心羽毛球馆';
+  },
+
+  /** 定位 → planRoutes 的完整加载链；失败态写入 routeErrorText（含重试入口），绝不静默回退 */
+  async loadRouteOptions(): Promise<void> {
+    // 登录态守卫沿用现有写法
+    const app = getApp<IAppOption>();
+    const guard = requireCurrentUser(app.globalData.currentUser);
+    if (!guard.ok) {
+      wx.showToast({ title: '登录状态失效，请重新登录', icon: 'none' });
+      wx.navigateTo({ url: '/pages/login/login' });
+      return;
+    }
+
+    this.setData({ routeLoading: false, routeErrorText: '' });
+
+    let origin: { latitude: number; longitude: number };
+    try {
+      origin = await this.getCurrentLocation();
+    } catch {
+      this.setData({
+        routeLoading: false,
+        routeErrorText: '无法获取当前位置，请允许定位后查看实时路线',
+      });
+      return;
+    }
+
+    this.setData({ routeLoading: true });
+    try {
+      const result = await routeOptionService.planRoutes({
+        origin,
+        destinationName: this.resolveRouteDestinationName(),
+        city: '广州市',
+        departureTime: this.data.trip.timeRange?.start,
+      });
+      this.setData({
+        routeOptions: result.options,
+        expandedRouteIndex: 0,
+        routesLoaded: true,
+        routeLoading: false,
+        routeErrorText: '',
+        routeResolvedDestination: result.resolvedDestination ?? null,
+      });
+    } catch (error) {
+      this.setData({
+        routeLoading: false,
+        routeErrorText: resolveRouteErrorText(error),
+      });
+    }
+  },
+
+  /** 组件 toggle 事件：手风琴状态机（utils/route-options-ui.ts），同一时刻只有一条展开 */
+  onRouteToggle(e: WechatMiniprogram.CustomEvent) {
+    const clickedIndex = Number(e.detail?.index);
+    if (!Number.isInteger(clickedIndex)) return;
+    this.setData({
+      expandedRouteIndex: resolveNextExpandedIndex(this.data.expandedRouteIndex, clickedIndex),
+    });
+  },
+
+  /** 组件 navigate 事件：最后一个带坐标 step 优先，其次 resolvedDestination；无坐标只提示不伪造 */
+  onRouteNavigate(e: WechatMiniprogram.CustomEvent) {
+    const option = e.detail?.option as RouteOption | undefined;
+    if (!option) return;
+    const target = extractNavigateTarget(option, this.data.routeResolvedDestination);
+    if (!target) {
+      wx.showToast({ title: '暂无法打开导航', icon: 'none' });
+      return;
+    }
+    wx.openLocation({
+      latitude: target.latitude,
+      longitude: target.longitude,
+      name: target.name,
+    });
+  },
+
+  /** 「重新规划」：清空加载标记后重走完整加载链（重新定位 + 重新规划） */
+  onRouteRetry() {
+    this.setData({
+      routesLoaded: false,
+      routeOptions: [],
+      routeResolvedDestination: null,
+    });
+    this.loadRouteOptions();
   },
 
   onInput(e: WechatMiniprogram.Input) {

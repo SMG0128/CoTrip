@@ -15,10 +15,16 @@ import './trip-share.test';
 import './trip-card.test';
 import { runHomeMultiTripsTests } from './home-multi-trips.test';
 import { runRealTripServiceTests } from './real-trip-service.test';
+import { runTripCompleteTests } from './trip-complete.test';
+import { runRouteOptionTests } from './route-option.test';
+import { runRouteOptionsUiTests } from './route-options-ui.test';
 
 async function main(): Promise<void> {
   await runHomeMultiTripsTests();
   await runRealTripServiceTests();
+  await runTripCompleteTests();
+  await runRouteOptionTests();
+  await runRouteOptionsUiTests();
   console.log('\n🎉 全部核心逻辑测试通过');
 }
 

@@ -15,7 +15,52 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - 完整产品规格：[`AI_Coexistence_Trip_MiniProgram_V1.md`](./AI_Coexistence_Trip_MiniProgram_V1.md)
 - 后端详细说明：[`server/README.md`](./server/README.md)
 
-## 当前版本：V0.3 Room Foundation
+## Current Capabilities
+
+当前已实际实现并通过测试的能力（后端 32/32、前端 16 个测试文件全绿）：
+
+- **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
+- **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
+- **Server-generated roomCode** —— 创建 Trip 时生成全局唯一 7 位房间号，旧数据自动回填。
+- **Trip completion flow** —— `POST /trips/:id/complete`：仅 creator 可完成；幂等（重复完成返回原快照，不重置 `completedAt`）；DRAFT/CANCELLED 拒绝（409）；前端二次确认 + 防重复提交；完成后移入历史行程。
+- **Multiple active trips** —— 首页展示全部进行中行程（最新在前），每张卡独立导航。
+- **Native WeChat sharing** —— 分享卡片直达 Join 落地页（携带 roomCode）。
+- **Navigation-style route recommendations** —— 见下节。
+- **Tencent Location Service integration** —— POI 检索 + 路线规划直连 WebService API。
+
+尚未实现：真实多人加入（`POST /trips/join`）、实时同步 / WebSocket、评论与计划的后端持久化。
+
+## Route Recommendations
+
+行程详情「我的推荐」已从静态演示路线升级为导航风格的**路线方案选择器**：
+
+- 最多展示 **3 条路线方案**（provider 排序即推荐序，近似重复方案自动剔除；只有 1 条就只显示 1 条，不伪造补足）。
+- 第一条默认标记「推荐」并展开；**任意时刻最多展开 1 条**，点击其他方案自动切换。
+- 折叠摘要可直接比较时长 / 交通方式 / 出发到达时间 / 票价；展开后显示完整站点级时间轴。
+- 数据来源：腾讯位置服务 WebService Direction API（**transit + walking** 并行请求），目的地经 POI 检索解析坐标。
+- 导航通过 `wx.openLocation` 交由微信内置地图完成，CoTrip 不自行实现导航。
+- **API 失败不回退假路线**：定位拒绝 / 地点解析失败 / 无路线 / 网络错误均显示明确失败态与重试入口。
+
+## Tencent Map Setup
+
+腾讯位置服务需要本地配置。当前代码使用占位符 `YOUR_TENCENT_MAP_KEY`（见 `config/tencent-map.ts`）：
+
+1. 在 [腾讯位置服务控制台](https://lbs.qq.com/) 创建应用并申请 Key，勾选所需 **WebService API** 能力（PlaceSearch / Direction），建议配置配额限额与用量告警。
+2. 在小程序管理后台「开发设置 → 服务器域名」添加 request 合法域名 `https://apis.map.qq.com`。
+3. 在微信小程序控制台配置位置权限与《用户隐私保护指引》（`permission.scope.userLocation` 与 `requiredPrivateInfos` 已在 `app.json` 声明）。
+4. 将 Key 填入 `config/tencent-map.ts` 替换占位符（仅本地修改，勿提交真实 Key）。
+
+**Never commit production/private keys.** 未配置 Key 时路线功能显示「暂未配置地图服务」，不会伪造数据。
+
+## Known Limitations
+
+- 真实多人房间加入（`POST /trips/join`）尚未实现。
+- 定位的运行时隐私授权弹窗（privacy authorization flow）尚未完整实现。
+- 腾讯地图真机 E2E 依赖人工完成 Key / 合法域名 / 隐私配置。
+- 地图预览（Map Preview）尚未实现。
+- 本阶段未使用后端代理转发腾讯地图请求（客户端受限 Key 直连）。
+
+## V0.3 Room Foundation（上一轮交付）
 
 本轮完成了**基于房间号（roomCode）的行程协作地基**，前后端与测试全部就绪：
 
@@ -121,7 +166,9 @@ npm run typecheck && npm test
 | PATCH | `/auth/profile` | 更新昵称/头像（需登录） |
 | POST | `/trips` | 创建当前用户拥有的 Trip（含服务器生成 roomCode） |
 | GET | `/trips?status=ACTIVE` | 列出当前用户参与的 Trip |
+| GET | `/trips?status=COMPLETED` | 列出当前用户的历史行程 |
 | GET | `/trips/:id` | 读取单个 Trip（仅参与者可见） |
+| POST | `/trips/:id/complete` | 完成行程（仅 creator，幂等；非法状态迁移返回 409） |
 
 错误统一返回 `{ "error": { "code": "...", "message": "..." } }`。
 

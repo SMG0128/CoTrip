@@ -50,7 +50,7 @@
 }
 
 .tab-item.selected .icon-wrap {
-  background: #edf3ff;
+  background: #eef3ff;
   box-shadow: 0 7rpx 18rpx rgba(50, 107, 255, 0.15);
   transform: scale(1.04);
 }

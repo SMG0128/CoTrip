@@ -56,5 +56,19 @@ export function tripRouter(trips: TripService, tokens: TokenService): Router {
     }
   });
 
+  // 完成行程：身份只取认证中间件注入的 userId，不读 body 参与权限判断。
+  router.post(
+    '/:id/complete',
+    authenticate,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const trip = await trips.completeTrip(req.userId!, req.params.id);
+        res.status(200).json({ trip });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
   return router;
 }

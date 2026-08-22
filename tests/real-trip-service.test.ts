@@ -123,5 +123,46 @@ export async function runRealTripServiceTests(): Promise<void> {
     '网络错误必须明确抛出且不得回退 Mock'
   );
 
+  // ---- completeTrip：真实接入请求语义 ----
+  const completeRequests = installWx((option) =>
+    succeed(
+      option,
+      {
+        trip: tripFixture({ status: 'COMPLETED', completedAt: '2026-08-21T10:00:00.000Z' }),
+      },
+      200
+    )
+  );
+  const completedTrip = await service.completeTrip('trip_123');
+  assert(completedTrip.status === 'COMPLETED', 'completeTrip 应返回后端完成的 Trip');
+  const complete = completeRequests[0];
+  // completeTrip 不携带请求体：data 应为空（无任何客户端伪造的身份/状态字段）
+  const completeBody = (complete.data ?? {}) as Record<string, unknown>;
+  assert(complete.method === 'POST', 'completeTrip 应使用 POST');
+  assert(
+    complete.url === `${authConfig.baseUrl}/trips/trip_123/complete`,
+    'completeTrip URL 应为 /trips/trip_123/complete'
+  );
+  assert(complete.header?.Authorization === 'Bearer test-token', '请求必须携带 Bearer token');
+  assert(!('creatorId' in completeBody), 'complete body 不得包含 creatorId');
+  assert(!('userId' in completeBody), 'complete body 不得包含 userId');
+  assert(!('status' in completeBody), 'complete body 不得包含 status');
+
+  installWx((option) =>
+    succeed(
+      option,
+      { error: { code: 'TRIP_STATE_INVALID', message: '行程状态不允许完成' } },
+      500
+    )
+  );
+  await expectReject(
+    () => service.completeTrip('trip_123'),
+    (error) =>
+      error.statusCode === 500 &&
+      error.code === 'TRIP_STATE_INVALID' &&
+      error.message === '行程状态不允许完成',
+    '500 必须透传为 RealTripServiceError（code/message/statusCode），失败真实抛出不回退'
+  );
+
   console.log('✅ real-trip-service.test.ts 全部通过');
 }

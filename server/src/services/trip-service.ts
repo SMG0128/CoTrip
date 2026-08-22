@@ -10,6 +10,7 @@ export interface TripService {
   createTrip(authenticatedUserId: string, input: CreateTripInput): Promise<Trip>;
   listTrips(userId: string, status?: TripStatus): Promise<Trip[]>;
   getTrip(userId: string, tripId: string): Promise<Trip>;
+  completeTrip(authenticatedUserId: string, tripId: string): Promise<Trip>;
 }
 
 export class RealTripService implements TripService {
@@ -71,5 +72,31 @@ export class RealTripService implements TripService {
       throw new AppError(403, 'TRIP_FORBIDDEN', '无权访问该行程');
     }
     return trip;
+  }
+
+  /** 完成行程：仅 creator 可操作；COMPLETED 幂等返回；DRAFT/CANCELLED 拒绝且绝不偷偷改状态。 */
+  async completeTrip(authenticatedUserId: string, tripId: string): Promise<Trip> {
+    const trip = await this.trips.findById(tripId);
+    if (!trip) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    // 身份只来自认证 token；非 creator 的 participant 同样无权完成行程。
+    if (authenticatedUserId !== trip.creatorId) {
+      throw new AppError(403, 'TRIP_FORBIDDEN', '仅行程发起人可完成行程');
+    }
+    if (trip.status === 'COMPLETED') {
+      // 幂等：已完成直接返回现有快照，不重置 completedAt、不落盘。
+      return trip;
+    }
+    if (trip.status !== 'ACTIVE') {
+      // DRAFT / CANCELLED 不允许完成；显式冲突交给调用方处理。
+      throw new AppError(409, 'TRIP_INVALID_STATUS_TRANSITION', '当前状态不允许完成行程');
+    }
+    const completedTrip: Trip = {
+      ...trip,
+      status: 'COMPLETED',
+      completedAt: new Date().toISOString(),
+    };
+    return this.trips.update(completedTrip);
   }
 }

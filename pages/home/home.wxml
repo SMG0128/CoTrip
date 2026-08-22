@@ -39,7 +39,7 @@
       </view>
     </view>
     <view class="quick-btn secondary" bind:tap="onHistory">
-      <view class="quick-icon"><image src="/assets/icons/utility/history.svg" mode="aspectFit" /></view>
+      <view class="quick-icon secondary-icon"><image src="/assets/icons/utility/history-line.svg" mode="aspectFit" /></view>
       <view class="quick-copy">
         <text class="quick-title">历史行程</text>
         <text class="quick-subtitle">查看过往旅程</text>

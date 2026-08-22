@@ -2,6 +2,8 @@
   box-sizing: border-box;
   min-height: 100vh;
   padding: 28rpx 0 calc(140rpx + env(safe-area-inset-bottom));
+  /* 页面基底：低饱和冷灰蓝，与各模块 Surface 形成色温差 */
+  background: #f5f7fc;
 }
 
 .hero {
@@ -10,6 +12,13 @@
   justify-content: space-between;
   min-height: 170rpx;
   padding: 0 42rpx 22rpx;
+  /* 方案 A：顶部纯白自然沉入极淡蓝雾，尾端完全溶解 —— 无紫色块、无边界 */
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    rgba(234, 242, 255, 0.6) 68%,
+    rgba(234, 242, 255, 0) 100%
+  );
 }
 
 .hero-copy {
@@ -51,7 +60,7 @@
   box-shadow: 0 10rpx 28rpx rgba(65, 92, 155, 0.08);
 }
 
-/* 房间码加入入口：圆弧矩形轻量搜索栏，视觉弱于新建行程 */
+/* 房间码加入入口：保持纯白 Surface，靠色温差而非装饰与基底区分 */
 .room-entry {
   display: flex;
   align-items: center;
@@ -82,7 +91,7 @@
 }
 
 .room-input-placeholder {
-  color: #aab6c8;
+  color: #9dabc2;
 }
 
 .room-join {
@@ -118,23 +127,24 @@
   padding: 24rpx;
 }
 
-/* 新建行程入口：与登录页「微信登录」按钮同源 —— 白底 + 蓝描边 + 蓝字，
-   内部一圈均匀细腻的内阴影，外部克制柔和的外阴影，轻微凹陷但不厚重 */
+/* 新建行程入口：白卡 + 极细品牌渐变描边（双背景层实现，圆角正常裁切）
+   —— 主入口身份靠描边与图标氛围表达，而非大面积铺色 */
 .quick-btn.primary {
   flex: 1.15;
   color: #326bff;
-  background: #ffffff;
-  border: 2rpx solid #326bff;
-  box-shadow:
-    inset 0 2rpx 12rpx rgba(50, 107, 255, 0.08),
-    0 12rpx 28rpx rgba(50, 107, 255, 0.12);
+  border: 2rpx solid transparent;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(135deg, #6a5cff, #326bff 55%, #20b9ff) border-box;
+  box-shadow: 0 12rpx 28rpx rgba(50, 107, 255, 0.12);
 }
 
+/* 历史行程入口：白卡 + 更弱更安静的边框，语气退后 */
 .quick-btn.secondary {
   flex: 0.85;
   background: #ffffff;
-  border: 1rpx solid rgba(122, 147, 194, 0.09);
-  box-shadow: 0 10rpx 30rpx rgba(60, 90, 160, 0.09);
+  border: 1rpx solid rgba(122, 147, 194, 0.07);
+  box-shadow: 0 8rpx 22rpx rgba(60, 90, 160, 0.06);
 }
 
 .quick-icon {
@@ -145,11 +155,20 @@
   background: #f2f5ff;
 }
 
-/* 伪 3D 加号底座：浅蓝底圆角小胶囊，轻微描边 + 轻外阴影，仿佛被轻轻托起 */
+/* 伪 3D 加号底座：浅蓝底圆角小胶囊 + 紧贴一圈极淡蓝色光晕，像被轻轻托起 */
 .primary-icon {
   background: #eef3ff;
   border: 1rpx solid rgba(50, 107, 255, 0.16);
-  box-shadow: 0 10rpx 22rpx rgba(50, 107, 255, 0.14);
+  box-shadow:
+    0 0 0 8rpx rgba(50, 107, 255, 0.05),
+    0 10rpx 22rpx rgba(50, 107, 255, 0.14);
+}
+
+/* 历史图标氛围：不改承载块形态与底色，仅加紫蓝色系小范围光晕（与新建卡同语言、更安静） */
+.secondary-icon {
+  box-shadow:
+    0 0 0 8rpx rgba(112, 87, 255, 0.05),
+    0 8rpx 20rpx rgba(112, 87, 255, 0.12);
 }
 
 .quick-icon image {
@@ -188,14 +207,17 @@
   color: #7f90b8;
 }
 
+/* 区域小标题：轻立体边框小胶囊，Surface 定为 #F0F4FF 功能蓝 */
 .section-kicker {
   display: inline-flex;
   align-items: center;
   margin: 0 24rpx 18rpx;
-  padding: 8rpx 18rpx;
-  border-radius: 24rpx;
-  color: #6a5cff;
-  background: #f0edff;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  color: #326bff;
+  background: #f0f4ff;
+  border: 1rpx solid rgba(50, 107, 255, 0.2);
+  box-shadow: 0 5rpx 14rpx rgba(50, 107, 255, 0.1);
   font-size: 23rpx;
   font-weight: 650;
 }

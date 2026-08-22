@@ -34,6 +34,20 @@ export class JsonTripRepository implements TripRepository {
     return trip;
   }
 
+  /** 按 id 整体替换该 Trip；与 create 共用原子 save 与失败语义（TRIP_PERSISTENCE_FAILURE）。 */
+  async update(trip: Trip): Promise<Trip> {
+    const exists = this.store.trips.some((existing) => existing.id === trip.id);
+    if (!exists) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    const nextStore = {
+      trips: this.store.trips.map((existing) => (existing.id === trip.id ? trip : existing)),
+    };
+    this.save(nextStore);
+    this.store = nextStore;
+    return trip;
+  }
+
   async findById(id: string): Promise<Trip | null> {
     return this.store.trips.find((trip) => trip.id === id) ?? null;
   }

@@ -10,10 +10,10 @@
       <text class="title">{{trip.title}}</text>
       <text class="meta">{{participantCount}} 人参与 · AI 已整理 {{commentCount}} 条需求</text>
     </view>
-    <button class="invite-btn" open-type="share">
-      <image src="/assets/icons/utility/plus.svg" mode="aspectFit" />
-      <text>邀请好友</text>
-    </button>
+    <view wx:if="{{canCompleteTrip}}" class="complete-btn {{isCompletingTrip ? 'loading' : ''}}" bind:tap="onCompleteTripTap">
+      <image src="/assets/icons/utility/check-circle.svg" mode="aspectFit" />
+      <text>{{isCompletingTrip ? '完成中…' : '完成行程'}}</text>
+    </view>
   </view>
 
   <plan-board
@@ -23,13 +23,21 @@
     bind:restaurant="onRestaurantTap"
   />
 
-  <view class="actions">
-    <button class="action-btn" open-type="share">邀请好友</button>
-    <view class="action-btn {{showRoute ? 'selected' : ''}}" bind:tap="onToggleRoute">我的推荐</view>
+  <view class="segmented">
+    <button class="segment" open-type="share">邀请好友</button>
+    <view class="segment {{showRoute ? 'selected' : ''}}" bind:tap="onToggleRoute">我的推荐</view>
   </view>
 
   <view wx:if="{{showRoute}}" class="route-wrap">
-    <personal-route route="{{route}}" segments="{{routeSegments}}" />
+    <route-options
+      options="{{routeOptions}}"
+      expanded-index="{{expandedRouteIndex}}"
+      loading="{{routeLoading}}"
+      error-text="{{routeErrorText}}"
+      bind:toggle="onRouteToggle"
+      bind:navigate="onRouteNavigate"
+      bind:retry="onRouteRetry"
+    />
   </view>
 
   <view class="ideas-card">
@@ -37,7 +45,7 @@
       <view class="ideas-title">
         <text>大家的想法</text>
       </view>
-      <image class="chat-art" src="/assets/3d/chat-bubble.png" mode="aspectFit" />
+      <image class="chat-art" src="/assets/icons/utility/chat-double.svg" mode="aspectFit" />
     </view>
     <view class="comments">
       <comment-item wx:for="{{comments}}" wx:key="id" comment="{{item}}" />

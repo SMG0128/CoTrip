@@ -1,0 +1,270 @@
+/* components/route-options/index.wxss
+   路线方案选择器：延续页面「白卡 + 轻描边 + 轻阴影」语言；
+   展开项边框略带蓝（rgba(50,107,255,.28)），非展开项更安静。 */
+
+.route-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* ---- 方案卡 ---- */
+.option-card {
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.12);
+  border-radius: 30rpx;
+  padding: 28rpx;
+  box-shadow: 0 8rpx 26rpx rgba(60, 90, 160, 0.06);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+/* 展开项：边框略带蓝，聚焦当前方案 */
+.option-card.expanded {
+  border-color: rgba(50, 107, 255, 0.28);
+  box-shadow: 0 10rpx 30rpx rgba(50, 107, 255, 0.1);
+}
+
+.option-summary {
+  min-width: 0;
+}
+
+.summary-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+/* 左上标签：第 0 条「推荐」小胶囊（轻蓝底蓝字），其余「路线 N/M」灰字 */
+.badge {
+  flex-shrink: 0;
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
+.badge-recommend {
+  padding: 4rpx 16rpx;
+  color: #326bff;
+  background: #eef3ff;
+  border-radius: 999rpx;
+  font-weight: 650;
+}
+
+.badge-plain {
+  color: #95a1b5;
+  font-weight: 500;
+}
+
+/* 右上大字时长 */
+.duration {
+  color: #17243d;
+  font-size: 34rpx;
+  font-weight: 760;
+}
+
+.modes {
+  display: block;
+  overflow: hidden;
+  margin-top: 14rpx;
+  color: #3d4c66;
+  font-size: 27rpx;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule {
+  display: block;
+  margin-top: 8rpx;
+  color: #64738d;
+  font-size: 24rpx;
+}
+
+/* summary 小灰字附加行 */
+.remark {
+  display: block;
+  margin-top: 10rpx;
+  color: #8492aa;
+  font-size: 22rpx;
+}
+
+/* ---- 展开详情：竖向时间轴 ---- */
+.option-detail {
+  margin-top: 26rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #edf1f7;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding-bottom: 26rpx;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+.step-dot {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 18rpx;
+  height: 18rpx;
+  margin: 10rpx 20rpx 0 2rpx;
+  background: #326bff;
+  border-radius: 50%;
+}
+
+/* 到达节点：空心圆点 */
+.step-dot.arrival {
+  background: #ffffff;
+  border: 5rpx solid #326bff;
+}
+
+/* 节点连接线：圆点中心 x = 2 + 9 = 11rpx，线宽 2rpx → left 10rpx */
+.step:not(:last-child) .step-dot::after {
+  content: '';
+  position: absolute;
+  left: 10rpx;
+  top: 32rpx;
+  width: 2rpx;
+  height: 100%;
+  background: #dce7fa;
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.step-title {
+  color: #27344c;
+  font-size: 28rpx;
+  font-weight: 550;
+}
+
+.step-subtitle {
+  margin-top: 4rpx;
+  color: #326bff;
+  font-size: 23rpx;
+  font-weight: 500;
+}
+
+.step-desc {
+  margin-top: 4rpx;
+  color: #8492aa;
+  font-size: 23rpx;
+}
+
+/* 详情底部：到达行 + 去导航 */
+.detail-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #edf1f7;
+}
+
+.arrival {
+  color: #64738d;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+/* 主操作沿用页面品牌渐变胶囊（与发送按钮同语言） */
+.nav-btn {
+  flex-shrink: 0;
+  padding: 12rpx 26rpx;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6a5cff, #326bff 68%, #20b9ff);
+  border-radius: 999rpx;
+  box-shadow: 0 8rpx 18rpx rgba(50, 107, 255, 0.22);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+/* ---- Loading skeleton：灰色摘要卡形状 ---- */
+.skeleton-card {
+  padding: 28rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.1);
+  border-radius: 30rpx;
+  box-shadow: 0 8rpx 26rpx rgba(60, 90, 160, 0.05);
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skeleton-line {
+  height: 26rpx;
+  background: linear-gradient(90deg, #edf1f7, #f6f8fc, #edf1f7);
+  border-radius: 10rpx;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton-badge {
+  width: 96rpx;
+}
+
+.skeleton-duration {
+  width: 140rpx;
+  height: 36rpx;
+}
+
+.skeleton-modes {
+  width: 55%;
+  margin-top: 24rpx;
+}
+
+.skeleton-schedule {
+  width: 70%;
+  margin-top: 16rpx;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---- 错误态 / 空态 ---- */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22rpx;
+  padding: 46rpx 32rpx;
+  background: #ffffff;
+  border: 1rpx dashed rgba(122, 147, 194, 0.35);
+  border-radius: 30rpx;
+}
+
+.error-text {
+  color: #64738d;
+  font-size: 25rpx;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.retry-btn {
+  padding: 14rpx 42rpx;
+  color: #326bff;
+  background: rgba(50, 107, 255, 0.08);
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 650;
+}
