@@ -126,6 +126,23 @@ function testPendingJoinContext(): void {
     );
     assert(getPendingJoinRoomCode() === 'ABCDEFG', 'pending 应可从内存读取');
 
+    setPendingJoinRoomCode('invalid');
+    assert(appGlobalData.pendingJoinRoomCode === null, '无效 pending 不得留在 globalData');
+    assert(
+      !storage.has(PENDING_JOIN_ROOM_CODE_STORAGE_KEY),
+      '无效 pending 不得写入本地存储'
+    );
+
+    storage.set(PENDING_JOIN_ROOM_CODE_STORAGE_KEY, 'broken');
+    appGlobalData.pendingJoinRoomCode = null;
+    assert(getPendingJoinRoomCode() === null, '损坏的冷启动 pending 应视为不存在');
+    assert(
+      !storage.has(PENDING_JOIN_ROOM_CODE_STORAGE_KEY),
+      '读取时应主动清理损坏的冷启动 pending'
+    );
+
+    setPendingJoinRoomCode('ABCDEFG');
+
     appGlobalData.pendingJoinRoomCode = null;
     assert(getPendingJoinRoomCode() === 'ABCDEFG', '冷启动时 pending 应可从 storage 恢复');
     assert(appGlobalData.pendingJoinRoomCode === 'ABCDEFG', 'storage 恢复值应同步回 globalData');

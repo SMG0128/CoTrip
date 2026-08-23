@@ -10,6 +10,11 @@ export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 /** 房间号长度 */
 export const ROOM_CODE_LENGTH = 7;
 
+/** 用户输入统一移除所有空白并转大写，再进行严格字符集校验。 */
+export function normalizeRoomCode(code: unknown): string {
+  return typeof code === 'string' ? code.replace(/\s+/g, '').toUpperCase() : '';
+}
+
 /**
  * 生成一个房间号。
  * @param random 可注入的随机源（测试用，默认 Math.random）

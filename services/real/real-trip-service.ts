@@ -2,6 +2,7 @@
 
 import { authConfig } from '../../config/auth';
 import { Trip } from '../../types/trip';
+import { normalizeRoomCode } from '../../utils/room-code';
 import { CreateTripInput, TripJoinPreview, TripService } from '../trip-service';
 
 interface TripResponse {
@@ -10,6 +11,10 @@ interface TripResponse {
 
 interface TripsResponse {
   trips: Trip[];
+}
+
+interface TripJoinPreviewResponse {
+  preview: TripJoinPreview;
 }
 
 interface BackendError {
@@ -57,18 +62,35 @@ export class RealTripService implements TripService {
     }
   }
 
-  async getJoinPreview(_roomCode: string): Promise<TripJoinPreview | null> {
-    throw new RealTripServiceError(
-      '真实多人加入后端暂不可用',
-      'TRIP_JOIN_BACKEND_UNAVAILABLE'
-    );
+  async getJoinPreview(roomCode: string): Promise<TripJoinPreview | null> {
+    const normalized = normalizeRoomCode(roomCode);
+    try {
+      const response = await this.request<TripJoinPreviewResponse>(
+        `/trips/join-preview?roomCode=${encodeURIComponent(normalized)}`,
+        'GET',
+        undefined,
+        false
+      );
+      // 显式挑选公开字段，避免后端响应中的身份字段越过 preview 边界。
+      return {
+        roomCode: response.preview.roomCode,
+        title: response.preview.title,
+        participantCount: response.preview.participantCount,
+        status: response.preview.status,
+      };
+    } catch (error) {
+      if (error instanceof RealTripServiceError && error.statusCode === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
-  async joinTrip(_roomCode: string): Promise<Trip> {
-    throw new RealTripServiceError(
-      '真实多人加入后端暂不可用',
-      'TRIP_JOIN_BACKEND_UNAVAILABLE'
-    );
+  async joinTrip(roomCode: string): Promise<Trip> {
+    const response = await this.request<TripResponse>('/trips/join', 'POST', {
+      roomCode: normalizeRoomCode(roomCode),
+    });
+    return response.trip;
   }
 
   async listActiveTrips(): Promise<Trip[]> {
@@ -92,7 +114,8 @@ export class RealTripService implements TripService {
   private request<T>(
     path: string,
     method: 'GET' | 'POST',
-    data?: Record<string, unknown>
+    data?: Record<string, unknown>,
+    authRequired = true
   ): Promise<T> {
     if (!authConfig.baseUrl) {
       return Promise.reject(
@@ -100,11 +123,15 @@ export class RealTripService implements TripService {
       );
     }
 
-    const token = wx.getStorageSync<string>(authConfig.tokenStorageKey);
-    if (!token) {
-      return Promise.reject(
-        new RealTripServiceError('登录状态失效，请重新登录', 'AUTH_UNAUTHORIZED', 401)
-      );
+    let header: Record<string, string> | undefined;
+    if (authRequired) {
+      const token = wx.getStorageSync<string>(authConfig.tokenStorageKey);
+      if (!token) {
+        return Promise.reject(
+          new RealTripServiceError('登录状态失效，请重新登录', 'AUTH_UNAUTHORIZED', 401)
+        );
+      }
+      header = { Authorization: `Bearer ${token}` };
     }
 
     return new Promise((resolve, reject) => {
@@ -112,7 +139,7 @@ export class RealTripService implements TripService {
         url: `${this.baseUrl}${path}`,
         method,
         data,
-        header: { Authorization: `Bearer ${token}` },
+        header,
         success: (response) => {
           if (response.statusCode >= 200 && response.statusCode < 300 && response.data) {
             resolve(response.data as T);

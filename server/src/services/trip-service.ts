@@ -2,14 +2,16 @@
 
 import crypto from 'crypto';
 import { TripRepository } from '../repositories/trip-repository';
-import { CreateTripInput, Trip, TripStatus } from '../types/trip';
+import { CreateTripInput, Trip, TripJoinPreview, TripStatus } from '../types/trip';
 import { AppError } from '../types/errors';
-import { generateRoomCode } from '../utils/room-code';
+import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../utils/room-code';
 
 export interface TripService {
   createTrip(authenticatedUserId: string, input: CreateTripInput): Promise<Trip>;
   listTrips(userId: string, status?: TripStatus): Promise<Trip[]>;
   getTrip(userId: string, tripId: string): Promise<Trip>;
+  getJoinPreview(roomCode: string): Promise<TripJoinPreview>;
+  joinTrip(authenticatedUserId: string, roomCode: string): Promise<Trip>;
   completeTrip(authenticatedUserId: string, tripId: string): Promise<Trip>;
 }
 
@@ -74,6 +76,32 @@ export class RealTripService implements TripService {
     return trip;
   }
 
+  async getJoinPreview(roomCodeInput: string): Promise<TripJoinPreview> {
+    const roomCode = this.validateRoomCode(roomCodeInput);
+    const trip = await this.trips.findByRoomCode(roomCode);
+    if (!trip) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    return {
+      roomCode: trip.roomCode,
+      title: trip.title,
+      participantCount: trip.participantIds.length,
+      status: trip.status,
+    };
+  }
+
+  async joinTrip(authenticatedUserId: string, roomCodeInput: string): Promise<Trip> {
+    const roomCode = this.validateRoomCode(roomCodeInput);
+    const trip = await this.trips.findByRoomCode(roomCode);
+    if (!trip) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    if (trip.status !== 'ACTIVE') {
+      throw new AppError(409, 'TRIP_NOT_JOINABLE', '该行程当前不可加入');
+    }
+    return this.trips.addParticipant(trip.id, authenticatedUserId);
+  }
+
   /** 完成行程：仅 creator 可操作；COMPLETED 幂等返回；DRAFT/CANCELLED 拒绝且绝不偷偷改状态。 */
   async completeTrip(authenticatedUserId: string, tripId: string): Promise<Trip> {
     const trip = await this.trips.findById(tripId);
@@ -98,5 +126,13 @@ export class RealTripService implements TripService {
       completedAt: new Date().toISOString(),
     };
     return this.trips.update(completedTrip);
+  }
+
+  private validateRoomCode(input: string): string {
+    const roomCode = normalizeRoomCode(input);
+    if (!isValidRoomCode(roomCode)) {
+      throw new AppError(400, 'TRIP_INVALID_ROOM_CODE', '房间号格式无效');
+    }
+    return roomCode;
   }
 }

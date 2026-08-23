@@ -66,6 +66,10 @@ class CollisionOnceRepo implements TripRepository {
     // 第一次视为「已存在」（模拟碰撞），之后视为空闲。
     return this.calls === 1 ? fixture({ roomCode: code }) : null;
   }
+  async addParticipant(_tripId: string, _userId: string): Promise<Trip> {
+    // 该桩仅覆盖房间号生成路径，join 不应被调用。
+    throw new Error('CollisionOnceRepo 不支持 addParticipant');
+  }
   async backfillRoomCodes(): Promise<number> {
     return 0;
   }

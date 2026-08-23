@@ -80,31 +80,117 @@ function succeed(option: TestRequestOption, data: unknown, statusCode = 200): vo
 export async function runRealTripServiceTests(): Promise<void> {
   const service = new RealTripService();
 
-  // Real join 后端尚未接线：即使使用 Mock 中确实存在的房间码，也必须明确失败，
-  // 且不能发 wx.request，更不能静默回退 MockTripService。
-  const previewRequests = installWx(() => {
-    throw new Error('getJoinPreview 不应发起 wx.request');
-  });
+  // ---- getJoinPreview：公开预览无需登录，且只暴露最小公开字段 ----
+  const previewRequests = installWx(
+    (option) =>
+      succeed(option, {
+        preview: {
+          roomCode: '7K4M9XQ',
+          title: '顺德一日游',
+          participantCount: 1,
+          status: 'ACTIVE',
+          creatorId: 'server-private-owner',
+          participantIds: ['server-private-owner'],
+          openid: 'server-private-openid',
+        },
+      }),
+    ''
+  );
+  const preview = await service.getJoinPreview(' 7k4 m9xq ');
+  assert(preview?.roomCode === '7K4M9XQ', 'preview 应返回后端房间码');
+  assert(preview?.title === '顺德一日游', 'preview 应返回后端标题');
+  assert(preview?.participantCount === 1, 'preview 应返回参与人数');
+  assert(preview?.status === 'ACTIVE', 'preview 应返回行程状态');
+  assert(preview !== null && !('creatorId' in preview), 'preview 不得暴露 creatorId');
+  assert(preview !== null && !('participantIds' in preview), 'preview 不得暴露 participantIds');
+  assert(preview !== null && !('openid' in preview), 'preview 不得暴露 openid');
+  const previewRequest = previewRequests[0];
+  assert(previewRequest.method === 'GET', 'getJoinPreview 应使用 GET');
+  assert(
+    previewRequest.url === `${authConfig.baseUrl}/trips/join-preview?roomCode=7K4M9XQ`,
+    'getJoinPreview URL 应携带规范化 roomCode'
+  );
+  assert(previewRequest.data === undefined, 'getJoinPreview 不应发送请求体');
+  assert(!previewRequest.header?.Authorization, '公开 preview 不应要求或发送 Bearer token');
+
+  installWx(
+    (option) =>
+      succeed(
+        option,
+        { error: { code: 'TRIP_NOT_FOUND', message: '未找到对应行程' } },
+        404
+      ),
+    ''
+  );
+  assert(
+    (await service.getJoinPreview('7K4M9XQ')) === null,
+    'getJoinPreview 404 应映射为 null'
+  );
+
+  installWx(
+    (option) =>
+      succeed(
+        option,
+        { error: { code: 'TRIP_PREVIEW_FAILED', message: '预览失败' } },
+        500
+      ),
+    ''
+  );
   await expectReject(
     () => service.getJoinPreview('7K4M9XQ'),
     (error) =>
-      error.code === 'TRIP_JOIN_BACKEND_UNAVAILABLE' &&
-      error.statusCode === undefined,
-    '真实模式 getJoinPreview 必须明确抛 TRIP_JOIN_BACKEND_UNAVAILABLE，不得回退 Mock'
+      error.code === 'TRIP_PREVIEW_FAILED' &&
+      error.message === '预览失败' &&
+      error.statusCode === 500,
+    'preview 非 404 错误必须明确抛出且不得回退 Mock'
   );
-  assert(previewRequests.length === 0, '真实模式 getJoinPreview 不得发起 wx.request');
 
-  const joinRequests = installWx(() => {
-    throw new Error('joinTrip 不应发起 wx.request');
+  // ---- joinTrip：必须认证，请求体只有规范化 roomCode ----
+  const joinedFixture = tripFixture({
+    participantIds: ['usr_123', 'usr_joined'],
+    roomCode: '7K4M9XQ',
   });
+  const joinRequests = installWx((option) => succeed(option, { trip: joinedFixture }));
+  const joined = await service.joinTrip(' 7k4 m9xq ');
+  assert(joined === joinedFixture, 'joinTrip 应返回后端返回的 Trip');
+  const joinRequest = joinRequests[0];
+  const joinBody = joinRequest.data as Record<string, unknown>;
+  assert(joinRequest.method === 'POST', 'joinTrip 应使用 POST');
+  assert(joinRequest.url === `${authConfig.baseUrl}/trips/join`, 'joinTrip URL 应为 /trips/join');
+  assert(joinRequest.header?.Authorization === 'Bearer test-token', 'joinTrip 必须携带 Bearer token');
+  assert(joinBody.roomCode === '7K4M9XQ', 'join body 应携带规范化 roomCode');
+  assert(Object.keys(joinBody).length === 1, 'join body 只能包含 roomCode');
+  assert(!('creatorId' in joinBody), 'join body 不得包含 creatorId');
+  assert(!('participantIds' in joinBody), 'join body 不得包含 participantIds');
+  assert(!('userId' in joinBody), 'join body 不得包含 userId');
+  assert(!('openid' in joinBody), 'join body 不得包含 openid');
+  assert(!('status' in joinBody), 'join body 不得包含 status');
+
+  const unauthenticatedJoinRequests = installWx(() => {
+    throw new Error('无 token 时 joinTrip 不应发起 wx.request');
+  }, '');
+  await expectReject(
+    () => service.joinTrip('7K4M9XQ'),
+    (error) => error.code === 'AUTH_UNAUTHORIZED' && error.statusCode === 401,
+    'joinTrip 无 token 时必须明确抛 AUTH_UNAUTHORIZED'
+  );
+  assert(unauthenticatedJoinRequests.length === 0, '无 token 时 joinTrip 不得发起请求');
+
+  installWx((option) =>
+    succeed(
+      option,
+      { error: { code: 'TRIP_NOT_JOINABLE', message: '该行程当前不可加入' } },
+      409
+    )
+  );
   await expectReject(
     () => service.joinTrip('7K4M9XQ'),
     (error) =>
-      error.code === 'TRIP_JOIN_BACKEND_UNAVAILABLE' &&
-      error.statusCode === undefined,
-    '真实模式 joinTrip 必须明确抛 TRIP_JOIN_BACKEND_UNAVAILABLE，不得回退 Mock'
+      error.code === 'TRIP_NOT_JOINABLE' &&
+      error.message === '该行程当前不可加入' &&
+      error.statusCode === 409,
+    'joinTrip 后端失败必须明确抛出且不得回退 Mock'
   );
-  assert(joinRequests.length === 0, '真实模式 joinTrip 不得发起 wx.request');
 
   const createRequests = installWx((option) => succeed(option, { trip: tripFixture() }, 201));
   await service.createTrip({

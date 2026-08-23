@@ -26,3 +26,11 @@ export interface CreateTripInput {
   areaConstraint?: unknown;
   timeRange?: unknown;
 }
+
+/** Join Landing 所需的最小公开投影；不得暴露任何用户身份字段。 */
+export interface TripJoinPreview {
+  roomCode: string;
+  title: string;
+  participantCount: number;
+  status: TripStatus;
+}

@@ -59,6 +59,29 @@ export class JsonTripRepository implements TripRepository {
     return this.store.trips.find((trip) => trip.roomCode === roomCode) ?? null;
   }
 
+  async addParticipant(tripId: string, userId: string): Promise<Trip> {
+    const trip = this.store.trips.find((candidate) => candidate.id === tripId);
+    if (!trip) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    if (trip.participantIds.includes(userId)) {
+      return trip;
+    }
+
+    const updated: Trip = {
+      ...trip,
+      participantIds: [...trip.participantIds, userId],
+    };
+    const nextStore = {
+      trips: this.store.trips.map((candidate) =>
+        candidate.id === tripId ? updated : candidate,
+      ),
+    };
+    this.save(nextStore);
+    this.store = nextStore;
+    return updated;
+  }
+
   async backfillRoomCodes(): Promise<number> {
     const migrated = this.migrate(this.store);
     this.store = migrated.store;

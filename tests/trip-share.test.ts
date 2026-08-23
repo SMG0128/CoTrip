@@ -2,7 +2,7 @@
 // 行程邀请分享载荷测试（V0.3 Room UI Foundation）：
 // - 有 roomCode：标题含行程名，path 指向 join-trip 并携带 roomCode
 // - 无 roomCode：不伪造 roomCode，安全回退首页
-// - URL 编码：特殊字符必须 encodeURIComponent
+// - 统一规范化：小写/空白收敛到 Join Landing；畸形代码安全回退
 // - 房间号展示 / 复制反馈 / 归一化纯函数
 
 import { Trip } from '../types/trip';
@@ -51,25 +51,39 @@ function tripFixture(overrides: Partial<Trip> = {}): Trip {
   assert(payload.title === '来 CoTrip 一起规划行程', '回退标题不声称加入当前行程');
 }
 
-// ---- 3. URL 编码：特殊字符必须 encodeURIComponent ----
+// ---- 3. 小写/空白：统一规范化后汇合到 Join Landing ----
 {
-  const roomCode = 'A B&C/?é';
+  const roomCode = ' 7k4 m9xq ';
   const payload = buildTripSharePayload(tripFixture({ roomCode }));
-  assert(payload.path.includes(`roomCode=${encodeURIComponent(roomCode)}`), '特殊字符必须 encodeURIComponent');
-  assert(payload.path.includes('roomCode=A%20B%26C%2F%3F%C3%A9'), '编码结果正确');
+  assert(
+    payload.path === '/pages/join-trip/join-trip?roomCode=7K4M9XQ',
+    '小写/空白 roomCode 必须规范化后进入 Join Landing'
+  );
+  assert(payload.hasRoomCode === true, '规范化后的有效 roomCode 应允许分享加入');
 }
 
-// ---- 4. 展示 / 复制反馈 / 归一化 ----
+// ---- 4. 畸形代码：不得生成不可用的加入链接 ----
+{
+  const payload = buildTripSharePayload(tripFixture({ roomCode: 'A B&C/?é' }));
+  assert(payload.path === '/pages/home/home', '畸形 roomCode 应安全回退首页');
+  assert(payload.hasRoomCode === false, '畸形 roomCode 不得声称可加入');
+}
+
+// ---- 5. 展示 / 复制反馈 / 归一化 ----
 {
   assert(resolveRoomCodeDisplay('7K4M9XQ') === '7K4M9XQ', '有 roomCode 显示原值');
+  assert(resolveRoomCodeDisplay(' 7k4 m9xq ') === '7K4M9XQ', '展示值应使用统一规范化');
   assert(resolveRoomCodeDisplay(undefined) === ROOM_CODE_PLACEHOLDER, '无 roomCode 显示待生成');
   assert(resolveRoomCodeDisplay('  ') === ROOM_CODE_PLACEHOLDER, '空白串视为缺失');
+  assert(resolveRoomCodeDisplay('INVALID') === ROOM_CODE_PLACEHOLDER, '畸形代码不得作为房间号展示');
   assert(roomCopyFeedback('7K4M9XQ') === '房间号已复制', '复制成功反馈');
+  assert(roomCopyFeedback(' 7k4 m9xq ') === '房间号已复制', '复制反馈应使用统一规范化');
+  assert(roomCopyFeedback('invalid') === '房间号尚未生成', '畸形代码不得提示复制成功');
   assert(roomCopyFeedback(undefined) === '房间号尚未生成', '缺失时复制反馈');
-  assert(normalizeRoomCode(' 7K4M9XQ ') === '7K4M9XQ', '房间号归一化去空白');
+  assert(normalizeRoomCode(' 7k4 m9xq ') === '7K4M9XQ', '房间号归一化应去空白并转大写');
 }
 
-// ---- 5. 绝不伪造：id / userId / timestamp 不产生 roomCode ----
+// ---- 6. 绝不伪造：id / userId / timestamp 不产生 roomCode ----
 {
   const payload = buildTripSharePayload(tripFixture());
   assert(payload.path === '/pages/home/home', '绝不从 trip.id 等伪造房间号');

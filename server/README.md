@@ -82,7 +82,10 @@ export const authConfig = {
 | PATCH | `/auth/profile` | 更新昵称/头像（需登录） |
 | POST | `/trips` | 创建当前用户拥有的 Trip shell（需登录） |
 | GET | `/trips?status=ACTIVE` | 列出当前用户参与的 Trip（需登录） |
+| GET | `/trips/join-preview?roomCode=XXXXXXX` | 读取最小公开邀请预览（无需登录） |
+| POST | `/trips/join` | 用 Bearer 身份幂等加入 ACTIVE Trip；请求体只需 `roomCode` |
 | GET | `/trips/:id` | 读取当前用户参与的单个 Trip（需登录） |
+| POST | `/trips/:id/complete` | 发起人完成 ACTIVE Trip（需登录） |
 
 错误统一返回：
 
@@ -104,4 +107,4 @@ export const authConfig = {
 npm test
 ```
 
-运行 TypeScript 检查，以及认证、Trip 身份隔离和 JSON 重启持久化测试。
+运行 TypeScript 检查，以及认证、Trip 身份隔离、多人 Join、幂等与 JSON 重启持久化测试。

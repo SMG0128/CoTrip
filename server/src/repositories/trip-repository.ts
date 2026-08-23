@@ -7,6 +7,8 @@ export interface TripRepository {
   findById(id: string): Promise<Trip | null>;
   /** V0.3 Room Identity：通过房间号查询 Trip（Join 能力的前置基础查询）。 */
   findByRoomCode(roomCode: string): Promise<Trip | null>;
+  /** 幂等加入 participant 并持久化；现有 participant 不重复写入。 */
+  addParticipant(tripId: string, userId: string): Promise<Trip>;
   /** 为缺失/非法 roomCode 的历史 Trip 安全补齐房间号，返回补齐数量。 */
   backfillRoomCodes(): Promise<number>;
   listForUser(userId: string, status?: TripStatus): Promise<Trip[]>;

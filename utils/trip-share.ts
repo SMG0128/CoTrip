@@ -7,6 +7,11 @@
 // - 无 roomCode → 安全回退分享首页，绝不伪造 roomCode / 不声称可加入当前 Trip。
 // - 禁止从 trip.id / userId / timestamp 自行拼造房间号。
 
+import { isValidRoomCode, normalizeRoomCode } from './room-code';
+
+// 保留既有导入 API，同时确保分享、首页与 Join Landing 使用同一规范化实现。
+export { normalizeRoomCode } from './room-code';
+
 /** roomCode 缺失时 UI 展示的占位文案 */
 export const ROOM_CODE_PLACEHOLDER = '待生成';
 
@@ -26,7 +31,7 @@ export function buildTripSharePayload(trip: {
   roomCode?: string;
 }): TripSharePayload {
   const roomCode = normalizeRoomCode(trip.roomCode);
-  if (roomCode) {
+  if (isValidRoomCode(roomCode)) {
     return {
       title: `一起规划「${trip.title}」`,
       path: `/pages/join-trip/join-trip?roomCode=${encodeURIComponent(roomCode)}`,
@@ -40,17 +45,13 @@ export function buildTripSharePayload(trip: {
   };
 }
 
-/** 归一化房间号：去空白；空串/undefined 视为缺失 */
-export function normalizeRoomCode(roomCode: string | undefined): string {
-  return roomCode?.trim() ?? '';
-}
-
 /** 房间号展示值：缺失时显示「待生成」 */
 export function resolveRoomCodeDisplay(roomCode: string | undefined): string {
-  return normalizeRoomCode(roomCode) || ROOM_CODE_PLACEHOLDER;
+  const normalized = normalizeRoomCode(roomCode);
+  return isValidRoomCode(normalized) ? normalized : ROOM_CODE_PLACEHOLDER;
 }
 
 /** 复制房间号的 toast 文案：不存在有效房间号时明确提示 */
 export function roomCopyFeedback(roomCode: string | undefined): string {
-  return normalizeRoomCode(roomCode) ? '房间号已复制' : '房间号尚未生成';
+  return isValidRoomCode(normalizeRoomCode(roomCode)) ? '房间号已复制' : '房间号尚未生成';
 }

@@ -47,6 +47,30 @@ export function tripRouter(trips: TripService, tokens: TokenService): Router {
     }
   });
 
+  // 公开邀请预览：只返回最小投影，不要求登录、不暴露 participantIds/creatorId。
+  // 必须声明在 /:id 前，避免 join-preview 被当作 Trip id。
+  router.get('/join-preview', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const roomCode = typeof req.query.roomCode === 'string' ? req.query.roomCode : '';
+      const preview = await trips.getJoinPreview(roomCode);
+      res.json({ preview });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // 加入身份只取 Bearer token，忽略 body 中所有 userId/participantIds/creatorId 等 spoof 字段。
+  router.post('/join', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const roomCode = typeof body.roomCode === 'string' ? body.roomCode : '';
+      const trip = await trips.joinTrip(req.userId!, roomCode);
+      res.json({ trip });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const trip = await trips.getTrip(req.userId!, req.params.id);
