@@ -2,7 +2,7 @@
 
 import { authConfig } from '../../config/auth';
 import { Trip } from '../../types/trip';
-import { CreateTripInput, TripService } from '../trip-service';
+import { CreateTripInput, TripJoinPreview, TripService } from '../trip-service';
 
 interface TripResponse {
   trip: Trip;
@@ -55,6 +55,20 @@ export class RealTripService implements TripService {
       }
       throw error;
     }
+  }
+
+  async getJoinPreview(_roomCode: string): Promise<TripJoinPreview | null> {
+    throw new RealTripServiceError(
+      '真实多人加入后端暂不可用',
+      'TRIP_JOIN_BACKEND_UNAVAILABLE'
+    );
+  }
+
+  async joinTrip(_roomCode: string): Promise<Trip> {
+    throw new RealTripServiceError(
+      '真实多人加入后端暂不可用',
+      'TRIP_JOIN_BACKEND_UNAVAILABLE'
+    );
   }
 
   async listActiveTrips(): Promise<Trip[]> {

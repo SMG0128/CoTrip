@@ -80,6 +80,32 @@ function succeed(option: TestRequestOption, data: unknown, statusCode = 200): vo
 export async function runRealTripServiceTests(): Promise<void> {
   const service = new RealTripService();
 
+  // Real join 后端尚未接线：即使使用 Mock 中确实存在的房间码，也必须明确失败，
+  // 且不能发 wx.request，更不能静默回退 MockTripService。
+  const previewRequests = installWx(() => {
+    throw new Error('getJoinPreview 不应发起 wx.request');
+  });
+  await expectReject(
+    () => service.getJoinPreview('7K4M9XQ'),
+    (error) =>
+      error.code === 'TRIP_JOIN_BACKEND_UNAVAILABLE' &&
+      error.statusCode === undefined,
+    '真实模式 getJoinPreview 必须明确抛 TRIP_JOIN_BACKEND_UNAVAILABLE，不得回退 Mock'
+  );
+  assert(previewRequests.length === 0, '真实模式 getJoinPreview 不得发起 wx.request');
+
+  const joinRequests = installWx(() => {
+    throw new Error('joinTrip 不应发起 wx.request');
+  });
+  await expectReject(
+    () => service.joinTrip('7K4M9XQ'),
+    (error) =>
+      error.code === 'TRIP_JOIN_BACKEND_UNAVAILABLE' &&
+      error.statusCode === undefined,
+    '真实模式 joinTrip 必须明确抛 TRIP_JOIN_BACKEND_UNAVAILABLE，不得回退 Mock'
+  );
+  assert(joinRequests.length === 0, '真实模式 joinTrip 不得发起 wx.request');
+
   const createRequests = installWx((option) => succeed(option, { trip: tripFixture() }, 201));
   await service.createTrip({
     title: '顺德一日游',

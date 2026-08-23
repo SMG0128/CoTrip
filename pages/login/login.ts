@@ -4,6 +4,11 @@
 // real 模式下后端不可用会明确失败并提示，绝不产生伪造登录态。
 
 import { authService } from '../../services/index';
+import { resolveLoginContinuation } from '../../utils/join-flow';
+import {
+  clearPendingJoinRoomCode,
+  getPendingJoinRoomCode,
+} from '../../utils/pending-join';
 
 Page({
   data: {
@@ -19,7 +24,16 @@ Page({
       .then((session) => {
         const app = getApp<IAppOption>();
         app.globalData.currentUser = session.user;
-        wx.switchTab({ url: '/pages/home/home' });
+        const pendingRoomCode = getPendingJoinRoomCode();
+        const continuation = resolveLoginContinuation(pendingRoomCode);
+        if (continuation.kind === 'join') {
+          // 登录只恢复邀请落地页；仍需用户再次明确点击“加入行程”。
+          wx.redirectTo({ url: continuation.url });
+          return;
+        }
+        // 无效的冷启动残留不应持续影响后续普通登录。
+        if (pendingRoomCode) clearPendingJoinRoomCode();
+        wx.switchTab({ url: continuation.url });
       })
       .catch((err: Error) => {
         wx.showToast({

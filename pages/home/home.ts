@@ -4,6 +4,7 @@
 import { Trip } from '../../types/trip';
 import { tripService } from '../../services/index';
 import { hydrateTripWithCurrentUser } from '../../utils/current-user';
+import { normalizeRoomCode } from '../../utils/room-code';
 
 Page({
   data: {
@@ -58,15 +59,15 @@ Page({
     wx.switchTab({ url: '/pages/profile/profile' });
   },
 
-  /** 房间码输入：轻量归一化（trim + 去空格 + uppercase）。不自动生成房间码。 */
+  /** 房间码输入统一走共享归一化边界；不自动生成房间码。 */
   onRoomCodeInput(e: WechatMiniprogram.Input) {
-    const normalized = (e.detail.value || '').replace(/\s+/g, '').toUpperCase();
+    const normalized = normalizeRoomCode(e.detail.value);
     this.setData({ roomCodeInput: normalized });
   },
 
   /** 手动加入：仅导航到 Join Landing，绝不伪造加入成功。 */
   onJoinByRoomCode() {
-    const code = this.data.roomCodeInput.trim();
+    const code = normalizeRoomCode(this.data.roomCodeInput);
     if (!code) {
       wx.showToast({ title: '请输入房间号', icon: 'none' });
       return;

@@ -68,7 +68,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Known Limitations
 
-- 真实多人房间加入（`POST /trips/join`）尚未实现。
+- 真实多人房间加入后端尚未实现；本地 Mock 已具备 preview/join 完整交互，real mode 会明确报 `TRIP_JOIN_BACKEND_UNAVAILABLE`，绝不回退 Mock。
 - 定位的运行时隐私授权弹窗（privacy authorization flow）尚未完整实现。
 - 腾讯地图真机 E2E 依赖人工完成 Key / 合法域名 / 隐私配置。
 - 地图预览（Map Preview）尚未实现。
@@ -84,11 +84,12 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **历史数据回填**：旧 Trip 在读取时自动补齐缺失的 `roomCode`，原字段完整保留。
 - **按房间号查找**：后端支持 `findByRoomCode` 查询，非法格式安全返回空。
 
-### 分享与加入（UI Foundation）
+### 分享与加入（Local Join Foundation）
 
 - **原生微信分享**：行程详情通过 `onShareAppMessage` 分享卡片邀请好友。有房间号 → 卡片直达加入落地页（roomCode 经 `encodeURIComponent`）；无房间号 → 安全回退分享首页，绝不伪造房间号、绝不声称可加入当前行程。
-- **Join 落地页**（`pages/join-trip/`）：解析并展示分享链接中的房间号。当前阶段仅为 UI 地基——不调用 Join API、不写入 participantIds、不假装加入成功。
+- **Join 落地页**（`pages/join-trip/`）：通过 `TripService.getJoinPreview` 加载最小公开预览；本地 Mock 支持幂等 `joinTrip`，仅在 service 返回 Trip 后进入详情。
 - **首页房间入口**：首页提供房间号手动输入（自动 trim / 去空格 / 大写归一化），导航至同一落地页。
+- **登录续接**：未登录点击加入时统一保存 `pendingJoinRoomCode`；登录成功只返回同一 Join 落地页，由用户再次明确点击加入，成功后清理 pending context。
 
 ### 体验与架构改进
 

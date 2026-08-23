@@ -5,16 +5,21 @@
 import { AuthService, LoginResult } from '../auth-service';
 import { mockDevCurrentUser } from '../../mock/mock-user';
 
+/** 仅用于 local/mock development，让“退出后冷启动”保持未登录。 */
+const MOCK_LOGGED_OUT_STORAGE_KEY = 'cotrip_mock_logged_out';
+
 export class MockAuthService implements AuthService {
   async login(): Promise<LoginResult> {
+    wx.removeStorageSync(MOCK_LOGGED_OUT_STORAGE_KEY);
     return { user: mockDevCurrentUser };
   }
 
   async restoreSession(): Promise<LoginResult | null> {
+    if (wx.getStorageSync<boolean>(MOCK_LOGGED_OUT_STORAGE_KEY)) return null;
     return { user: mockDevCurrentUser };
   }
 
   async logout(): Promise<void> {
-    // Mock 无持久化，无需清理
+    wx.setStorageSync(MOCK_LOGGED_OUT_STORAGE_KEY, true);
   }
 }

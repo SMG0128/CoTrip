@@ -23,8 +23,7 @@ export interface Trip {
   commentIds: string[];
   constraintIds: string[];
   /**
-   * 房间号（V0.3 UI Foundation，前端仅预留）。
-   * 真实云端 Trip 当前不返回该字段；由后续服务器 Room API 正式生成。
+   * 服务器拥有的房间号；本地 Mock 仅提供固定开发值用于 Join 流程验收。
    * 前端禁止自行从 trip.id / userId / timestamp 伪造。
    */
   roomCode?: string;

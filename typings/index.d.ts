@@ -3,5 +3,6 @@
 interface IAppOption {
   globalData: {
     currentUser: import('./types/participant').Participant | null;
+    pendingJoinRoomCode: string | null;
   };
 }

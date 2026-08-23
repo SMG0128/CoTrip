@@ -2,14 +2,45 @@
   <view class="join-card">
     <view class="brand">CoTrip</view>
     <view class="headline">你收到一个行程邀请</view>
-    <view class="subhead">输入房间号加入，和大家一起规划</view>
 
-    <view class="room-box">
-      <text class="room-label">房间号</text>
-      <text class="room-code">{{roomCode}}</text>
-    </view>
+    <block wx:if="{{pageState === 'loading'}}">
+      <view class="state-panel">
+        <view class="loading-dot"></view>
+        <text class="state-text">正在加载邀请…</text>
+      </view>
+    </block>
 
-    <button class="join-btn" bind:tap="onJoin">加入行程</button>
-    <text class="hint">多人加入功能即将接通</text>
+    <block wx:elif="{{preview}}">
+      <view class="trip-title">{{preview.title}}</view>
+      <view class="trip-meta">当前 {{preview.participantCount}} 人</view>
+
+      <view class="room-box">
+        <text class="room-label">房间号</text>
+        <text class="room-code">{{roomCode}}</text>
+      </view>
+
+      <button
+        wx:if="{{pageState === 'valid' || pageState === 'joining' || pageState === 'join-failed'}}"
+        class="join-btn"
+        bind:tap="onJoin"
+        loading="{{joining}}"
+        disabled="{{joining}}"
+      >{{joining ? '正在加入…' : '加入行程'}}</button>
+      <view wx:else class="state-panel compact">
+        <text class="state-text error">{{errorText}}</text>
+      </view>
+      <text wx:if="{{pageState === 'join-failed'}}" class="hint error">{{errorText}}</text>
+    </block>
+
+    <block wx:else>
+      <view class="room-box muted">
+        <text class="room-label">房间号</text>
+        <text class="room-code">{{roomCode || '—'}}</text>
+      </view>
+      <view class="state-panel compact">
+        <text class="state-text error">{{errorText}}</text>
+      </view>
+      <button wx:if="{{pageState === 'failed'}}" class="retry-btn" bind:tap="loadPreview">重新加载</button>
+    </block>
   </view>
 </view>

@@ -51,3 +51,4 @@ export type {
   AuthService,
   RouteOptionService,
 };
+export type { TripJoinPreview } from './trip-service';
