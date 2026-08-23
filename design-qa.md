@@ -1,59 +1,59 @@
-# CoTrip Light 3D Design QA
+# CoTrip New Trip SVG Icon Refresh — Design QA
 
 ## Comparison Target
 
-- Source visual truth:
-  - C:\Users\32569\AppData\Local\Temp\codex-clipboard-231b5eef-695a-427e-bda3-3d1cf775d0c7.png (Home)
-  - C:\Users\32569\AppData\Local\Temp\codex-clipboard-94cd3f81-d1a1-4f2d-9277-6444d7ab064c.png (Trip Detail / Plan)
-  - C:\Users\32569\AppData\Local\Temp\codex-clipboard-1d6a5f54-a4b7-467b-90c2-5a4feb196781.png (Trip Detail / Comments)
-  - C:\Users\32569\AppData\Local\Temp\codex-clipboard-c66c7c83-9fe8-49c6-8aa0-2ab400523bc9.png (Profile)
-- Source dimensions: 941 × 1672 px each.
-- Intended CSS viewports: 375, 390, and 430 px wide; Mini Program rpx scaling, density normalized by the simulator.
-- State: active trip with plan v4, ranked restaurants, four comments, collapsed debug panel, and profile notification settings.
-- Implementation screenshot: not captured.
+- Source visual truth: `C:\Users\32569\AppData\Local\Temp\codex-clipboard-4d6ae376-437e-4615-9aa7-419363e3a100.png`
+- Source pixels: 1132 × 1389 px; phone region cropped to 556 × 1254 px and normalized to 364 × 821 px for equal-width comparison.
+- Rendered implementation: `D:\weixindasai\artifacts\trip-create-implementation.png`
+- Full DevTools evidence: `D:\weixindasai\artifacts\trip-create-devtools.png`
+- Combined comparison: `D:\weixindasai\artifacts\trip-create-comparison.png`
+- Implementation pixels: 364 × 785 px, captured from the WeChat DevTools iPhone 15 Pro simulator.
+- CSS viewport: iPhone 15 Pro logical viewport (393 × 852); the desktop simulator was scaled to the captured phone frame.
+- Density normalization: source and implementation were compared at the same 364 px phone width. The shorter implementation capture was vertically padded only in the combined image; neither phone screen was stretched.
+- State: logged-in local development user, empty New Trip form, light theme.
 
 ## Findings
 
-- [P1] Rendered comparison is blocked.
-  - Location: WeChat DevTools simulator.
-  - Evidence: the open DevTools window contains an older unsaved editor buffer and displays a blank simulator. Reloading it would discard user-owned unsaved state. CLI automation is unavailable because the DevTools service port is disabled; enabling it would change a security setting.
-  - Impact: typography, exact spacing, image scale, and wrapping cannot be judged from rendered evidence.
-  - Fix: save or discard the existing DevTools buffer, reopen the project from disk, compile, and capture Home, Plan, Comments, and Profile at the three target widths.
+- No actionable P0/P1/P2 mismatch remains.
+- [P3] The library-sourced suitcase is slightly squarer than the concept illustration.
+  - Location: header artwork.
+  - Evidence: the source has a subtly tapered carry-on shell; the implementation uses a clean rounded rectangular IconPark outline.
+  - Impact: minor illustration-level drift only; the travel metaphor, gradient, handle, wheels, and sparkle remain immediately recognizable.
+  - Follow-up: retain unless a closer licensed carry-on icon is introduced across the whole CoTrip icon family.
 
 ## Required Fidelity Surfaces
 
-- Fonts and typography: system font stack and reference hierarchy implemented; rendered weights/wrapping not verified.
-- Spacing and layout rhythm: responsive rpx layout and 375 px overrides implemented; rendered comparison blocked.
-- Colors and visual tokens: shared canvas, surface, accent, semantic color, radius, and shadow tokens implemented.
-- Image quality and asset fidelity: transparent CC0 raster assets inspected directly; final in-layout crop/scale not verified.
-- Copy and content: reference labels preserved while live trip, constraint, provider, and notification data remain bound.
+- Fonts and typography: existing system font stack, hierarchy, weights, wrapping, and copy remain unchanged; no clipping or unexpected line wrap is visible.
+- Spacing and layout rhythm: card order, padding, row spacing, fixed footer, radii, shadows, and safe-area placement remain intact. The final CTA spans the footer as in the source.
+- Colors and visual tokens: icons use the requested `#4F7CFF → #7B61FF` stroke gradient with `#FF9A3C` accents; the CTA continues the same blue-purple direction with readable white content.
+- Image quality and asset fidelity: all app-owned New Trip icons render as sharp external SVG assets sourced from the IconPark family or the existing CoTrip sparkle asset. No emoji, text glyph, CSS art, inline SVG, or raster placeholder remains on this page.
+- Copy and content: all labels and helper text match the existing product copy and the supplied visual target.
+- Accessibility and behavior: row labels retain text, icon alignment preserves tap targets, and the local login plus Home → New Trip navigation path was exercised. The final DevTools capture shows no visible compile error state.
 
 ## Full-view and Focused Evidence
 
-The four source images were opened and inspected. No valid implementation capture is available, so no side-by-side full-view or focused-region comparison was performed.
+- Full view: `artifacts/trip-create-comparison.png` places the normalized source phone and final simulator phone in one image. Overall hierarchy, three-card form structure, fixed CTA, and above-the-fold density are consistent.
+- Focused icon pass: header luggage/sparkle, area globe-pin/location/chevron, time calendar-clock/clock/calendar, brief notebook-pencil/pencil, and CTA calendar-plus were inspected at original capture resolution. All assets are present, aligned, and visually consistent.
+- A separate crop was not needed because the equal-width combined comparison keeps every icon and label legible at original capture resolution.
 
 ## Comparison History
 
-- Pass 1: static implementation completed; npm run typecheck, npm test, JSON parsing, and all 17 asset-reference checks passed.
-- Render attempt: blocked by the unsaved DevTools buffer and disabled automation service port. No visual fixes were inferred from the blank simulator.
+- Pass 1: all SVGs rendered correctly, but the new flex layout caused the native WeChat button to shrink to its contents. Recorded as P2 because it materially changed the persistent CTA width.
+- Fix: moved icon/text flex alignment into an inner wrapper and explicitly sized the fixed footer and native button with border-box width rules. The suitcase handle was also switched to a closer library-sourced carry-on handle.
+- Pass 2: recaptured at the same simulator/device state. The CTA now spans the footer, every SVG remains sharp, and no P0/P1/P2 difference remains.
 
 ## Implementation Checklist
 
-- Reopen the project from disk after preserving the existing editor buffer.
-- Capture Home, Trip Plan, Trip Comments, and Profile at 375, 390, and 430 px.
-- Compare typography, section spacing, long-title wrapping, restaurant truncation, badges, switches, and safe-area input placement.
-- Resolve any P0/P1/P2 mismatch, then repeat the comparison.
+- [x] Replace all app-owned New Trip page icons with SVG assets.
+- [x] Apply a consistent gradient outline and orange accent language.
+- [x] Preserve existing page structure, copy, card rhythm, and interactions.
+- [x] Verify TypeScript and core tests.
+- [x] Compile and inspect the page in WeChat DevTools.
+- [x] Compare the source and final implementation in one normalized image.
 
 ## Follow-up Polish
 
-- Replace the generic gym and takeaway-cup illustrations with custom racket, metro, and Vietnamese-food renders if image generation becomes available.
+- Optionally replace the header suitcase only if a closer licensed tapered carry-on exists in the same icon family.
+- The create action itself was not submitted during visual QA to avoid adding another local persisted trip; its existing behavior remains covered by the project tests.
 
-## Custom Tab Bar Patch
-
-- Native tab presentation replaced with `custom-tab-bar/`; routes remain `pages/home/home` and `pages/profile/profile` and continue through `wx.switchTab`.
-- Bar geometry: 28rpx margins and 100rpx height at 375px; 30rpx margins and 104rpx height at 390px and 430px.
-- Safe-area behavior: the pill uses `bottom: calc(env(safe-area-inset-bottom) + 12rpx)` with no full-width safe-area container.
-- Home and Profile reserve `140rpx + env(safe-area-inset-bottom)`, leaving 24–28rpx between scroll content and the floating pill.
-- Static checks at 375/390/430 widths passed. Rendered verification remains part of the existing DevTools blocker above.
-
-final result: blocked
+final result: passed

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="84" height="84" viewBox="0 0 48 48" fill="none">
+
+  <defs>
+    <linearGradient id="cotrip-main" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F7CFF"/>
+      <stop offset="1" stop-color="#7B61FF"/>
+    </linearGradient>
+    <linearGradient id="cotrip-accent" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9A3C"/>
+      <stop offset="1" stop-color="#FF6B6B"/>
+    </linearGradient>
+  </defs>
+<g transform="translate(2 3) scale(.80)"><path d="M10 6C10 4.89543 10.8954 4 12 4H40C41.1046 4 42 4.89543 42 6V42C42 43.1046 41.1046 44 40 44H12C10.8954 44 10 43.1046 10 42V6Z" fill="none" stroke="url(#cotrip-main)" stroke-width="2" stroke-linejoin="round"/><path d="M34 6V42" stroke="url(#cotrip-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 14H14" stroke="url(#cotrip-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 24H14" stroke="url(#cotrip-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 34H14" stroke="url(#cotrip-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 4H39" stroke="url(#cotrip-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 44H39" stroke="url(#cotrip-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g transform="translate(28 27) scale(.40)"><path d="M7 42H43" stroke="url(#cotrip-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 26.7199V34H18.3172L39 13.3081L31.6951 6L11 26.7199Z" fill="#FFFFFF" stroke="url(#cotrip-accent)" stroke-width="2" stroke-linejoin="round"/></g>
+</svg>

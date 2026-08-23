@@ -1,5 +1,5 @@
 <view class="create">
-  <!-- 页头：轻盈的创建空间，与登录页同一套伪 3D 视觉 -->
+  <!-- 页头：轻盈的创建空间，使用 CoTrip 渐变线性图标 -->
   <view class="create-head">
     <view class="head-copy">
       <view class="head-kicker">发起一趟共同出行</view>
@@ -8,22 +8,25 @@
     </view>
     <view class="head-art">
       <view class="head-glow"></view>
-      <image class="head-travel" src="/assets/3d/travel.png" mode="aspectFit" />
-      <image class="head-star" src="/assets/3d/star.png" mode="aspectFit" />
+      <image class="head-travel" src="/assets/icons/trip-create/luggage.svg" mode="aspectFit" />
+      <image class="head-star" src="/assets/icons/utility/sparkle.svg" mode="aspectFit" />
     </view>
   </view>
 
   <!-- 区域限定 -->
   <view class="card">
     <view class="section-head">
-      <image class="section-icon" src="/assets/3d/location.png" mode="aspectFit" />
+      <image class="section-icon" src="/assets/icons/trip-create/area.svg" mode="aspectFit" />
       <text class="section-title">区域限定</text>
     </view>
     <view class="field" bind:tap="onAreaTap">
-      <text class="field-label">区域</text>
+      <view class="field-label-group">
+        <image class="field-icon" src="/assets/icons/trip-create/location.svg" mode="aspectFit" />
+        <text class="field-label">区域</text>
+      </view>
       <view class="field-value">
         <text>{{areaText}}</text>
-        <image class="arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+        <image class="arrow" src="/assets/icons/trip-create/chevron-right.svg" mode="aspectFit" />
       </view>
     </view>
   </view>
@@ -31,11 +34,14 @@
   <!-- 时间范围 -->
   <view class="card">
     <view class="section-head">
-      <image class="section-icon" src="/assets/3d/calender.png" mode="aspectFit" />
+      <image class="section-icon" src="/assets/icons/trip-create/time-range.svg" mode="aspectFit" />
       <text class="section-title">时间范围</text>
     </view>
     <view class="field">
-      <text class="field-label">开始</text>
+      <view class="field-label-group">
+        <image class="field-icon" src="/assets/icons/trip-create/clock.svg" mode="aspectFit" />
+        <text class="field-label">开始</text>
+      </view>
       <view class="field-value">
         <picker mode="date" bind:change="onStartDateChange">
           <text class="picker-text">{{startDate || '选择日期'}}</text>
@@ -46,7 +52,10 @@
       </view>
     </view>
     <view class="field">
-      <text class="field-label">结束</text>
+      <view class="field-label-group">
+        <image class="field-icon" src="/assets/icons/trip-create/calendar.svg" mode="aspectFit" />
+        <text class="field-label">结束</text>
+      </view>
       <view class="field-value">
         <picker mode="date" bind:change="onEndDateChange">
           <text class="picker-text">{{endDate || '选择日期'}}</text>
@@ -61,22 +70,30 @@
   <!-- 事件简述 -->
   <view class="card">
     <view class="section-head">
-      <image class="section-icon" src="/assets/3d/chat-bubble.png" mode="aspectFit" />
+      <image class="section-icon" src="/assets/icons/trip-create/brief.svg" mode="aspectFit" />
       <text class="section-title">事件简述</text>
     </view>
-    <textarea
-      class="brief"
-      placeholder="例如：打两个小时羽毛球，然后去吃越南菜"
-      placeholder-class="placeholder"
-      value="{{brief}}"
-      bind:input="onBriefInput"
-      maxlength="200"
-      auto-height
-    />
+    <view class="brief-wrap">
+      <image class="brief-icon" src="/assets/icons/trip-create/pencil.svg" mode="aspectFit" />
+      <textarea
+        class="brief"
+        placeholder="例如：打两个小时羽毛球，然后去吃越南菜"
+        placeholder-class="placeholder"
+        value="{{brief}}"
+        bind:input="onBriefInput"
+        maxlength="200"
+        auto-height
+      />
+    </view>
   </view>
 
   <!-- 创建 -->
   <view class="footer">
-    <button class="btn-primary create-btn" bind:tap="onCreate">创建行程</button>
+    <button class="btn-primary create-btn" bind:tap="onCreate">
+      <view class="create-btn-content">
+        <image class="create-btn-icon" src="/assets/icons/trip-create/calendar-plus.svg" mode="aspectFit" />
+        <text>创建行程</text>
+      </view>
+    </button>
   </view>
 </view>
