@@ -10,4 +10,6 @@ export interface Participant {
   avatarUrl?: string;
   /** 是否行程创建者 */
   isCreator?: boolean;
+  /** 是否已完成首次资料完善（来自服务端；缺省视为未完成） */
+  profileCompleted?: boolean;
 }

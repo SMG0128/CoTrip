@@ -5,7 +5,13 @@ import crypto from 'crypto';
 import { UserRepository } from '../repositories/user-repository';
 import { WechatService } from './wechat-service';
 import { TokenService } from './token-service';
-import { User, PublicUser, toPublicUser } from '../types/user';
+import {
+  DEFAULT_USER_NICKNAME,
+  User,
+  PublicUser,
+  isRealNickname,
+  toPublicUser,
+} from '../types/user';
 import { AppError } from '../types/errors';
 
 export interface LoginResult {
@@ -75,6 +81,9 @@ export class RealAuthService implements AuthService {
       user.avatarUrl = patch.avatarUrl.trim();
     }
 
+    // profileCompleted 唯一语义：拥有合法、非空且非默认占位的昵称——按最终昵称重算，
+    // 仅更新头像不会置位；身份来自已认证 userId，客户端无法伪造该标记
+    user.profileCompleted = isRealNickname(user.nickname);
     user.updatedAt = Date.now();
     await this.users.update(user);
     return toPublicUser(user);
@@ -85,9 +94,10 @@ export class RealAuthService implements AuthService {
     const user: User = {
       id: this.generateId(),
       wechatOpenId: openid,
-      // 新账号使用安全默认资料，不假设 wx.login 提供真实昵称/头像
-      nickname: '微信用户',
+      // 新账号使用安全默认资料，不假设 wx.login 提供真实昵称/头像；真实资料由首次资料完善流程保存
+      nickname: DEFAULT_USER_NICKNAME,
       avatarUrl: '',
+      profileCompleted: false,
       createdAt: now,
       updatedAt: now,
     };

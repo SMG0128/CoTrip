@@ -30,6 +30,13 @@
   </view>
 
   <view class="other-card">
+    <view class="menu-item" bind:tap="onEditProfile">
+      <view class="menu-main">
+        <view class="menu-icon"><image src="/assets/icons/trip-create/pencil.svg" mode="aspectFit" /></view>
+        <text>编辑资料</text>
+      </view>
+      <image class="menu-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+    </view>
     <view class="menu-item" bind:tap="onPrivacy">
       <view class="menu-main">
         <view class="menu-icon"><image src="/assets/icons/settings/privacy.svg" mode="aspectFit" /></view>

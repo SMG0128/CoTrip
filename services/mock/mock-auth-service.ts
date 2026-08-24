@@ -22,4 +22,12 @@ export class MockAuthService implements AuthService {
   async logout(): Promise<void> {
     wx.setStorageSync(MOCK_LOGGED_OUT_STORAGE_KEY, true);
   }
+
+  /** Mock 实现：直接改写开发用户内存对象，并把资料完善标记置为已完成。 */
+  async updateProfile(patch: { nickname?: string; avatarUrl?: string }): Promise<LoginResult> {
+    if (patch.nickname !== undefined) mockDevCurrentUser.nickname = patch.nickname.trim();
+    if (patch.avatarUrl !== undefined) mockDevCurrentUser.avatarUrl = patch.avatarUrl;
+    mockDevCurrentUser.profileCompleted = true;
+    return { user: mockDevCurrentUser };
+  }
 }

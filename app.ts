@@ -12,13 +12,11 @@ App<IAppOption>({
   },
   onLaunch() {
     this.globalData.pendingJoinRoomCode = getPendingJoinRoomCode();
-    // 启动时尝试恢复登录态；未登录时保持 null，由登录页引导
-    authService.restoreSession().then((session) => {
-      if (session) {
-        this.globalData.currentUser = session.user;
-      }
-    }).catch(() => {
-      // 恢复失败不阻塞启动，登录页会重新引导
-    });
+    // 启动时尝试恢复登录态；恢复结果同时暴露为 authReady，登录页等待它完成冷启动路由。
+    // 未登录或恢复失败时 authReady 解析为 null，登录页据此停留在登录态，绝不伪造会话。
+    this.globalData.authReady = authService.restoreSession().then((session) => {
+      if (session) { this.globalData.currentUser = session.user; }
+      return session;
+    }).catch(() => null);
   },
 });

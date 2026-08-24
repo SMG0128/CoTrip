@@ -50,6 +50,10 @@ Page({
     });
   },
 
+  onEditProfile() {
+    wx.navigateTo({ url: '/pages/profile-setup/profile-setup?mode=edit' });
+  },
+
   onPrivacy() {
     wx.showModal({
       title: '隐私说明',

@@ -1,0 +1,31 @@
+<view class="setup">
+  <view class="brand">CoTrip</view>
+  <view class="title">完善你的资料</view>
+  <view class="desc">昵称将作为你在行程中的显示名</view>
+
+  <!-- 头像：默认 SVG；「使用微信头像」由用户主动触发，取消/失败不影响资料设置 -->
+  <view class="avatar-card">
+    <image class="avatar-preview" src="{{previewSrc}}" mode="aspectFill" />
+    <button
+      class="choose-avatar-btn"
+      open-type="chooseAvatar"
+      bindchooseavatar="onChooseAvatar"
+    >使用微信头像</button>
+  </view>
+
+  <view class="form-card">
+    <input
+      class="nickname-input"
+      type="nickname"
+      maxlength="30"
+      placeholder="请输入昵称"
+      placeholder-class="nickname-placeholder"
+      value="{{nickname}}"
+      bindinput="onInput"
+    />
+  </view>
+
+  <button class="submit-btn" loading="{{saving}}" bind:tap="onSubmit">
+    {{isEdit ? '保存' : '开始使用 CoTrip'}}
+  </button>
+</view>

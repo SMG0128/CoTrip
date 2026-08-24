@@ -3,7 +3,7 @@
 // 依赖 config/auth.ts 中的 baseUrl。real 模式下后端不可用会明确失败，绝不回退 Mock。
 
 import { AuthService, LoginResult } from '../auth-service';
-import { authConfig } from '../../config/auth';
+import { appConfig } from '../../config/auth';
 import { Participant } from '../../types/participant';
 import { currentUserToParticipant } from '../../utils/current-user';
 
@@ -11,6 +11,8 @@ interface PublicUser {
   id: string;
   nickname: string;
   avatarUrl?: string;
+  /** 服务端在登录与资料响应中始终返回该标记 */
+  profileCompleted: boolean;
 }
 
 interface LoginResponse {
@@ -28,11 +30,11 @@ interface BackendError {
 
 export class RealAuthService implements AuthService {
   private get baseUrl(): string {
-    return authConfig.baseUrl.replace(/\/$/, '');
+    return appConfig.baseUrl.replace(/\/$/, '');
   }
 
   async login(): Promise<LoginResult> {
-    if (!authConfig.baseUrl) {
+    if (!appConfig.baseUrl) {
       throw new Error('未配置后端地址（config/auth.ts baseUrl），无法进行真实微信登录');
     }
 
@@ -50,8 +52,8 @@ export class RealAuthService implements AuthService {
   }
 
   async restoreSession(): Promise<LoginResult | null> {
-    const token = wx.getStorageSync<string>(authConfig.tokenStorageKey);
-    const user = wx.getStorageSync<Participant>(authConfig.userStorageKey);
+    const token = wx.getStorageSync<string>(appConfig.tokenStorageKey);
+    const user = wx.getStorageSync<Participant>(appConfig.userStorageKey);
     if (!token || !user) return null;
 
     // 用 token 拉取最新资料
@@ -71,9 +73,32 @@ export class RealAuthService implements AuthService {
     }
   }
 
+  async updateProfile(patch: { nickname?: string; avatarUrl?: string }): Promise<LoginResult> {
+    // 身份完全由已持久化的 Bearer token 决定；无 token 直接视为会话失效
+    const token = wx.getStorageSync<string>(appConfig.tokenStorageKey);
+    if (!token) {
+      throw new Error('登录状态失效，请重新登录');
+    }
+
+    try {
+      const freshUser = await this.requestUpdateProfile(token, patch);
+      // token 不变，仅用服务端返回的最新资料覆盖本地用户缓存
+      const participant = this.toParticipant(freshUser);
+      this.persist(token, participant);
+      return { user: participant, token };
+    } catch (err) {
+      // 401：token 已失效，先清除本地登录态再明确抛错
+      if (this.isUnauthorized(err)) {
+        await this.logout();
+        throw new Error((err as Error).message || '登录状态失效，请重新登录');
+      }
+      throw err;
+    }
+  }
+
   async logout(): Promise<void> {
-    wx.removeStorageSync(authConfig.tokenStorageKey);
-    wx.removeStorageSync(authConfig.userStorageKey);
+    wx.removeStorageSync(appConfig.tokenStorageKey);
+    wx.removeStorageSync(appConfig.userStorageKey);
   }
 
   private toParticipant(user: PublicUser): Participant {
@@ -132,6 +157,32 @@ export class RealAuthService implements AuthService {
     });
   }
 
+  private requestUpdateProfile(
+    token: string,
+    patch: { nickname?: string; avatarUrl?: string }
+  ): Promise<PublicUser> {
+    // 基础库 wx.request 运行时支持 PATCH，但官方类型联合尚未收录该字面量，
+    // 经 string 中转做一次受控断言（不使用 any）。
+    const methodPatch: string = 'PATCH';
+    return new Promise((resolve, reject) => {
+      wx.request({
+        url: `${this.baseUrl}/auth/profile`,
+        method: methodPatch as WechatMiniprogram.RequestOption['method'],
+        header: { Authorization: `Bearer ${token}` },
+        // body 只含调用方传入的字段，不额外包一层
+        data: patch,
+        success: (res) => {
+          if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
+            resolve((res.data as ProfileResponse).user);
+          } else {
+            reject(this.toError(res));
+          }
+        },
+        fail: (err) => reject(new Error(`资料更新请求失败：${err.errMsg}`)),
+      });
+    });
+  }
+
   private toError(res: WechatMiniprogram.RequestSuccessCallbackResult): Error {
     const data = res.data as BackendError | undefined;
     const message = data?.error?.message;
@@ -145,7 +196,7 @@ export class RealAuthService implements AuthService {
   }
 
   private persist(token: string, user: Participant): void {
-    wx.setStorageSync(authConfig.tokenStorageKey, token);
-    wx.setStorageSync(authConfig.userStorageKey, user);
+    wx.setStorageSync(appConfig.tokenStorageKey, token);
+    wx.setStorageSync(appConfig.userStorageKey, user);
   }
 }

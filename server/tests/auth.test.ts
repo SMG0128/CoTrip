@@ -209,4 +209,110 @@ export async function runAuthTests(): Promise<void> {
     const { user } = await auth.login('code');
     await assert.rejects(() => auth.updateProfile(user.id, { nickname: '   ' }), (e: AppError) => e.code === 'VALIDATION_ERROR');
   });
+  // --- 资料完善标记（profileCompleted） ---
+  await record('login: 新用户 profileCompleted=false 且公开用户携带该标记', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_fresh'), new HmacTokenService('s'));
+    const result = await auth.login('code');
+    assert.strictEqual(result.user.profileCompleted, false);
+  });
+
+  await record('profile: 真实保存昵称后 profileCompleted=true 并持久化', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_save'), new HmacTokenService('s'));
+    const { user } = await auth.login('code');
+    const updated = await auth.updateProfile(user.id, { nickname: '小明' });
+    assert.strictEqual(updated.profileCompleted, true);
+    // 模拟重启：落盘值也应携带该标记
+    const persisted = await repo.findById(user.id);
+    assert.strictEqual(persisted?.profileCompleted, true);
+    assert.strictEqual((await auth.getProfile(user.id)).profileCompleted, true);
+  });
+
+  await record('profile: 空昵称校验失败不置位 profileCompleted', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_invalid'), new HmacTokenService('s'));
+    const { user } = await auth.login('code');
+    await assert.rejects(() => auth.updateProfile(user.id, { nickname: '   ' }), (e: AppError) => e.code === 'VALIDATION_ERROR');
+    // 校验失败先抛 AppError，不应走到置位行
+    assert.strictEqual((await repo.findById(user.id))?.profileCompleted, false);
+  });
+
+  await record('profile: 历史用户(无标记但已自定义昵称)视为已完成', async () => {
+    const repo = tempRepo();
+    // 历史数据：无 profileCompleted 字段，仅靠昵称兜底判断
+    await repo.create({
+      id: 'u_legacy',
+      wechatOpenId: 'openid_legacy',
+      nickname: '老张',
+      avatarUrl: '',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_x'), new HmacTokenService('s'));
+    const profile = await auth.getProfile('u_legacy');
+    assert.strictEqual(profile.profileCompleted, true);
+  });
+
+  await record('profile: 新用户仅改头像不完成资料（无合法昵称时保持 false）', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_avatar'), new HmacTokenService('s'));
+    const { user } = await auth.login('code');
+    const updated = await auth.updateProfile(user.id, { avatarUrl: 'http://a.png' });
+    assert.strictEqual(updated.profileCompleted, false);
+    const persisted = await repo.findById(user.id);
+    assert.strictEqual(persisted?.profileCompleted, false);
+  });
+
+  await record('profile: 已有合法昵称的用户仅改头像保持已完成', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_avatar_ok'), new HmacTokenService('s'));
+    const { user } = await auth.login('code');
+    await auth.updateProfile(user.id, { nickname: '小明' });
+    const updated = await auth.updateProfile(user.id, { avatarUrl: 'http://a.png' });
+    assert.strictEqual(updated.profileCompleted, true);
+    assert.strictEqual((await repo.findById(user.id))?.profileCompleted, true);
+  });
+
+  await record('profile: 显式改回默认占位名视为未完成资料', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_reset'), new HmacTokenService('s'));
+    const { user } = await auth.login('code');
+    await auth.updateProfile(user.id, { nickname: '小明' });
+    const reset = await auth.updateProfile(user.id, { nickname: '微信用户' });
+    assert.strictEqual(reset.profileCompleted, false);
+  });
+
+  await record('profile: 昵称与标记在重启后持久化', async () => {
+    const file = path.join(os.tmpdir(), `cotrip-profile-${Date.now()}-${Math.random()}.json`);
+    const repo1 = new JsonUserRepository(file);
+    const auth1 = new RealAuthService(
+      repo1,
+      new FakeWechatService('openid_restart'),
+      new HmacTokenService('s')
+    );
+    const { user } = await auth1.login('code');
+    await auth1.updateProfile(user.id, { nickname: '重启小明', avatarUrl: 'data:image/png;base64,QQ==' });
+    // 模拟重启：用同一文件新建仓库实例读取落盘数据
+    const repo2 = new JsonUserRepository(file);
+    const persisted = await repo2.findById(user.id);
+    assert.strictEqual(persisted?.nickname, '重启小明');
+    assert.strictEqual(persisted?.avatarUrl, 'data:image/png;base64,QQ==');
+    assert.strictEqual(persisted?.profileCompleted, true);
+    fs.rmSync(file, { force: true });
+  });
+
+  await record('profile: 改回默认昵称即使已有微信头像仍视为未完成', async () => {
+    const repo = tempRepo();
+    const auth = new RealAuthService(repo, new FakeWechatService('openid_reset2'), new HmacTokenService('s'));
+    const { user } = await auth.login('code');
+    await auth.updateProfile(user.id, {
+      nickname: '小明',
+      avatarUrl: 'https://wx.qlogo.cn/mmopen/a.png',
+    });
+    const reset = await auth.updateProfile(user.id, { nickname: '微信用户' });
+    assert.strictEqual(reset.profileCompleted, false);
+    // 头像保留，不因昵称重置被清除（头像不参与完成判定）
+    assert.strictEqual(reset.avatarUrl, 'https://wx.qlogo.cn/mmopen/a.png');
+  });
 }

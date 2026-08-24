@@ -23,6 +23,12 @@ export interface AuthService {
   /** 从本地缓存恢复登录态；未登录返回 null */
   restoreSession(): Promise<LoginResult | null>;
 
+  /**
+   * 更新当前登录用户的资料（PATCH /auth/profile）。
+   * 身份完全由已持久化的 Bearer token 决定；失败明确抛错，绝不本地伪造成功。
+   */
+  updateProfile(patch: { nickname?: string; avatarUrl?: string }): Promise<LoginResult>;
+
   /** 退出登录，清除本地登录态 */
   logout(): Promise<void>;
 }

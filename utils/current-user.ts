@@ -19,17 +19,20 @@ export const MOCK_SELF_ID = 'user_A';
 /**
  * 认证/登录层用户 → 业务 Participant 的最小转换边界。
  * 真实 ID 保持不变；nickname → 参与者显示名；avatarUrl → 头像。
+ * profileCompleted（首次资料完善标记）原样透传，未提供时为 undefined。
  * 不引入 openid / 微信身份字段，避免认证层与 Trip Core 强耦合。
  */
 export function currentUserToParticipant(user: {
   id: string;
   nickname: string;
   avatarUrl?: string;
+  profileCompleted?: boolean;
 }): Participant {
   return {
     id: user.id,
     nickname: user.nickname,
     avatarUrl: user.avatarUrl,
+    profileCompleted: user.profileCompleted,
   };
 }
 
