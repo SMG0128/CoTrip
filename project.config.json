@@ -1,7 +1,104 @@
 {
   "description": "CoTrip 微信小程序项目配置",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": ".claude"
+      },
+      {
+        "type": "folder",
+        "value": ".git"
+      },
+      {
+        "type": "folder",
+        "value": ".test-dist"
+      },
+      {
+        "type": "folder",
+        "value": "artifacts"
+      },
+      {
+        "type": "folder",
+        "value": "server"
+      },
+      {
+        "type": "folder",
+        "value": "tests"
+      },
+      {
+        "type": "folder",
+        "value": "typings"
+      },
+      {
+        "type": "file",
+        "value": "LOGO.png"
+      },
+      {
+        "type": "file",
+        "value": "package.json"
+      },
+      {
+        "type": "file",
+        "value": "package-lock.json"
+      },
+      {
+        "type": "file",
+        "value": "tsconfig.json"
+      },
+      {
+        "type": "suffix",
+        "value": ".md"
+      },
+      {
+        "type": "suffix",
+        "value": ".map"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/wallet.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/clock.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/notify-heart.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/calender.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/takeaway-cup.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/sheild.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/setting.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/gym.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/forward.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/plus.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/3d/tick.png"
+      }
+    ],
     "include": []
   },
   "setting": {

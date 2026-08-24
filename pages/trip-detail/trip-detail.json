@@ -4,8 +4,6 @@
   "usingComponents": {
     "plan-board": "../../components/plan-board/index",
     "route-options": "../../components/route-options/index",
-    "comment-item": "../../components/comment-item/index",
-    "restaurant-card": "../../components/restaurant-card/index",
-    "conflict-card": "../../components/conflict-card/index"
+    "comment-item": "../../components/comment-item/index"
   }
 }
