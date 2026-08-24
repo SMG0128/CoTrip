@@ -6,6 +6,9 @@
 ## [Unreleased]
 
 ### Added
+- 房间号真实加入闭环：后端新增 `GET /trips/join-preview`（公开、仅返回安全字段）与 `POST /trips/join`（Bearer 认证、身份仅取服务端校验的 userId、ACTIVE-only、重复加入幂等、creator 不变、participantIds 去重并持久化）
+- 前端 Join 流程接通真实 API：Join 落地页加载真实 Preview，`RealTripService` 直连 Join contract 且无 Mock 回退；未登录加入意图持久化（`pendingJoinRoomCode`），登录成功后自动恢复，加入成功后清理 pending state
+- 新建行程页图标统一为蓝紫渐变 SVG 风格（`assets/icons/trip-create/`）
 - 导航式路线方案选择器：「我的推荐」最多展示 3 条方案，首条默认推荐并展开，任意时刻最多展开 1 条
 - 腾讯位置服务路线规划集成（WebService Direction API：transit + walking 并行请求，防御式 DTO 映射）
 - 目的地 POI 解析与 `wx.openLocation` 导航 handoff

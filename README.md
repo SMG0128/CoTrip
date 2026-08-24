@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 32/32、前端 17 个测试文件全绿）：
+当前已实际实现并通过测试的能力（后端 37/37、前端 18 个测试文件全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -25,11 +25,12 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Trip completion flow** —— `POST /trips/:id/complete`：仅 creator 可完成；幂等（重复完成返回原快照，不重置 `completedAt`）；DRAFT/CANCELLED 拒绝（409）；前端二次确认 + 防重复提交；完成后移入历史行程。
 - **Multiple active trips** —— 首页展示全部进行中行程（最新在前），每张卡独立导航。
 - **Native WeChat sharing** —— 分享卡片直达 Join 落地页（携带 roomCode）。
+- **Real room joining** —— Join 落地页 / 首页房间入口 / 微信分享均已接通真实加入流程：公开 Preview → Bearer 认证幂等加入；身份只来自服务端校验的 token，失败不回退 Mock。
 - **Navigation-style route recommendations** —— 见下节。
 - **Tencent Location Service integration** —— POI Search + Direction（walking / transit）已真实配置并跑通，直连 WebService API。
 - **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
 
-尚未实现：真实多人加入（`POST /trips/join`）、实时同步 / WebSocket、评论与计划的后端持久化。
+尚未实现：实时同步 / WebSocket、评论与计划的后端持久化。
 
 ## Route Recommendations
 
@@ -68,7 +69,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Known Limitations
 
-- 真实多人房间加入已完成本地后端与前端 API 接线，但尚未部署生产，也尚未执行真实双账号 E2E。
+- 真实多人房间加入已完成本地后端与前端 API 接线，但尚未部署生产，也尚未执行真实双账号 E2E；生产后端适配将在服务器环境继续。
 - 定位的运行时隐私授权弹窗（privacy authorization flow）尚未完整实现。
 - 腾讯地图真机 E2E 依赖人工完成 Key / 合法域名 / 隐私配置。
 - 地图预览（Map Preview）尚未实现。
@@ -184,6 +185,8 @@ npm run typecheck && npm test
 | GET | `/trips?status=COMPLETED` | 列出当前用户的历史行程 |
 | GET | `/trips/:id` | 读取单个 Trip（仅参与者可见） |
 | POST | `/trips/:id/complete` | 完成行程（仅 creator，幂等；非法状态迁移返回 409） |
+| GET | `/trips/join-preview?roomCode=XXXXXXX` | 按房间号读取最小公开邀请预览（无需登录） |
+| POST | `/trips/join` | 用 Bearer 身份幂等加入 ACTIVE Trip；请求体只需 `roomCode` |
 
 错误统一返回 `{ "error": { "code": "...", "message": "..." } }`。
 
@@ -202,7 +205,7 @@ npm run typecheck && npm test
 
 ## Roadmap
 
-- [ ] **POST /trips/join** —— 房间号真实加入 API（V0.3 已预留 Join 落地页与房间号校验，接口尚未接通）
+- [x] **POST /trips/join** —— 房间号真实加入 API（本地前后端已接通并通过测试；生产部署与真实双账号 E2E 待服务器阶段完成）
 - [ ] 评论流与 AI 约束提取接入真实服务
 - [ ] 规划引擎对接真实 Provider（地图/地点检索）
 - [ ] 通知订阅消息
