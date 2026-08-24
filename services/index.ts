@@ -1,7 +1,9 @@
 // services/index.ts
 // Service 统一入口。
-// 认证服务：根据 config/auth.ts 的 mode 显式选择真实实现或 Mock。
-// 其余服务当前使用 Mock 实现，未来切换真实后端时替换实例化即可。
+// 登录与全部行程能力（列表/创建/详情/分享/Join/持久化）一律使用真实后端实现；
+// 后端失败时明确暴露错误状态，绝不静默回退 Mock。
+// Mock 仅剩一条内置示例行程（utils/demo-trip.ts），不经过本文件的服务契约。
+// AI / 地图 / 地点 / 通知 / 外部动作当前为既有能力实现，后续按需替换。
 
 import { AIService } from './ai-service';
 import { TripService } from './trip-service';
@@ -13,33 +15,28 @@ import { AuthService } from './auth-service';
 import { RouteOptionService } from '../types/route-option';
 
 import { MockAIService } from './mock/mock-ai-service';
-import { MockTripService } from './mock/mock-trip-service';
 import { MockMapService } from './mock/mock-map-service';
 import { MockPlaceService } from './mock/mock-place-service';
 import { MockNotificationService } from './mock/mock-notification-service';
 import { MockExternalActionService } from './mock/mock-external-action-service';
-import { MockAuthService } from './mock/mock-auth-service';
 import { RealAuthService } from './real/real-auth-service';
 import { RealTripService } from './real/real-trip-service';
-import { MockRouteOptionService, RealRouteOptionService } from './route-option-service';
+import { RealRouteOptionService } from './route-option-service';
 
-import { authConfig } from '../config/auth';
+// 认证：一律真实后端（wx.login → CoTrip Backend），后端不可用时登录明确失败。
+export const authService: AuthService = new RealAuthService();
 
-// 认证服务：按显式 mode 选择实现。real 模式下后端失败不会回退 Mock。
-export const authService: AuthService =
-  authConfig.mode === 'real' ? new RealAuthService() : new MockAuthService();
+// 行程：一律真实后端，无全局 Mock 模式、无 Mock fallback。
+export const tripService: TripService = new RealTripService();
 
 export const aiService: AIService = new MockAIService();
-export const tripService: TripService =
-  authConfig.mode === 'real' ? new RealTripService() : new MockTripService();
 export const mapService: MapService = new MockMapService();
 export const placeService: PlaceService = new MockPlaceService();
 export const notificationService: NotificationService = new MockNotificationService();
 export const externalActionService: ExternalActionService = new MockExternalActionService();
 
-// 路线方案服务：「我的推荐」路线选择。real 模式直连腾讯地图，失败真实抛错不回退。
-export const routeOptionService: RouteOptionService =
-  authConfig.mode === 'real' ? new RealRouteOptionService() : new MockRouteOptionService();
+// 路线方案服务：「我的推荐」直连腾讯地图；失败真实抛错走错误态 UI，绝不伪造路线。
+export const routeOptionService: RouteOptionService = new RealRouteOptionService();
 
 export type {
   AIService,

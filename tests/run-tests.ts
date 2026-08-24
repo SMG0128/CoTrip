@@ -20,6 +20,7 @@ import { runRouteOptionTests } from './route-option.test';
 import { runRouteOptionsUiTests } from './route-options-ui.test';
 import { runGuangzhouMetroTests } from './guangzhou-metro.test';
 import { runJoinFlowTests } from './join-flow.test';
+import { runDemoTripTests } from './demo-trip.test';
 
 async function main(): Promise<void> {
   await runHomeMultiTripsTests();
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
   await runRouteOptionsUiTests();
   await runGuangzhouMetroTests();
   await runJoinFlowTests();
+  await runDemoTripTests();
   console.log('\n🎉 全部核心逻辑测试通过');
 }
 

@@ -7,6 +7,9 @@ import { Plan } from './plan';
 
 export type TripStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
+/** 行程数据来源：缺省视为 'server'（后端真实数据）；'mock' 为内置示例行程，仅本地展示 */
+export type TripSource = 'server' | 'mock';
+
 export interface Trip {
   id: string;
   title: string;
@@ -27,4 +30,6 @@ export interface Trip {
    * 前端禁止自行从 trip.id / userId / timestamp 伪造。
    */
   roomCode?: string;
+  /** 数据来源标记：'mock' 表示内置示例行程，禁止任何后端读写（判断以固定 ID 为准，此字段用于 UI 展示） */
+  source?: TripSource;
 }

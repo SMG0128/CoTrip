@@ -1,15 +1,13 @@
 // config/auth.ts
-// 认证配置：显式指定认证模式。
+// 应用运行配置。登录与行程数据一律走真实后端；Mock 不再是一种运行模式，
+// 仅剩一条内置示例行程（见 utils/demo-trip.ts），由 enableDemoTrip 控制是否展示。
 //
-//   mode: 'mock'  → 使用 MockAuthService，前端无需后端即可运行（开发默认）。
-//   mode: 'real'  → 使用 RealAuthService，走 wx.login + CoTrip Backend。
-//
-// 注意：real 模式下若后端不可用，登录会明确失败，绝不静默回退到 Mock。
+// 注意：后端不可用时登录/行程请求会明确失败并展示错误状态，绝不静默回退到 Mock。
 
-export const authConfig = {
-  /** 认证模式：'mock' | 'real' */
-  mode: 'mock' as 'mock' | 'real',
-  /** 后端服务地址，例如 'https://api.example.com'（仅 real 模式使用） */
+export const appConfig = {
+  /** 是否在首页展示内置示例行程（仅本地演示数据，不与后端交互） */
+  enableDemoTrip: true,
+  /** 后端服务地址，例如 'https://api.example.com' */
   baseUrl: 'https://api.yipziwun.asia',
   /** 登录态在本地缓存的 key */
   tokenStorageKey: 'cotrip_auth_token',

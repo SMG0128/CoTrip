@@ -5,6 +5,7 @@
 
 import { Trip } from '../../types/trip';
 import { deriveTripCardState, resolveEventIcon, TripCardState } from '../../utils/trip-card';
+import { shouldShowMockTag } from '../../utils/demo-trip';
 
 Component({
   properties: {
@@ -20,6 +21,8 @@ Component({
   },
   data: {
     state: 'EMPTY' as TripCardState,
+    /** 仅内置示例行程显示的 MOCK 小标签 */
+    isMock: false,
     participantCount: 0,
     commentCount: 0,
     conflictCount: 0,
@@ -44,6 +47,7 @@ Component({
       const last = state === 'MULTI_EVENT' ? events[events.length - 1] : undefined;
       this.setData({
         state,
+        isMock: shouldShowMockTag(trip),
         participantCount: trip.participantIds.length,
         commentCount: trip.commentIds.length,
         conflictCount: trip.currentPlan?.conflicts.length ?? 0,

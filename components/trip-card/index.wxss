@@ -72,6 +72,26 @@
   font-weight: 760;
 }
 
+/* 活动卡标题行：标题占满剩余宽度，MOCK 胶囊固定右侧，不改变卡片布局节奏 */
+.trip-copy .title-row .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 仅示例行程显示的 MOCK 标签：小尺寸低饱和蓝紫胶囊，不抢主标题层级 */
+.mock-tag {
+  flex-shrink: 0;
+  margin-top: 6rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 18rpx;
+  line-height: 1.7;
+  font-weight: 600;
+  letter-spacing: 0.5rpx;
+  color: #5a67d8;
+  background: rgba(90, 103, 216, 0.10);
+}
+
 .stats {
   display: flex;
   align-items: center;

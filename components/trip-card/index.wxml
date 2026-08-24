@@ -18,7 +18,10 @@
     <view class="status"><view class="status-dot"></view>进行中</view>
     <view class="trip-head">
       <view class="trip-copy">
-        <text class="title">{{trip.title}}</text>
+        <view class="title-row">
+          <text class="title">{{trip.title}}</text>
+          <text wx:if="{{isMock}}" class="mock-tag">MOCK</text>
+        </view>
         <view class="stats">
           <text>{{participantCount}} 人参与</text>
           <text class="stats-divider"></text>

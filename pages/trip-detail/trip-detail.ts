@@ -2,9 +2,10 @@
 // 行程详情页：接入 Planning Pipeline + 真实地点 + Budget Planner 排序。
 // 禁止用 setTimeout 伪装 AI，全部走真实规则引擎。
 
-import { mockActiveTrip } from '../../mock/mock-trip';
 import { mockComments } from '../../mock/mock-comments';
 import { realRestaurants } from '../../mock/mock-real-places';
+import { appConfig } from '../../config/auth';
+import { buildDemoTrip, guardDemoTripWrite, isDemoTripId } from '../../utils/demo-trip';
 import { Comment } from '../../types/comment';
 import { Trip } from '../../types/trip';
 import { Constraint } from '../../types/constraint';
@@ -69,8 +70,9 @@ function buildEmptyPlan(tripId: string): Plan {
 
 Page({
   data: {
-    trip: mockActiveTrip as Trip,
-    comments: mockComments as Comment[],
+    // 页面壳默认值：onLoad 的所有分支都会立即以真实数据或示例行程覆盖
+    trip: buildDemoTrip(),
+    comments: [] as Comment[],
     restaurants: realRestaurants as Restaurant[],
     rankedRestaurants: [] as ReturnType<typeof rankCandidates>,
     candidateGroups: [] as EventCandidateGroup[],
@@ -91,8 +93,8 @@ Page({
     canCompleteTrip: false,
     isCompletingTrip: false,
     // V0.3 Room UI：展示值 + 是否存在有效房间号（控制复制/分享能力）
-    roomCode: resolveRoomCodeDisplay(mockActiveTrip.roomCode),
-    hasRoomCode: !!normalizeRoomCode(mockActiveTrip.roomCode),
+    roomCode: resolveRoomCodeDisplay(undefined),
+    hasRoomCode: false,
     // Debug 面板
     debugEnabled: DEBUG_ENABLED,
     debugExpanded: false,
@@ -113,11 +115,23 @@ Page({
   },
 
   engine: null as PlanningEngine | null,
+  /** 进入页面时的初始快照，供 Debug 面板「重置」恢复（示例与真实 Trip 各自正确复位） */
+  initialSnapshot: null as { trip: Trip; comments: Comment[] } | null,
 
   onLoad(options?: Record<string, string | undefined>) {
     const app = getApp<IAppOption>();
     const currentUser = app.globalData.currentUser;
     const requestedTripId = options?.tripId;
+
+    if (requestedTripId && isDemoTripId(requestedTripId)) {
+      // 示例行程：纯本地展示，绝不请求后端、绝不进入真实 repository
+      if (appConfig.enableDemoTrip) {
+        this.bootstrapTrip(buildDemoTrip(), currentUser, true);
+      } else {
+        this.handleTripUnavailable('行程不存在');
+      }
+      return;
+    }
 
     if (requestedTripId) {
       // 新创建的真实 Trip 通过 tripId 加载：creatorId/participantIds 天然属于 currentUser，
@@ -132,8 +146,12 @@ Page({
       return;
     }
 
-    // 默认进入 Mock 示例行程：运行时把旧 mock self 槽位替换为真实 currentUser
-    this.bootstrapTrip(mockActiveTrip, currentUser, true);
+    // 无参数直达（开发路径）：示例行程开启时本地展示，否则按无效处理
+    if (appConfig.enableDemoTrip) {
+      this.bootstrapTrip(buildDemoTrip(), currentUser, true);
+    } else {
+      this.handleTripUnavailable('缺少行程参数');
+    }
   },
 
   handleTripUnavailable(message: string) {
@@ -149,6 +167,9 @@ Page({
     const comments = seedDemoComments ? (mockComments as Comment[]) : ([] as Comment[]);
     const tripDate = trip.timeRange?.start?.slice(0, 10) ?? '2026-08-22';
     const timezone = trip.timeRange?.timezone ?? 'Asia/Shanghai';
+
+    // 记录初始快照：Debug 重置恢复到本行程自身的初始状态（而非固定 Mock 数据）
+    this.initialSnapshot = { trip, comments };
 
     this.setData({
       trip: trip.currentPlan ? trip : { ...trip, currentPlan: buildEmptyPlan(trip.id) },
@@ -251,6 +272,13 @@ Page({
    * real 模式失败真实抛错：仅 toast 错误信息，绝不本地伪造 status/completedAt，绝不跳首页。
    */
   onCompleteTripTap() {
+    // 示例行程守卫：一切写后端动作直接明确提示，不发真实请求
+    const blockedMessage = guardDemoTripWrite(this.data.trip.id);
+    if (blockedMessage) {
+      wx.showToast({ title: blockedMessage, icon: 'none' });
+      return;
+    }
+
     // 登录态守卫：无 currentUser 时禁止操作，绝不回退到 Mock 用户
     const app = getApp<IAppOption>();
     const guard = requireCurrentUser(app.globalData.currentUser);
@@ -471,14 +499,15 @@ Page({
   },
 
   onDebugReset() {
-    if (!this.engine) return;
+    if (!this.engine || !this.initialSnapshot) return;
+    const snapshot = this.initialSnapshot;
     this.engine.reset();
     this.setData({
-      comments: mockComments,
-      trip: { ...this.data.trip, currentPlan: mockActiveTrip.currentPlan },
+      comments: snapshot.comments,
+      trip: { ...this.data.trip, currentPlan: snapshot.trip.currentPlan },
       restaurants: realRestaurants,
       rankedRestaurants: [],
-      candidateGroups: buildEventCandidateGroups(mockActiveTrip.currentPlan, []),
+      candidateGroups: buildEventCandidateGroups(snapshot.trip.currentPlan, []),
       debugConstraints: [],
       debugPlanVersion: 0,
       debugConflictCount: 0,

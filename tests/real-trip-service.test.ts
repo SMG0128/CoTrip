@@ -1,6 +1,6 @@
 // RealTripService 请求语义测试：认证、server-owned 字段边界与失败行为。
 
-import { authConfig } from '../config/auth';
+import { appConfig } from '../config/auth';
 import {
   RealTripService,
   RealTripServiceError,
@@ -107,7 +107,7 @@ export async function runRealTripServiceTests(): Promise<void> {
   const previewRequest = previewRequests[0];
   assert(previewRequest.method === 'GET', 'getJoinPreview 应使用 GET');
   assert(
-    previewRequest.url === `${authConfig.baseUrl}/trips/join-preview?roomCode=7K4M9XQ`,
+    previewRequest.url === `${appConfig.baseUrl}/trips/join-preview?roomCode=7K4M9XQ`,
     'getJoinPreview URL 应携带规范化 roomCode'
   );
   assert(previewRequest.data === undefined, 'getJoinPreview 不应发送请求体');
@@ -156,7 +156,7 @@ export async function runRealTripServiceTests(): Promise<void> {
   const joinRequest = joinRequests[0];
   const joinBody = joinRequest.data as Record<string, unknown>;
   assert(joinRequest.method === 'POST', 'joinTrip 应使用 POST');
-  assert(joinRequest.url === `${authConfig.baseUrl}/trips/join`, 'joinTrip URL 应为 /trips/join');
+  assert(joinRequest.url === `${appConfig.baseUrl}/trips/join`, 'joinTrip URL 应为 /trips/join');
   assert(joinRequest.header?.Authorization === 'Bearer test-token', 'joinTrip 必须携带 Bearer token');
   assert(joinBody.roomCode === '7K4M9XQ', 'join body 应携带规范化 roomCode');
   assert(Object.keys(joinBody).length === 1, 'join body 只能包含 roomCode');
@@ -202,7 +202,7 @@ export async function runRealTripServiceTests(): Promise<void> {
   const create = createRequests[0];
   const createBody = create.data as Record<string, unknown>;
   assert(create.method === 'POST', 'createTrip 应使用 POST');
-  assert(create.url === `${authConfig.baseUrl}/trips`, 'createTrip URL 应为 /trips');
+  assert(create.url === `${appConfig.baseUrl}/trips`, 'createTrip URL 应为 /trips');
   assert(create.header?.Authorization === 'Bearer test-token', '请求必须携带 Bearer token');
   assert(!('creatorId' in createBody), 'create body 不得包含 creatorId');
   assert(!('participantIds' in createBody), 'create body 不得包含 participantIds');
@@ -252,7 +252,7 @@ export async function runRealTripServiceTests(): Promise<void> {
   const completeBody = (complete.data ?? {}) as Record<string, unknown>;
   assert(complete.method === 'POST', 'completeTrip 应使用 POST');
   assert(
-    complete.url === `${authConfig.baseUrl}/trips/trip_123/complete`,
+    complete.url === `${appConfig.baseUrl}/trips/trip_123/complete`,
     'completeTrip URL 应为 /trips/trip_123/complete'
   );
   assert(complete.header?.Authorization === 'Bearer test-token', '请求必须携带 Bearer token');

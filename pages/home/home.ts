@@ -5,6 +5,7 @@ import { Trip } from '../../types/trip';
 import { tripService } from '../../services/index';
 import { hydrateTripWithCurrentUser } from '../../utils/current-user';
 import { normalizeRoomCode } from '../../utils/room-code';
+import { mergeHomeTrips } from '../../utils/demo-trip';
 
 Page({
   data: {
@@ -25,15 +26,20 @@ Page({
     const currentUser = app.globalData.currentUser;
     this.setData({ user: currentUser });
 
-    // 多进行中行程：返回多少展示多少（最新在前，较旧在后）。
+    // 真实行程列表 + 唯一示例行程合并展示；真实接口失败时保留错误提示，
+    // 示例行程仍独立可见，但绝不掩盖错误、绝不充当 fallback 数据源。
+    const renderTrips = (trips: Trip[]) => {
+      const activeTrips = mergeHomeTrips(trips).map((trip) =>
+        hydrateTripWithCurrentUser(trip, currentUser)
+      );
+      this.setData({ activeTrips, hasActiveTrips: activeTrips.length > 0 });
+    };
+
     tripService
       .listActiveTrips()
-      .then((trips) => {
-        const activeTrips = trips.map((trip) => hydrateTripWithCurrentUser(trip, currentUser));
-        this.setData({ activeTrips, hasActiveTrips: activeTrips.length > 0 });
-      })
+      .then(renderTrips)
       .catch(() => {
-        this.setData({ activeTrips: [], hasActiveTrips: false });
+        renderTrips([]);
         wx.showToast({ title: '行程加载失败，请稍后重试', icon: 'none' });
       });
   },

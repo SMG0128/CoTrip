@@ -1,6 +1,6 @@
 // TripService 的真实后端实现。失败会明确抛错，绝不回退 Mock。
 
-import { authConfig } from '../../config/auth';
+import { appConfig } from '../../config/auth';
 import { Trip } from '../../types/trip';
 import { normalizeRoomCode } from '../../utils/room-code';
 import { CreateTripInput, TripJoinPreview, TripService } from '../trip-service';
@@ -34,7 +34,7 @@ export class RealTripServiceError extends Error {
 
 export class RealTripService implements TripService {
   private get baseUrl(): string {
-    return authConfig.baseUrl.replace(/\/$/, '');
+    return appConfig.baseUrl.replace(/\/$/, '');
   }
 
   async createTrip(input: CreateTripInput): Promise<Trip> {
@@ -117,7 +117,7 @@ export class RealTripService implements TripService {
     data?: Record<string, unknown>,
     authRequired = true
   ): Promise<T> {
-    if (!authConfig.baseUrl) {
+    if (!appConfig.baseUrl) {
       return Promise.reject(
         new RealTripServiceError('未配置后端地址，无法加载行程', 'TRIP_BACKEND_NOT_CONFIGURED')
       );
@@ -125,7 +125,7 @@ export class RealTripService implements TripService {
 
     let header: Record<string, string> | undefined;
     if (authRequired) {
-      const token = wx.getStorageSync<string>(authConfig.tokenStorageKey);
+      const token = wx.getStorageSync<string>(appConfig.tokenStorageKey);
       if (!token) {
         return Promise.reject(
           new RealTripServiceError('登录状态失效，请重新登录', 'AUTH_UNAUTHORIZED', 401)
