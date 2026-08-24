@@ -13,6 +13,7 @@ export interface TripService {
   getJoinPreview(roomCode: string): Promise<TripJoinPreview>;
   joinTrip(authenticatedUserId: string, roomCode: string): Promise<Trip>;
   completeTrip(authenticatedUserId: string, tripId: string): Promise<Trip>;
+  deleteTrip(authenticatedUserId: string, tripId: string): Promise<void>;
 }
 
 export class RealTripService implements TripService {
@@ -140,6 +141,19 @@ export class RealTripService implements TripService {
       completedAt: new Date().toISOString(),
     };
     return this.trips.update(completedTrip);
+  }
+
+  /** 删除行程：仅 creator 可操作；硬删除，从持久化中彻底移除，无任何软删/回收站。 */
+  async deleteTrip(authenticatedUserId: string, tripId: string): Promise<void> {
+    const trip = await this.trips.findById(tripId);
+    if (!trip) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    // 身份只来自认证 token；participant（含其他任何用户）均无权删除他人行程。
+    if (authenticatedUserId !== trip.creatorId) {
+      throw new AppError(403, 'TRIP_FORBIDDEN', '仅行程发起人可删除行程');
+    }
+    await this.trips.remove(trip.id);
   }
 
   private validateRoomCode(input: string): string {

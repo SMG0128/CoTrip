@@ -111,9 +111,14 @@ export class RealTripService implements TripService {
     return response.trip;
   }
 
+  /** 硬删除：不携带任何请求体，权限完全由后端按 token 身份判定。 */
+  async deleteTrip(tripId: string): Promise<void> {
+    await this.request<{ ok: boolean }>(`/trips/${encodeURIComponent(tripId)}`, 'DELETE');
+  }
+
   private request<T>(
     path: string,
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     data?: Record<string, unknown>,
     authRequired = true
   ): Promise<T> {

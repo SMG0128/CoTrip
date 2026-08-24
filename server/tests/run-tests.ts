@@ -5,6 +5,7 @@ import { runAuthTests } from './auth.test';
 import { runRoomCodeTests } from './room-code.test';
 import { runTripTests } from './trips.test';
 import { runTripCompleteTests } from './trip-complete.test';
+import { runTripDeleteTests } from './trip-delete.test';
 import { runTripJoinTests } from './trip-join.test';
 
 interface TestResult {
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
   await runRoomCodeTests();
   await runTripTests();
   await runTripCompleteTests();
+  await runTripDeleteTests();
   await runTripJoinTests();
 
   let failed = 0;

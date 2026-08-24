@@ -9,6 +9,8 @@ export interface TripRepository {
   findByRoomCode(roomCode: string): Promise<Trip | null>;
   /** 幂等加入 participant 并持久化；现有 participant 不重复写入。 */
   addParticipant(tripId: string, userId: string): Promise<Trip>;
+  /** 硬删除：从存储中彻底移除该 Trip 并持久化；id 不存在时作为防御抛 TRIP_NOT_FOUND。 */
+  remove(tripId: string): Promise<void>;
   /** 为缺失/非法 roomCode 的历史 Trip 安全补齐房间号，返回补齐数量。 */
   backfillRoomCodes(): Promise<number>;
   listForUser(userId: string, status?: TripStatus): Promise<Trip[]>;

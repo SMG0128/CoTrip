@@ -89,6 +89,17 @@ export class JsonTripRepository implements TripRepository {
     return updated;
   }
 
+  /** 硬删除：与 create/update 共用原子 save 与失败语义；只移除目标 Trip，其余原样保留。 */
+  async remove(tripId: string): Promise<void> {
+    const exists = this.store.trips.some((existing) => existing.id === tripId);
+    if (!exists) {
+      throw new AppError(404, 'TRIP_NOT_FOUND', '行程不存在');
+    }
+    const nextStore = { trips: this.store.trips.filter((existing) => existing.id !== tripId) };
+    this.save(nextStore);
+    this.store = nextStore;
+  }
+
   async backfillRoomCodes(): Promise<number> {
     const migrated = this.migrate(this.store);
     this.store = migrated.store;

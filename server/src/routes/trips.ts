@@ -94,5 +94,16 @@ export function tripRouter(trips: TripService, tokens: TokenService): Router {
     },
   );
 
+  // 删除行程（硬删除）：权限只由 token 身份 + 服务端 creatorId 判定；
+  // 返回 JSON 体而非 204 空体，保持客户端统一响应解析语义。
+  router.delete('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await trips.deleteTrip(req.userId!, req.params.id);
+      res.status(200).json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

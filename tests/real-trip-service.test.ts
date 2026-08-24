@@ -276,5 +276,40 @@ export async function runRealTripServiceTests(): Promise<void> {
     '500 必须透传为 RealTripServiceError（code/message/statusCode），失败真实抛出不回退'
   );
 
+  // ---- deleteTrip：真实 DELETE 请求语义，权限完全交给后端 ----
+  const deleteRequests = installWx((option) => succeed(option, { ok: true }));
+  await service.deleteTrip('trip_123');
+  const remove = deleteRequests[0];
+  assert(remove.method === 'DELETE', 'deleteTrip 应使用 HTTP DELETE');
+  assert(remove.url === `${appConfig.baseUrl}/trips/trip_123`, 'deleteTrip URL 应为 /trips/:id');
+  assert(remove.header?.Authorization === 'Bearer test-token', '请求必须携带 Bearer token');
+  assert(remove.data === undefined, 'delete body 必须为空：不携带任何客户端身份/状态字段');
+
+  const unauthenticatedDeleteRequests = installWx(() => {
+    throw new Error('无 token 时 deleteTrip 不应发起 wx.request');
+  }, '');
+  await expectReject(
+    () => service.deleteTrip('trip_123'),
+    (error) => error.code === 'AUTH_UNAUTHORIZED' && error.statusCode === 401,
+    'deleteTrip 无 token 时必须明确抛 AUTH_UNAUTHORIZED'
+  );
+  assert(unauthenticatedDeleteRequests.length === 0, '无 token 时 deleteTrip 不得发起请求');
+
+  installWx((option) =>
+    succeed(
+      option,
+      { error: { code: 'TRIP_FORBIDDEN', message: '仅行程发起人可删除行程' } },
+      403
+    )
+  );
+  await expectReject(
+    () => service.deleteTrip('trip_123'),
+    (error) =>
+      error.statusCode === 403 &&
+      error.code === 'TRIP_FORBIDDEN' &&
+      error.message === '仅行程发起人可删除行程',
+    'participant 删除 403 必须真实抛出且不得本地假装删除成功'
+  );
+
   console.log('✅ real-trip-service.test.ts 全部通过');
 }

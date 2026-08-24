@@ -94,6 +94,13 @@ export class MockTripService implements TripService {
     return trip;
   }
 
+  /** 与真实语义一致：内存硬删除。当前无任何调用方（全局走 RealTripService）。 */
+  async deleteTrip(tripId: string): Promise<void> {
+    const exists = this.trips.some((t) => t.id === tripId);
+    if (!exists) throw new MockTripServiceError('未找到对应行程', 'TRIP_NOT_FOUND');
+    this.trips = this.trips.filter((t) => t.id !== tripId);
+  }
+
   private findByRoomCode(roomCode: string): Trip | null {
     const normalized = normalizeRoomCode(roomCode);
     if (!isValidRoomCode(normalized)) return null;

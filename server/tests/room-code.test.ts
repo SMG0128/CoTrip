@@ -70,6 +70,10 @@ class CollisionOnceRepo implements TripRepository {
     // 该桩仅覆盖房间号生成路径，join 不应被调用。
     throw new Error('CollisionOnceRepo 不支持 addParticipant');
   }
+  async remove(_tripId: string): Promise<void> {
+    // 该桩仅覆盖房间号生成路径，删除不应被调用。
+    throw new Error('CollisionOnceRepo 不支持 remove');
+  }
   async backfillRoomCodes(): Promise<number> {
     return 0;
   }

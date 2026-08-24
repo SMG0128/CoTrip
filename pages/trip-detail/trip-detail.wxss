@@ -138,6 +138,35 @@ button::after {
   pointer-events: none;
 }
 
+/* 删除行程按钮：圆形垃圾桶图标入口，位于「完成行程」左侧。
+   危险语义交给二次确认文案表达——这里只做安静的次级操作：
+   与完成按钮同高同层级（白底 + 细描边 + 轻阴影），图标用低饱和蓝灰，不做红色警告视觉。 */
+.delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 66rpx;
+  height: 66rpx;
+  padding: 0;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.09);
+  border-radius: 50%;
+  box-shadow: 0 8rpx 24rpx rgba(60, 90, 160, 0.09);
+}
+
+.delete-btn image {
+  width: 34rpx;
+  height: 34rpx;
+}
+
+/* 请求进行中：与完成按钮一致的降透明防重复点击态 */
+.delete-btn.loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 /* ---- 分段控件：安静的浅底承载槽，选中项以白色悬浮小卡浮起，而非蓝色大色块 ---- */
 .segmented {
   display: flex;
@@ -415,6 +444,16 @@ button::after {
   .complete-btn {
     padding-right: 14rpx;
     font-size: 22rpx;
+  }
+
+  .delete-btn {
+    width: 62rpx;
+    height: 62rpx;
+  }
+
+  .delete-btn image {
+    width: 32rpx;
+    height: 32rpx;
   }
 
   .ideas-card {

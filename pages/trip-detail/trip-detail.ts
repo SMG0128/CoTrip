@@ -41,6 +41,12 @@ import {
   resolveCompleteTripPermission,
   runCompleteTripFlow,
 } from '../../utils/trip-complete';
+import {
+  buildDeleteTripModal,
+  resolveDeleteTripPermission,
+  runDeleteTripFlow,
+  shouldShowDeleteEntry,
+} from '../../utils/trip-delete';
 import { RealTripServiceError } from '../../services/real/real-trip-service';
 
 // Debug 仅在开发版/体验版显示，正式版自动隐藏。
@@ -92,6 +98,9 @@ Page({
     // 完成行程：仅 owner + ACTIVE 展示入口；请求进行中防重复点击
     canCompleteTrip: false,
     isCompletingTrip: false,
+    // 删除行程：仅 owner（且非示例行程）展示圆形垃圾桶入口；请求进行中防重复提交
+    canDeleteTrip: false,
+    isDeletingTrip: false,
     // V0.3 Room UI：展示值 + 是否存在有效房间号（控制复制/分享能力）
     roomCode: resolveRoomCodeDisplay(undefined),
     hasRoomCode: false,
@@ -180,6 +189,8 @@ Page({
       hasRoomCode: !!normalizeRoomCode(trip.roomCode),
       // 完成行程入口：仅创建者 + 进行中可见（按 id 判断，禁止昵称判断）
       canCompleteTrip: isTripOwner(trip, currentUser) && trip.status === 'ACTIVE',
+      // 删除行程入口：仅创建者可见；示例行程永不显示（hydrate 后 owner 判断会误命中 demo）
+      canDeleteTrip: shouldShowDeleteEntry(trip, currentUser),
     });
 
     // 初始化规划引擎，注入初始计划
@@ -314,6 +325,63 @@ Page({
       },
       onError: (error) => {
         this.setData({ isCompletingTrip: false });
+        wx.showToast({
+          title:
+            error instanceof RealTripServiceError ? error.message : '操作失败，请稍后重试',
+          icon: 'none',
+        });
+      },
+    });
+  },
+
+  /**
+   * 删除行程入口：圆形垃圾桶按钮（仅 owner 显示）。示例行程守卫 + 登录态守卫后走统一流程
+   * （权限/二次确认/防重复在 utils/trip-delete.ts）。硬删除不可恢复：
+   * real 模式失败真实抛错——仅 toast 错误信息、留在本页可重试，绝不本地假装删除。
+   */
+  onDeleteTripTap() {
+    // 示例行程守卫：一切写后端动作直接明确提示，不发真实请求
+    const blockedMessage = guardDemoTripWrite(this.data.trip.id);
+    if (blockedMessage) {
+      wx.showToast({ title: blockedMessage, icon: 'none' });
+      return;
+    }
+
+    // 登录态守卫：无 currentUser 时禁止操作，绝不回退到 Mock 用户
+    const app = getApp<IAppOption>();
+    const guard = requireCurrentUser(app.globalData.currentUser);
+    if (!guard.ok) {
+      wx.showToast({ title: '登录状态失效，请重新登录', icon: 'none' });
+      wx.navigateTo({ url: '/pages/login/login' });
+      return;
+    }
+
+    runDeleteTripFlow({
+      permission: resolveDeleteTripPermission(
+        this.data.trip,
+        guard.user,
+        this.data.isDeletingTrip
+      ),
+      confirm: () =>
+        new Promise<boolean>((resolve) =>
+          wx.showModal({
+            ...buildDeleteTripModal(),
+            success: (res) => resolve(!!res.confirm),
+            fail: () => resolve(false),
+          })
+        ),
+      remove: () => {
+        this.setData({ isDeletingTrip: true });
+        return tripService.deleteTrip(this.data.trip.id);
+      },
+      onSuccess: () => {
+        // 清理页面本地状态后离开：首页 onShow 会重新拉取真实 Trip list
+        this.setData({ isDeletingTrip: false });
+        wx.showToast({ title: '行程已删除', icon: 'success' });
+        setTimeout(() => wx.switchTab({ url: '/pages/home/home' }), 1500);
+      },
+      onError: (error) => {
+        this.setData({ isDeletingTrip: false });
         wx.showToast({
           title:
             error instanceof RealTripServiceError ? error.message : '操作失败，请稍后重试',

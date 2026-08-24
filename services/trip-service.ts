@@ -28,4 +28,6 @@ export interface TripService {
   listActiveTrips(): Promise<Trip[]>;
   listHistoryTrips(): Promise<Trip[]>;
   completeTrip(tripId: string): Promise<Trip>;
+  /** 硬删除行程（仅后端按 token 身份校验 creator）；失败明确抛错，绝不本地假装删除。 */
+  deleteTrip(tripId: string): Promise<void>;
 }

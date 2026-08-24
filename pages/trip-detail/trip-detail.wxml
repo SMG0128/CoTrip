@@ -10,6 +10,9 @@
       <text class="title">{{trip.title}}</text>
       <text class="meta">{{participantCount}} 人参与 · AI 已整理 {{commentCount}} 条需求</text>
     </view>
+    <view wx:if="{{canDeleteTrip}}" class="delete-btn {{isDeletingTrip ? 'loading' : ''}}" bind:tap="onDeleteTripTap">
+      <image src="/assets/icons/utility/trash.svg" mode="aspectFit" />
+    </view>
     <view wx:if="{{canCompleteTrip}}" class="complete-btn {{isCompletingTrip ? 'loading' : ''}}" bind:tap="onCompleteTripTap">
       <image src="/assets/icons/utility/check-circle.svg" mode="aspectFit" />
       <text>{{isCompletingTrip ? '完成中…' : '完成行程'}}</text>
