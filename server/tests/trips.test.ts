@@ -91,10 +91,10 @@ export async function runTripTests(): Promise<void> {
     const temp = temporaryStore();
     try {
       const repo = new JsonTripRepository(temp.file);
-      await repo.create(fixture({ id: 'mine_old', creatorId: 'other', participantIds: ['usr_123'], createdAt: '2026-08-19T00:00:00.000Z' }));
-      await repo.create(fixture({ id: 'not_mine', creatorId: 'usr_456', participantIds: ['usr_456'], createdAt: '2026-08-21T00:00:00.000Z' }));
-      await repo.create(fixture({ id: 'mine_new', creatorId: 'other', participantIds: ['other', 'usr_123'], createdAt: '2026-08-20T00:00:00.000Z' }));
-      await repo.create(fixture({ id: 'mine_done', participantIds: ['usr_123'], status: 'COMPLETED', createdAt: '2026-08-22T00:00:00.000Z' }));
+      await repo.create(fixture({ id: 'mine_old', roomCode: 'ABCDEFG', creatorId: 'other', participantIds: ['usr_123'], createdAt: '2026-08-19T00:00:00.000Z' }));
+      await repo.create(fixture({ id: 'not_mine', roomCode: 'HJKMNPQ', creatorId: 'usr_456', participantIds: ['usr_456'], createdAt: '2026-08-21T00:00:00.000Z' }));
+      await repo.create(fixture({ id: 'mine_new', roomCode: 'QRSTUVW', creatorId: 'other', participantIds: ['other', 'usr_123'], createdAt: '2026-08-20T00:00:00.000Z' }));
+      await repo.create(fixture({ id: 'mine_done', roomCode: '2345678', participantIds: ['usr_123'], status: 'COMPLETED', createdAt: '2026-08-22T00:00:00.000Z' }));
       assert.deepStrictEqual((await repo.listForUser('usr_123', 'ACTIVE')).map((trip) => trip.id), ['mine_new', 'mine_old']);
       assert.deepStrictEqual((await repo.listForUser('usr_123', 'COMPLETED')).map((trip) => trip.id), ['mine_done']);
     } finally {

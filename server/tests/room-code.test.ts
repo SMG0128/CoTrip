@@ -110,6 +110,29 @@ export async function runRoomCodeTests(): Promise<void> {
     }
   });
 
+  await record('room code: 并发创建在提交点碰撞后重试并保持唯一', async () => {
+    const temp = temporaryStore();
+    try {
+      const repo = new JsonTripRepository(temp.file);
+      let calls = 0;
+      // 两个请求首次都生成 AAAAAAA；提交冲突的一方随后生成 DDDDDDD。
+      const rng = () => (calls++ < ROOM_CODE_LENGTH * 2 ? 0 : 0.1);
+      const service = new RealTripService(repo, rng);
+      const [first, second] = await Promise.all([
+        service.createTrip('usr_123', { title: '并发行程 A', initialBrief: '' }),
+        service.createTrip('usr_456', { title: '并发行程 B', initialBrief: '' }),
+      ]);
+
+      assert.notStrictEqual(first.roomCode, second.roomCode);
+      assert.deepStrictEqual(
+        new Set([first.roomCode, second.roomCode]),
+        new Set(['AAAAAAA', 'DDDDDDD']),
+      );
+    } finally {
+      fs.rmSync(temp.directory, { recursive: true, force: true });
+    }
+  });
+
   await record('room code: 碰撞时重新生成（确定性注入随机源）', async () => {
     const repo = new CollisionOnceRepo();
     let calls = 0;
@@ -178,6 +201,18 @@ export async function runRoomCodeTests(): Promise<void> {
           commentIds: [],
           constraintIds: [],
         },
+        {
+          id: 'legacy_duplicate',
+          title: '重复房间号',
+          status: 'ACTIVE' as const,
+          creatorId: 'usr_old',
+          participantIds: ['usr_old'],
+          createdAt: '2026-08-04T00:00:00.000Z',
+          initialBrief: '重复合法 roomCode 也必须修复',
+          roomCode: 'K2M4P9Q',
+          commentIds: [],
+          constraintIds: [],
+        },
       ];
       fs.writeFileSync(temp.file, JSON.stringify({ trips: legacy }, null, 2), 'utf8');
 
@@ -186,12 +221,18 @@ export async function runRoomCodeTests(): Promise<void> {
       const a = await repo.findById('legacy_a');
       const b = await repo.findById('legacy_b');
       const c = await repo.findById('legacy_c');
-      assert.ok(a && b && c, 'backfill 不得丢 Trip');
+      const duplicate = await repo.findById('legacy_duplicate');
+      assert.ok(a && b && c && duplicate, 'backfill 不得丢 Trip');
 
       assertValidRoomCode(a.roomCode);
       assertValidRoomCode(b.roomCode);
       assert.notStrictEqual(b.roomCode, '0XXXXXX', '含 0 的非法 roomCode 必须被重新生成');
       assert.strictEqual(c.roomCode, 'K2M4P9Q', '已有合法 roomCode 不得被重新生成');
+      assert.notStrictEqual(
+        duplicate.roomCode,
+        'K2M4P9Q',
+        '重复的合法 roomCode 必须重新生成以恢复全局唯一性',
+      );
 
       // 原字段全部保留
       assert.strictEqual(a.id, 'legacy_a');
@@ -203,12 +244,12 @@ export async function runRoomCodeTests(): Promise<void> {
       assert.deepStrictEqual(a.constraintIds, ['x1']);
 
       // 唯一性
-      const codes = [a.roomCode, b.roomCode, c.roomCode];
-      assert.strictEqual(new Set(codes).size, 3, 'backfill 后房间号必须唯一');
+      const codes = [a.roomCode, b.roomCode, c.roomCode, duplicate.roomCode];
+      assert.strictEqual(new Set(codes).size, 4, 'backfill 后房间号必须唯一');
 
       // 已持久化
       const persisted = JSON.parse(fs.readFileSync(temp.file, 'utf8')) as { trips: Trip[] };
-      assert.strictEqual(persisted.trips.length, 3);
+      assert.strictEqual(persisted.trips.length, 4);
       for (const trip of persisted.trips) {
         assert.ok(isValidRoomCode(trip.roomCode), '持久化文件中的 Trip 必须全部拥有合法 roomCode');
       }

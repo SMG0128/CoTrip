@@ -56,7 +56,12 @@ export class HmacTokenService implements TokenService {
       throw new AppError(401, 'AUTH_INVALID_TOKEN', '无效的登录凭证');
     }
 
-    if (!payload.userId || typeof payload.exp !== 'number') {
+    if (
+      typeof payload.userId !== 'string'
+      || payload.userId.length === 0
+      || typeof payload.exp !== 'number'
+      || !Number.isFinite(payload.exp)
+    ) {
       throw new AppError(401, 'AUTH_INVALID_TOKEN', '无效的登录凭证');
     }
     if (payload.exp < Date.now()) {

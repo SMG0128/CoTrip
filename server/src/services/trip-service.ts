@@ -43,14 +43,13 @@ export class RealTripService implements TripService {
       throw new AppError(400, 'VALIDATION_ERROR', '行程简述不能超过 2000 个字符');
     }
 
-    const trip: Trip = {
+    const tripBase: Omit<Trip, 'roomCode'> = {
       id: `trip_${crypto.randomUUID()}`,
       title,
       status: 'ACTIVE',
       creatorId: authenticatedUserId,
       participantIds: [authenticatedUserId],
       createdAt: new Date().toISOString(),
-      roomCode: await this.generateUniqueRoomCode(),
       initialBrief,
       areaConstraint: input.areaConstraint,
       timeRange: input.timeRange,
@@ -58,7 +57,22 @@ export class RealTripService implements TripService {
       constraintIds: [],
     };
 
-    return this.trips.create(trip);
+    // 仓库在最终提交点再次保证 roomCode 唯一；并发碰撞时重新生成而不是写入歧义数据。
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const trip: Trip = {
+        ...tripBase,
+        roomCode: await this.generateUniqueRoomCode(),
+      };
+      try {
+        return await this.trips.create(trip);
+      } catch (error) {
+        if (error instanceof AppError && error.code === 'ROOM_CODE_CONFLICT') {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new AppError(500, 'ROOM_CODE_GENERATION_FAILED', '房间号生成失败，请重试');
   }
 
   async listTrips(userId: string, status?: TripStatus): Promise<Trip[]> {

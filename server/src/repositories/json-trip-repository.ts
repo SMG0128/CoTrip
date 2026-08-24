@@ -28,6 +28,13 @@ export class JsonTripRepository implements TripRepository {
   }
 
   async create(trip: Trip): Promise<Trip> {
+    if (this.store.trips.some((existing) => existing.id === trip.id)) {
+      throw new AppError(500, 'TRIP_PERSISTENCE_FAILURE', '行程数据保存失败');
+    }
+    if (this.store.trips.some((existing) => existing.roomCode === trip.roomCode)) {
+      // service 捕获后重新生成；唯一性必须在提交点再次校验，避免并发“先查后写”竞态。
+      throw new AppError(409, 'ROOM_CODE_CONFLICT', '房间号冲突');
+    }
     const nextStore = { trips: [...this.store.trips, trip] };
     this.save(nextStore);
     this.store = nextStore;
@@ -104,23 +111,27 @@ export class JsonTripRepository implements TripRepository {
    * 保留原 id / creatorId / participantIds / createdAt 及其它全部字段，只补 roomCode。
    */
   private migrate(store: Store): { store: Store; backfilled: number } {
-    const used = new Set(store.trips.map((trip) => trip.roomCode).filter(isValidRoomCode));
+    const used = new Set<string>();
     let backfilled = 0;
     const trips = store.trips.map((trip) => {
-      if (isValidRoomCode(trip.roomCode)) {
+      if (isValidRoomCode(trip.roomCode) && !used.has(trip.roomCode)) {
+        used.add(trip.roomCode);
         return trip;
       }
-      let code = generateRoomCode();
-      let guard = 0;
-      while (used.has(code) && guard < 100) {
-        code = generateRoomCode();
-        guard++;
-      }
+      const code = this.generateUnusedRoomCode(used);
       used.add(code);
       backfilled++;
       return { ...trip, roomCode: code };
     });
     return { store: { trips }, backfilled };
+  }
+
+  private generateUnusedRoomCode(used: Set<string>): string {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const code = generateRoomCode();
+      if (!used.has(code)) return code;
+    }
+    throw new AppError(500, 'ROOM_CODE_GENERATION_FAILED', '房间号生成失败，请重试');
   }
 
   private load(): Store {

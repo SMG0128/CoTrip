@@ -30,8 +30,19 @@ export class JsonUserRepository implements UserRepository {
   }
 
   async create(user: User): Promise<User> {
-    this.store.users.push(user);
-    this.save();
+    // 同一 openid 的并发首次登录必须汇合到同一个 CoTrip 用户。
+    // create 在单进程内同步完成，因此第二个并发调用会看到第一个调用刚提交的 store。
+    const existing = this.store.users.find((candidate) => candidate.wechatOpenId === user.wechatOpenId);
+    if (existing) {
+      return existing;
+    }
+    if (this.store.users.some((candidate) => candidate.id === user.id)) {
+      throw new AppError(500, 'USER_PERSISTENCE_FAILURE', '用户数据保存失败');
+    }
+
+    const nextStore = { users: [...this.store.users, user] };
+    this.save(nextStore);
+    this.store = nextStore;
     return user;
   }
 
@@ -40,8 +51,11 @@ export class JsonUserRepository implements UserRepository {
     if (idx === -1) {
       throw new AppError(404, 'USER_PERSISTENCE_FAILURE', '用户不存在');
     }
-    this.store.users[idx] = user;
-    this.save();
+    const nextStore = {
+      users: this.store.users.map((candidate, index) => (index === idx ? user : candidate)),
+    };
+    this.save(nextStore);
+    this.store = nextStore;
     return user;
   }
 
@@ -51,20 +65,48 @@ export class JsonUserRepository implements UserRepository {
         return { users: [] };
       }
       const raw = fs.readFileSync(this.file, 'utf8');
-      const parsed = JSON.parse(raw) as Store;
-      return { users: Array.isArray(parsed.users) ? parsed.users : [] };
+      const parsed = JSON.parse(raw) as { users?: unknown };
+      if (!Array.isArray(parsed.users) || !parsed.users.every(isUser)) {
+        throw new Error('invalid user store');
+      }
+      return { users: parsed.users };
     } catch {
-      // 数据文件损坏时以空库启动，避免服务崩溃
-      return { users: [] };
+      // 绝不把损坏文件当成空库，否则下一次登录会覆盖真实身份映射。
+      throw new AppError(500, 'USER_PERSISTENCE_FAILURE', '用户数据读取失败');
     }
   }
 
-  private save(): void {
+  private save(store: Store): void {
+    const directory = path.dirname(this.file);
+    const temporaryFile = `${this.file}.tmp`;
     try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.writeFileSync(this.file, JSON.stringify(this.store, null, 2), 'utf8');
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(temporaryFile, JSON.stringify(store, null, 2), 'utf8');
+      fs.renameSync(temporaryFile, this.file);
     } catch {
+      try {
+        fs.rmSync(temporaryFile, { force: true });
+      } catch {
+        // 保留原始写入错误；清理临时文件失败不得泄露路径。
+      }
       throw new AppError(500, 'USER_PERSISTENCE_FAILURE', '用户数据保存失败');
     }
   }
+}
+
+function isUser(value: unknown): value is User {
+  if (!value || typeof value !== 'object') return false;
+  const user = value as Record<string, unknown>;
+  return (
+    typeof user.id === 'string'
+    && user.id.length > 0
+    && typeof user.wechatOpenId === 'string'
+    && user.wechatOpenId.length > 0
+    && typeof user.nickname === 'string'
+    && typeof user.avatarUrl === 'string'
+    && typeof user.createdAt === 'number'
+    && Number.isFinite(user.createdAt)
+    && typeof user.updatedAt === 'number'
+    && Number.isFinite(user.updatedAt)
+  );
 }

@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 37/37、前端 18 个测试文件全绿）：
+当前已实际实现并通过测试的能力（后端 41/41、前端 18 个测试文件全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。

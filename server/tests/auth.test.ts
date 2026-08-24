@@ -28,6 +28,20 @@ function tempRepo(): JsonUserRepository {
   return new JsonUserRepository(file);
 }
 
+function temporaryStore(): { directory: string; file: string } {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cotrip-users-'));
+  return { directory, file: path.join(directory, 'users.json') };
+}
+
+function signedToken(payload: unknown, secret: string): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = require('crypto')
+    .createHmac('sha256', secret)
+    .update(body)
+    .digest('base64url');
+  return `${body}.${signature}`;
+}
+
 export async function runAuthTests(): Promise<void> {
   // --- Token 服务 ---
   await record('token: 签发后可校验并还原 userId', () => {
@@ -57,6 +71,16 @@ export async function runAuthTests(): Promise<void> {
       .update(expired)
       .digest('base64url');
     assert.throws(() => tokens.verify(`${expired}.${sig}`), (e: AppError) => e.code === 'AUTH_TOKEN_EXPIRED');
+  });
+
+  await record('token: 签名正确但 payload 类型非法仍应拒绝', () => {
+    const secret = 'test-secret';
+    const tokens = new HmacTokenService(secret);
+    const malformed = signedToken({ userId: { spoofed: true }, exp: Date.now() + 60_000 }, secret);
+    assert.throws(
+      () => tokens.verify(malformed),
+      (e: AppError) => e.code === 'AUTH_INVALID_TOKEN',
+    );
   });
 
   // --- 用户仓库 ---
@@ -94,6 +118,20 @@ export async function runAuthTests(): Promise<void> {
     fs.rmSync(file, { force: true });
   });
 
+  await record('repository: 损坏 JSON 明确失败且不会被静默清空', () => {
+    const temp = temporaryStore();
+    try {
+      fs.writeFileSync(temp.file, '{broken json', 'utf8');
+      assert.throws(
+        () => new JsonUserRepository(temp.file),
+        (error: AppError) => error.code === 'USER_PERSISTENCE_FAILURE',
+      );
+      assert.strictEqual(fs.readFileSync(temp.file, 'utf8'), '{broken json');
+    } finally {
+      fs.rmSync(temp.directory, { recursive: true, force: true });
+    }
+  });
+
   // --- 登录流程 ---
   await record('login: 新用户创建并返回 token + 公开用户（不含 openid）', async () => {
     const repo = tempRepo();
@@ -111,6 +149,33 @@ export async function runAuthTests(): Promise<void> {
     const first = await auth.login('code-1');
     const second = await auth.login('code-2');
     assert.strictEqual(first.user.id, second.user.id);
+  });
+
+  await record('login: 同一 openid 并发首次登录只创建一个 CoTrip 身份', async () => {
+    const temp = temporaryStore();
+    try {
+      const repo = new JsonUserRepository(temp.file);
+      const auth = new RealAuthService(
+        repo,
+        new FakeWechatService('openid_concurrent'),
+        new HmacTokenService('s'),
+      );
+      const [first, second] = await Promise.all([
+        auth.login('code-1'),
+        auth.login('code-2'),
+      ]);
+      assert.strictEqual(first.user.id, second.user.id);
+
+      const persisted = JSON.parse(fs.readFileSync(temp.file, 'utf8')) as {
+        users: Array<{ wechatOpenId: string }>;
+      };
+      assert.strictEqual(
+        persisted.users.filter((user) => user.wechatOpenId === 'openid_concurrent').length,
+        1,
+      );
+    } finally {
+      fs.rmSync(temp.directory, { recursive: true, force: true });
+    }
   });
 
   await record('login: 无效 code 应抛 AUTH_INVALID_CODE', async () => {
