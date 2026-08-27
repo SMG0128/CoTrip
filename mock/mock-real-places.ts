@@ -11,9 +11,9 @@ import { ExternalAction } from '../types/external-action';
 export const realBadmintonVenue: Location = {
   id: 'location_badminton_center',
   name: '广州羽毛球中心羽毛球馆',
-  latitude: 23.1319,
-  longitude: 113.3213,
-  address: '广州市天河区天河路229号体育中心羽毛球附馆',
+  latitude: 23.13652,
+  longitude: 113.322263,
+  address: '广东省广州市天河区天河路299号广州天河体育中心附馆',
   district: '天河区',
   city: '广州市',
   providerRefs: [{ provider: 'tencent_map', externalId: 'poi_badminton_center' }],

@@ -89,7 +89,7 @@
 
   <!-- 创建 -->
   <view class="footer">
-    <button class="btn-primary create-btn" bind:tap="onCreate">
+    <button class="btn-primary create-btn cotrip-glass cotrip-glass--colored" bind:tap="onCreate">
       <view class="create-btn-content">
         <image class="create-btn-icon" src="/assets/icons/trip-create/calendar-plus.svg" mode="aspectFit" />
         <text>创建行程</text>

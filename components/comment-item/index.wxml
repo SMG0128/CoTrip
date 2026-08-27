@@ -3,7 +3,9 @@
   <view class="comment-main">
     <view class="head">
       <text class="nickname">{{nickname}}</text>
-      <constraint-status status="{{comment.aiStatus}}" />
+      <view class="status-slot">
+        <constraint-status status="{{comment.aiStatus}}" />
+      </view>
     </view>
     <text class="text">{{comment.rawText}}</text>
   </view>

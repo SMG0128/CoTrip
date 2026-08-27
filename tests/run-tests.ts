@@ -10,6 +10,7 @@ import './event-candidates.test';
 import './tencent-map-adapter.test';
 import './external-action-resolver.test';
 import './current-user.test';
+import './room-code.test';
 import './trip-ownership.test';
 import './trip-share.test';
 import './trip-card.test';

@@ -1,11 +1,16 @@
+@import "../../styles/glass.wxss";
+
 .status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 170rpx;
   gap: 7rpx;
   font-size: 21rpx;
   padding: 7rpx 15rpx;
   border-radius: 20rpx;
   font-weight: 600;
+  line-height: 1.2;
   white-space: nowrap;
 }
 

@@ -24,9 +24,17 @@
 }
 
 .nickname {
+  min-width: 0;
   color: #17243d;
   font-size: 27rpx;
   font-weight: 700;
+}
+
+.status-slot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 170rpx;
 }
 
 .text {

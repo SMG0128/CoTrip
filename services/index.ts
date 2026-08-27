@@ -21,7 +21,7 @@ import { MockNotificationService } from './mock/mock-notification-service';
 import { MockExternalActionService } from './mock/mock-external-action-service';
 import { RealAuthService } from './real/real-auth-service';
 import { RealTripService } from './real/real-trip-service';
-import { RealRouteOptionService } from './route-option-service';
+import { DisabledRouteOptionService } from './route-option-service';
 
 // 认证：一律真实后端（wx.login → CoTrip Backend），后端不可用时登录明确失败。
 export const authService: AuthService = new RealAuthService();
@@ -35,8 +35,9 @@ export const placeService: PlaceService = new MockPlaceService();
 export const notificationService: NotificationService = new MockNotificationService();
 export const externalActionService: ExternalActionService = new MockExternalActionService();
 
-// 路线方案服务：「我的推荐」直连腾讯地图；失败真实抛错走错误态 UI，绝不伪造路线。
-export const routeOptionService: RouteOptionService = new RealRouteOptionService();
+// 路线方案服务：真实行程暂时全局禁用，保证不会误触腾讯 API；
+// 示例行程由页面显式使用 MockRouteOptionService 读取已固化路线。
+export const routeOptionService: RouteOptionService = new DisabledRouteOptionService();
 
 export type {
   AIService,

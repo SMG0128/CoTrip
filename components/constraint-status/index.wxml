@@ -1,4 +1,7 @@
-<view class="status" style="color: {{color}}; background: {{bg}};">
+<view
+  class="status cotrip-glass cotrip-glass--colored"
+  style="color: {{color}}; background: {{bg}}; border-color: {{border}}; box-shadow: {{shadow}};"
+>
   <image src="{{icon}}" mode="aspectFit" />
   <text>{{label}}</text>
 </view>

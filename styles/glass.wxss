@@ -1,0 +1,36 @@
+/*
+ * CoTrip 共享玻璃材质
+ *
+ * 用法：
+ * - 无色玻璃：class="cotrip-glass cotrip-glass--neutral"
+ *   背景透明度 100%（alpha=0），保留模糊、浅灰描边和高光。
+ * - 有色玻璃：class="cotrip-glass cotrip-glass--colored"
+ *   默认蓝色透明度 0%（alpha=1）；业务组件可用自身样式或内联样式覆盖
+ *   background / border-color / box-shadow，复用同一材质骨架。
+ */
+
+.cotrip-glass {
+  box-sizing: border-box;
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-style: solid;
+  border-width: 1.5rpx;
+}
+
+.cotrip-glass--neutral {
+  background: rgba(255, 255, 255, 0);
+  border-color: #e4e8ef;
+  box-shadow:
+    0 0 0 1rpx rgba(255, 255, 255, 0.55),
+    0 0 16rpx rgba(255, 255, 255, 0.5),
+    0 12rpx 34rpx rgba(56, 84, 145, 0.13);
+}
+
+.cotrip-glass--colored {
+  background: rgba(50, 107, 255, 1);
+  border-color: #a9c0ff;
+  box-shadow:
+    0 0 0 1rpx rgba(169, 192, 255, 0.58),
+    0 0 16rpx rgba(50, 107, 255, 0.28),
+    0 12rpx 28rpx rgba(50, 107, 255, 0.3);
+}

@@ -1,48 +1,68 @@
 <view class="home">
-  <view class="hero">
-    <view class="hero-copy">
-      <view class="brand-row">
-        <text class="brand">CoTrip</text>
-        <image class="brand-star" src="/assets/3d/star.png" mode="aspectFit" />
-      </view>
-      <text class="tagline">AI 帮大家把想法变成共同计划</text>
+  <view class="home-hero">
+    <view class="city-carousel-layer" aria-hidden="true">
+      <swiper
+        class="city-carousel"
+        autoplay="{{true}}"
+        circular="{{true}}"
+        interval="5200"
+        duration="900"
+      >
+        <swiper-item wx:for="{{homeBanners}}" wx:key="id">
+          <image class="city-carousel-image" src="{{item.imageUrl}}" mode="aspectFill" />
+        </swiper-item>
+      </swiper>
+      <view class="city-carousel-fade"></view>
     </view>
-    <view class="avatar-entry" bind:tap="onProfile">
-      <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="92" />
-    </view>
-  </view>
 
-  <!-- 房间码加入入口：轻量搜索栏，位于 Hero 与 Quick 之间，不抢新建行程主入口 -->
-  <view class="room-entry">
-    <image class="room-entry-icon" src="/assets/icons/utility/link.svg" mode="aspectFit" />
-    <input
-      class="room-input"
-      placeholder="输入房间号加入行程"
-      placeholder-class="room-input-placeholder"
-      value="{{roomCodeInput}}"
-      bind:input="onRoomCodeInput"
-      confirm-type="go"
-      bind:confirm="onJoinByRoomCode"
-      maxlength="16"
-    />
-    <view class="room-join {{roomCodeInput ? 'enabled' : ''}}" bind:tap="onJoinByRoomCode">
-      加入
-    </view>
-  </view>
-
-  <view class="quick">
-    <view class="quick-btn primary" bind:tap="onCreateTrip">
-      <view class="quick-icon primary-icon"><image src="/assets/icons/utility/plus-3d.svg" mode="aspectFit" /></view>
-      <view class="quick-copy">
-        <text class="quick-title">新建行程</text>
-        <text class="quick-subtitle">AI 智能规划行程</text>
+    <view class="home-hero-content" style="padding-top: {{homeTopInsetPx}}px;">
+      <view class="hero">
+        <view class="hero-copy">
+          <view class="brand-row">
+            <text class="brand">CoTrip</text>
+            <image class="brand-star" src="/assets/3d/star.png" mode="aspectFit" />
+          </view>
+          <text class="tagline">AI 帮大家把想法变成共同计划</text>
+        </view>
+        <view class="avatar-entry cotrip-glass cotrip-glass--neutral" bind:tap="onProfile">
+          <participant-avatar nickname="{{user.nickname}}" avatarUrl="{{user.avatarUrl}}" size="92" />
+        </view>
       </view>
-    </view>
-    <view class="quick-btn secondary" bind:tap="onHistory">
-      <view class="quick-icon secondary-icon"><image src="/assets/icons/utility/history-line.svg" mode="aspectFit" /></view>
-      <view class="quick-copy">
-        <text class="quick-title">历史行程</text>
-        <text class="quick-subtitle">查看过往旅程</text>
+
+      <!-- 房间码加入入口：轻量搜索栏，位于 Hero 与 Quick 之间，不抢新建行程主入口 -->
+      <view class="room-entry">
+        <image class="room-entry-icon" src="/assets/icons/utility/link.svg" mode="aspectFit" />
+        <input
+          class="room-input"
+          placeholder="输入房间号加入行程"
+          placeholder-class="room-input-placeholder"
+          value="{{roomCodeInput}}"
+          bind:input="onRoomCodeInput"
+          bind:focus="onRoomCodeFocus"
+          confirm-type="go"
+          bind:confirm="onJoinByRoomCode"
+          maxlength="16"
+        />
+        <view class="room-join {{roomCodeInput ? 'enabled' : ''}}" bind:tap="onJoinByRoomCode">
+          加入
+        </view>
+      </view>
+
+      <view class="quick">
+        <view class="quick-btn primary" bind:tap="onCreateTrip">
+          <view class="quick-icon primary-icon"><image src="/assets/icons/utility/plus-3d.svg" mode="aspectFit" /></view>
+          <view class="quick-copy">
+            <text class="quick-title">新建行程</text>
+            <text class="quick-subtitle">AI 智能规划行程</text>
+          </view>
+        </view>
+        <view class="quick-btn secondary cotrip-glass cotrip-glass--neutral" bind:tap="onHistory">
+          <view class="quick-icon secondary-icon"><image src="/assets/icons/utility/history-line.svg" mode="aspectFit" /></view>
+          <view class="quick-copy">
+            <text class="quick-title">历史行程</text>
+            <text class="quick-subtitle">查看过往旅程</text>
+          </view>
+        </view>
       </view>
     </view>
   </view>

@@ -99,19 +99,22 @@
     </view>
   </view>
 
-  <view class="input-bar">
-    <input
-      class="input"
-      placeholder="说说你的时间、预算或想法…"
-      placeholder-class="placeholder"
-      value="{{inputText}}"
-      bind:input="onInput"
-      confirm-type="send"
-      bind:confirm="onSend"
-    />
-    <view class="send-btn" bind:tap="onSend">
-      <image src="/assets/icons/utility/send.svg" mode="aspectFit" />
-      <text>发送</text>
+  <view class="composer">
+    <view class="input-bar cotrip-glass cotrip-glass--neutral">
+      <input
+        class="input"
+        placeholder="说说你的时间、预算或想法…"
+        placeholder-class="placeholder"
+        value="{{inputText}}"
+        bind:input="onInput"
+        confirm-type="send"
+        bind:confirm="onSend"
+      />
+    </view>
+    <view class="send-btn cotrip-glass cotrip-glass--neutral" bind:tap="onSend">
+      <view class="send-btn-core">
+        <image src="/assets/icons/utility/send.svg" mode="aspectFit" />
+      </view>
     </view>
   </view>
 </view>

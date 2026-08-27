@@ -1,3 +1,5 @@
+@import "../../styles/glass.wxss";
+
 .create {
   box-sizing: border-box;
   min-height: 100vh;
@@ -202,15 +204,10 @@
   background: rgba(247, 249, 253, 0.96);
 }
 
-/* 创建 CTA：与登录按钮同一设计语言，作为主 CTA 使用更强一点的蓝色填充，
-   但保持圆角 / 干净边界 / 克制阴影 */
+/* 创建 CTA：共享有色玻璃材质；默认蓝色为完全不透明。 */
 .footer .btn-primary {
-  box-sizing: border-box;
   width: 100%;
   margin: 0;
-  border: 0;
-  background: linear-gradient(135deg, #4f7cff 0%, #326bff 58%, #7b61ff 100%);
-  box-shadow: 0 12rpx 28rpx rgba(79, 124, 255, 0.26);
 }
 
 .create-btn {

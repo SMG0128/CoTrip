@@ -1,28 +1,32 @@
+@import "../styles/glass.wxss";
+
+/* tabBar：共享无色玻璃底座 + 选中项扁平实心胶囊 */
 .custom-tab-bar {
   position: fixed;
   z-index: 999;
   left: 30rpx;
   right: 30rpx;
   bottom: calc(env(safe-area-inset-bottom) + 12rpx);
-  box-sizing: border-box;
   display: flex;
   align-items: center;
   height: 104rpx;
   padding: 10rpx 16rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(116, 142, 193, 0.08);
   border-radius: 52rpx;
-  box-shadow: 0 12rpx 34rpx rgba(56, 84, 145, 0.13);
 }
 
 .tab-item {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1;
   height: 84rpx;
-  color: #a1adbf;
+  color: #111111;
+  border: 1rpx solid transparent;
   border-radius: 42rpx;
+  transition:
+    background 0.3s ease,
+    color 0.25s ease;
 }
 
 .icon-wrap {
@@ -32,7 +36,6 @@
   width: 58rpx;
   height: 58rpx;
   margin-right: 10rpx;
-  border-radius: 20rpx;
 }
 
 .tab-icon {
@@ -41,18 +44,20 @@
 }
 
 .tab-label {
+  /* 强制块级化：text 默认为 inline，可能不参与 flex 居中计算，导致只居中图标 */
+  display: block;
   font-size: 25rpx;
-  font-weight: 620;
+  font-weight: 500;
+  /* 收紧行高，避免 normal 行高把文字视觉重心顶偏上 */
+  line-height: 1;
+  /* 汉字字形重心在字盒内略偏上，微调下移 2rpx 达成视觉居中 */
+  margin-top: 2rpx;
 }
 
+/* 选中态：扁平风格——白色纯色填充，无渐变无阴影无缩放 */
 .tab-item.selected {
   color: #326bff;
-}
-
-.tab-item.selected .icon-wrap {
-  background: #eef3ff;
-  box-shadow: 0 7rpx 18rpx rgba(50, 107, 255, 0.15);
-  transform: scale(1.04);
+  background: #ffffff;
 }
 
 .tab-item.selected .tab-label {

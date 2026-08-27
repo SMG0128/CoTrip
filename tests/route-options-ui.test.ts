@@ -528,20 +528,23 @@ export async function runRouteOptionsUiTests(): Promise<void> {
     '票价缺失时隐藏而非显示占位符'
   );
 
-  // mock 预览数据票价可见性：方案1 ¥2 / 方案2 ¥2 / 方案3（纯步行）无
+  // 真实腾讯响应固化后的 mock 票价：地铁方案 ¥2，两条夜班公交方案均 ¥3
   const mockRows = buildRouteRowVMs(mockRouteOptions);
-  assert(mockRows[0].costText === '¥2', 'mock 方案 1（步行+APM线）显示 ¥2');
-  assert(mockRows[1].costText === '¥2', 'mock 方案 2（步行+1号线）显示 ¥2');
-  assert(mockRows[2].costText === '', 'mock 方案 3（纯步行）不显示价格');
+  assert(mockRows[0].costText === '¥2', 'mock 方案 1（步行+3号线北延段）显示 ¥2');
+  assert(mockRows[1].costText === '¥3', 'mock 方案 2（步行+夜77路）显示 ¥3');
+  assert(mockRows[2].costText === '¥3', 'mock 方案 3（步行+夜17路）显示 ¥3');
 
-  // mock 折叠态分段链：方案1 = 步行8 › APM 线 › 步行6；方案3（纯步行）= 步行 39 分钟
+  // mock 折叠态分段链严格保留当次腾讯 Provider 返回的 leg 顺序与时长
   assert(mockRows[0].summarySegments.length === 3, 'mock 方案 1 三段链（跳过 ARRIVAL）');
-  assert(mockRows[0].summarySegments[0].durationText === '8 分钟', 'mock 方案 1 首段步行 8 分钟');
-  assert(mockRows[0].summarySegments[1].label === 'APM 线', 'mock 方案 1 地铁段为「APM 线」');
-  assert(mockRows[0].summarySegments[2].durationText === '6 分钟', 'mock 方案 1 末段步行 6 分钟');
-  assert(mockRows[1].summarySegments[1].label === '1 号线', 'mock 方案 2 地铁段为「1 号线」');
-  assert(mockRows[2].summarySegments.length === 1, 'mock 方案 3 纯步行合并为 1 段');
-  assert(mockRows[2].summarySegments[0].durationText === '39 分钟', 'mock 方案 3 步行总时长「39 分钟」');
+  assert(mockRows[0].summarySegments[0].durationText === '4 分钟', 'mock 方案 1 首段步行 4 分钟');
+  assert(
+    mockRows[0].summarySegments[1].label === '3号线(北延段)',
+    'mock 方案 1 地铁段为「3号线(北延段)」'
+  );
+  assert(mockRows[0].summarySegments[2].durationText === '13 分钟', 'mock 方案 1 末段步行 13 分钟');
+  assert(mockRows[1].summarySegments[1].label === '夜77路', 'mock 方案 2 公交段为「夜77路」');
+  assert(mockRows[2].summarySegments.length === 3, 'mock 方案 3 保留步行+公交+步行三段');
+  assert(mockRows[2].summarySegments[1].label === '夜17路', 'mock 方案 3 公交段为「夜17路」');
 
   // ---- 展开详情视图模型：Travel Leg 列表 + 统一目的地脚注 ----
   const detail = buildRouteDetailVM(srcOption);

@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 41/41、前端 18 个测试文件全绿）：
+当前已实际实现并通过测试的能力（后端 59/59、前端 23 个测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -26,9 +26,11 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Multiple active trips** —— 首页展示全部进行中行程（最新在前），每张卡独立导航。
 - **Native WeChat sharing** —— 分享卡片直达 Join 落地页（携带 roomCode）。
 - **Real room joining** —— Join 落地页 / 首页房间入口 / 微信分享均已接通真实加入流程：公开 Preview → Bearer 认证幂等加入；身份只来自服务端校验的 token，失败不回退 Mock。
-- **Navigation-style route recommendations** —— 见下节。
-- **Tencent Location Service integration** —— POI Search + Direction（walking / transit）已真实配置并跑通，直连 WebService API。
+- **Navigation-style route recommendations** —— 见下节；示例行程使用已固化、可重复验证的广州路线数据。
+- **Tencent Location Service adapter** —— 已实现 POI Search + Direction（walking / transit）适配器；当前产品门禁禁止真实行程触发腾讯路线 API，避免其他行程产生外部调用。
 - **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
+- **Immersive Home experience** —— 首页使用广州图片循环横幅、自定义全面屏安全区与底部渐隐；共享玻璃材质覆盖导航、头像、评论和状态组件，主操作保留独立材质控制。
+- **Clipboard-assisted room join** —— 首页聚焦房间号输入时可从剪贴板识别并归一化房间号，仍由用户明确确认加入。
 
 尚未实现：实时同步 / WebSocket、评论与计划的后端持久化。
 
@@ -52,26 +54,29 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ### 数据与降级
 
-- 数据来源：腾讯位置服务 WebService API（**POI Search** 解析目的地坐标 + **Direction walking / transit** 并行请求）。
+- 当前示例行程直接读取 `mock/mock-route-options.ts` 中已固化的广州羽毛球中心路线，不因输入或外部服务变化而漂移。
+- 真实行程统一使用 `DisabledRouteOptionService`，在 Provider 调用前明确失败，因此不会触发腾讯地图路线 API。
+- `RealRouteOptionService` 与腾讯 Provider 适配器继续保留，供后续解除产品门禁时启用；解除前必须重新完成配额、域名、隐私与真机验证。
 - 导航通过 `wx.openLocation` 交给微信内置地图完成，CoTrip 不自行实现导航。
-- **失败不回退假路线**：Provider / 地点解析 / 定位失败均显示明确失败态与重试入口；绝不伪造路线、票价或到达时间。
+- **失败不回退假路线**：非示例行程显示明确的暂不可用状态；绝不把示例 fixture 当作真实行程 fallback，也不伪造路线、票价或到达时间。
 
 ## Tencent Map Setup
 
-腾讯位置服务 WebService API（POI Search + Direction walking/transit）已**真实配置并在本地跑通**。真实 Key **不进入 Git**，仓库内始终为占位符：
+仓库保留腾讯位置服务 WebService API 适配器，但真实行程的路线调用当前被产品门禁禁用。仓库内始终只提交占位符，真实 Key **不进入 Git**：
 
 1. 在 [腾讯位置服务控制台](https://lbs.qq.com/) 创建应用并申请 Key，勾选所需 **WebService API** 能力（PlaceSearch / Direction），建议配置配额限额与用量告警。
-2. 将 Key 填入 `config/tencent-map.ts` 替换占位符 `YOUR_TENCENT_MAP_KEY`（仅本地修改，**勿提交真实 Key**）。
+2. 仅在本地将 `config/tencent-map.ts` 的 `YOUR_TENCENT_MAP_KEY` 替换为受限 Key；不要提交该修改。当前允许的端点为 `/ws/place/v1/search`、`/ws/direction/v1/walking` 与 `/ws/direction/v1/transit`。
 3. 在小程序管理后台「开发设置 → 服务器域名」添加 request 合法域名 `https://apis.map.qq.com`。
 4. 在微信小程序控制台配置位置权限与《用户隐私保护指引》（`permission.scope.userLocation` 与 `requiredPrivateInfos` 已在 `app.json` 声明）。
 
-**Never commit production/private keys.** 未配置 Key 时路线功能显示「暂未配置地图服务」，不会伪造数据。
+**Never commit production/private keys.** 当前真实行程会在请求 Provider 前停止；未配置 Key 或未解除门禁都不会产生真实路线请求。
 
 ## Known Limitations
 
 - 真实多人房间加入已完成本地后端与前端 API 接线，但尚未部署生产，也尚未执行真实双账号 E2E；生产后端适配将在服务器环境继续。
 - 定位的运行时隐私授权弹窗（privacy authorization flow）尚未完整实现。
 - 腾讯地图真机 E2E 依赖人工完成 Key / 合法域名 / 隐私配置。
+- 真实行程的腾讯路线 API 当前主动禁用；示例导航固定显示本地 fixture。
 - 地图预览（Map Preview）尚未实现。
 - 本阶段未使用后端代理转发腾讯地图请求（客户端受限 Key 直连）。
 
@@ -102,7 +107,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 ### 测试覆盖
 
 - 后端：37/37 通过（覆盖房间号、公开 Preview、Bearer Join、A/B/C 多用户、幂等、spoof 防护、非 ACTIVE 拒绝与重启持久化）。
-- 前端：18 个测试组全部通过（覆盖 Real/Mock Join、登录续接、分享归一化与成功导航）。
+- 前端：23 个测试模块全部通过（覆盖 Real/Mock Join、登录续接、分享归一化、路线门禁与成功导航）。
 
 ## 项目结构
 
@@ -117,7 +122,9 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 ├── types/                          # 领域模型（Trip、Plan、Event、Constraint…）
 ├── core/                           # 纯规划逻辑（约束解析→冲突检测→规划引擎）
 ├── services/                       # 服务接口 + mock/ 与 real/ 实现
-├── config/auth.ts                  # 认证模式切换（mock | real）
+├── config/auth.ts                  # 后端地址、存储键与示例行程开关
+├── config/tencent-map.ts           # 腾讯地图公开配置占位符（禁止提交真实 Key）
+├── styles/                         # 共享 tokens、排版、工具类与玻璃材质
 ├── utils/                          # 纯函数工具（trip-share、trip-card、route-options-ui、guangzhou-metro…）
 ├── mock/                           # Mock 数据
 ├── tests/                          # 前端单元测试（自研轻量运行器）
@@ -150,7 +157,7 @@ npm run typecheck    # 严格类型检查
 npm test             # 编译至临时目录并运行全部前端测试
 ```
 
-开发预览：用**微信开发者工具**导入仓库根目录即可（TypeScript 由内置编译插件处理，无 CLI 构建）。替换 `project.config.json` 中的 `touristappid` 为正式 AppID 后可使用真实登录。
+开发预览：用**微信开发者工具**导入仓库根目录即可（TypeScript 由内置编译插件处理，无 CLI 构建）。仓库中的 `project.config.json` 固定使用 `touristappid`；真实 AppID 仅保存在本地配置中，禁止提交。
 
 ### 后端
 
@@ -165,12 +172,10 @@ npm run typecheck && npm test
 
 健康检查：`GET http://localhost:3000/health`
 
-### 认证模式
+### 认证与示例模式
 
-编辑 `config/auth.ts`：
-
-- `mode: 'mock'` —— 前端无需后端即可运行（开发默认）。
-- `mode: 'real'` —— 走 `wx.login` → CoTrip 后端 → 微信 `code2Session`。后端不可用时登录明确失败，**不会**回退 Mock。
+- 登录与行程持久化始终走真实后端：`wx.login` → CoTrip Backend → 微信 `code2Session`。后端不可用时明确失败，**不会**回退 Mock。
+- `config/auth.ts` 只保存后端 `baseUrl`、本地存储键和 `enableDemoTrip`；示例行程是明确标注的本地样例，不是认证或持久化 fallback。
 
 ## 接口一览
 
@@ -202,10 +207,12 @@ npm run typecheck && npm test
 - `WECHAT_SECRET` / `session_key` / `openid` 仅存在于后端；小程序只持有 CoTrip token 与 userId。
 - `creatorId` / `participantIds` 只来自已校验 token，客户端提交的身份字段会被忽略。
 - `.env`、`server/data/*.json`、私钥证书文件均在 `.gitignore` 中，切勿提交。
+- `project.config.json` 只提交 `touristappid`，`config/tencent-map.ts` 只提交 `YOUR_TENCENT_MAP_KEY`；真实 AppID/Key 必须保留在本地或服务端环境。
 
 ## Roadmap
 
 - [x] **POST /trips/join** —— 房间号真实加入 API（本地前后端已接通并通过测试；生产部署与真实双账号 E2E 待服务器阶段完成）
 - [ ] 评论流与 AI 约束提取接入真实服务
-- [ ] 规划引擎对接真实 Provider（地图/地点检索）
+- [x] 腾讯地图 Provider 适配器（POI Search + walking / transit）
+- [ ] 完成真实路线调用的配额、域名、隐私与真机验证后解除产品门禁
 - [ ] 通知订阅消息

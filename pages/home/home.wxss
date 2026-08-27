@@ -1,24 +1,76 @@
+@import "../../styles/glass.wxss";
+
 .home {
   box-sizing: border-box;
   min-height: 100vh;
-  padding: 28rpx 0 calc(140rpx + env(safe-area-inset-bottom));
+  padding: 0 0 calc(140rpx + env(safe-area-inset-bottom));
   /* 页面基底：低饱和冷灰蓝，与各模块 Surface 形成色温差 */
   background: #f5f7fc;
 }
 
+.home-hero {
+  position: relative;
+}
+
+/* 广州轮播仅是背景层：不接收触摸，所有输入与按钮保持在最高层。 */
+.city-carousel-layer {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.city-carousel,
+.city-carousel-image {
+  width: 100%;
+  height: 100%;
+}
+
+.city-carousel-image {
+  opacity: 0.68;
+  /* 蓝框目标比当前可见图片区约高 1/3：从顶部放大裁切，
+     让城市与水面细节继续延伸到快捷按钮区域。 */
+  transform: scale(1.38);
+  transform-origin: center top;
+}
+
+/* 图片向下融入页面底色，避免轮播区出现硬边界。 */
+.city-carousel-fade {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(245, 247, 252, 0.08) 0%,
+    rgba(245, 247, 252, 0.14) 72%,
+    rgba(245, 247, 252, 0.48) 90%,
+    #f5f7fc 100%
+  );
+}
+
+.home-hero-content {
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
 .hero {
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 170rpx;
   padding: 0 42rpx 22rpx;
-  /* 方案 A：顶部纯白自然沉入极淡蓝雾，尾端完全溶解 —— 无紫色块、无边界 */
-  background: linear-gradient(
-    180deg,
-    #ffffff 0%,
-    rgba(234, 242, 255, 0.6) 68%,
-    rgba(234, 242, 255, 0) 100%
-  );
+  background: transparent;
 }
 
 .hero-copy {
@@ -56,22 +108,24 @@
 .avatar-entry {
   padding: 8rpx;
   border-radius: 32rpx;
-  background: rgba(255, 255, 255, 0.75);
-  box-shadow: 0 10rpx 28rpx rgba(65, 92, 155, 0.08);
 }
 
 /* 房间码加入入口：保持纯白 Surface，靠色温差而非装饰与基底区分 */
 .room-entry {
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
   box-sizing: border-box;
   margin: 0 24rpx 34rpx;
   height: 88rpx;
   padding: 0 12rpx 0 26rpx;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.9);
   border: 1rpx solid rgba(122, 147, 194, 0.09);
   border-radius: 44rpx;
   box-shadow: 0 10rpx 26rpx rgba(60, 90, 160, 0.07);
+  -webkit-backdrop-filter: blur(18rpx);
+  backdrop-filter: blur(18rpx);
 }
 
 .room-entry-icon {
@@ -112,6 +166,8 @@
 }
 
 .quick {
+  position: relative;
+  z-index: 3;
   display: flex;
   gap: 20rpx;
   padding: 10rpx 24rpx 38rpx;
@@ -127,24 +183,20 @@
   padding: 24rpx;
 }
 
-/* 新建行程入口：白卡 + 极细品牌渐变描边（双背景层实现，圆角正常裁切）
-   —— 主入口身份靠描边与图标氛围表达，而非大面积铺色 */
+/* 新建行程入口：不使用共享封装，局部保留 100% 透明毛玻璃。 */
 .quick-btn.primary {
   flex: 1.15;
   color: #326bff;
-  border: 2rpx solid transparent;
-  background:
-    linear-gradient(#ffffff, #ffffff) padding-box,
-    linear-gradient(135deg, #6a5cff, #326bff 55%, #20b9ff) border-box;
+  border: 2rpx solid #4f7cff;
+  background: rgba(255, 255, 255, 0);
   box-shadow: 0 12rpx 28rpx rgba(50, 107, 255, 0.12);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
 }
 
-/* 历史行程入口：白卡 + 更弱更安静的边框，语气退后 */
+/* 历史行程入口：具体材质由共享无色玻璃类提供。 */
 .quick-btn.secondary {
   flex: 0.85;
-  background: #ffffff;
-  border: 1rpx solid rgba(122, 147, 194, 0.07);
-  box-shadow: 0 8rpx 22rpx rgba(60, 90, 160, 0.06);
 }
 
 .quick-icon {

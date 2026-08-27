@@ -1,3 +1,5 @@
+@import "../../styles/glass.wxss";
+
 .detail {
   box-sizing: border-box;
   min-height: 100vh;
@@ -249,30 +251,38 @@ button::after {
   padding-top: 4rpx;
 }
 
-.input-bar {
+/* 评论输入组合：毛玻璃输入框 + 独立圆形发送按钮，二者分家并等高 */
+.composer {
   position: fixed;
   z-index: 50;
   left: 18rpx;
   right: 18rpx;
   bottom: calc(12rpx + env(safe-area-inset-bottom));
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 14rpx;
-  padding: 14rpx;
-  background: rgba(255, 255, 255, 0.97);
-  border: 1rpx solid rgba(122, 147, 194, 0.1);
+}
+
+/* 输入框容器：共享无色玻璃材质，仅包裹输入框 */
+.input-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 104rpx;
+  padding: 6rpx 10rpx;
   border-radius: 44rpx;
-  box-shadow: 0 12rpx 34rpx rgba(60, 90, 160, 0.14);
 }
 
 .input {
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
-  height: 78rpx;
-  padding: 0 26rpx;
+  height: 88rpx;
+  padding: 0 20rpx;
   background: #f5f7fb;
-  border-radius: 34rpx;
+  /* 同心圆角：毛玻璃 44rpx − 上下内边距 8rpx，轮廓保持一致 */
+  border-radius: 36rpx;
   font-size: 26rpx;
 }
 
@@ -280,31 +290,36 @@ button::after {
   color: #b3bdcd;
 }
 
-/* 发送按钮：与「新建行程」按钮（home .quick-btn.primary）同源视觉语言
-   —— 白卡 + 极细品牌渐变描边（双背景层实现，圆角正常裁切）+ 浅阴影；
-   身份靠描边与轻量蓝字表达，不做大面积铺色 */
+/* 发送按钮：共享无色玻璃圆环 + 内部缩小的白色实心圆，二者同心 */
 .send-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  min-width: 142rpx;
-  height: 78rpx;
-  color: #326bff;
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+}
+
+/* 白色实心核心：保留原白卡 + 品牌渐变描边视觉，缩小嵌入毛玻璃环内 */
+.send-btn-core {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 80rpx;
+  height: 80rpx;
   background:
     linear-gradient(#ffffff, #ffffff) padding-box,
     linear-gradient(135deg, #6a5cff, #326bff 55%, #20b9ff) border-box;
   border: 2rpx solid transparent;
-  border-radius: 34rpx;
+  border-radius: 50%;
   box-shadow: 0 8rpx 18rpx rgba(50, 107, 255, 0.12);
-  font-size: 26rpx;
-  font-weight: 650;
 }
 
-.send-btn image {
-  width: 40rpx;
-  height: 40rpx;
-  margin-right: 5rpx;
+.send-btn-core image {
+  width: 44rpx;
+  height: 44rpx;
 }
 
 .debug-panel {
@@ -460,7 +475,26 @@ button::after {
     padding: 24rpx;
   }
 
+  .input-bar {
+    height: 100rpx;
+  }
+
+  .input {
+    height: 84rpx;
+  }
+
   .send-btn {
-    min-width: 124rpx;
+    width: 100rpx;
+    height: 100rpx;
+  }
+
+  .send-btn-core {
+    width: 76rpx;
+    height: 76rpx;
+  }
+
+  .send-btn-core image {
+    width: 42rpx;
+    height: 42rpx;
   }
 }

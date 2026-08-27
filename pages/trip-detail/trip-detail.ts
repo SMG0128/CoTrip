@@ -15,7 +15,11 @@ import { Plan } from '../../types/plan';
 import { PlanningEngine } from '../../core/planning-engine';
 import { rankCandidates } from '../../core/candidate-ranker';
 import { tencentMapProvider } from '../../services/providers/tencent-map-provider';
-import { routeOptionService, tripService } from '../../services/index';
+import { tripService } from '../../services/index';
+import {
+  MockRouteOptionService,
+  ROUTE_OPTION_DISABLED_MESSAGE,
+} from '../../services/route-option-service';
 import { EventCandidateGroup } from '../../types/event-candidate';
 import { ResolvedDestination, RouteOption } from '../../types/route-option';
 import { buildEventCandidateGroups } from '../../utils/event-candidates';
@@ -59,6 +63,7 @@ function isDebugEnabled(): boolean {
 }
 
 const DEBUG_ENABLED = isDebugEnabled();
+const demoRouteOptionService = new MockRouteOptionService();
 
 /** 新 Trip 无初始计划时生成空骨架，避免 PlanBoard 空引用 */
 function buildEmptyPlan(tripId: string): Plan {
@@ -405,17 +410,6 @@ Page({
     }
   },
 
-  /** wx.getLocation 包装为 Promise；用户拒绝/失败一律 reject，绝不伪造位置兜底 */
-  getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
-    return new Promise((resolve, reject) => {
-      wx.getLocation({
-        type: 'gcj02',
-        success: (res) => resolve({ latitude: res.latitude, longitude: res.longitude }),
-        fail: () => reject(new Error('LOCATION_UNAVAILABLE')),
-      });
-    });
-  },
-
   /**
    * 推导路线规划目的地名称：
    * 优先 currentPlan 第一个带地点 event 的 location.name；
@@ -433,37 +427,26 @@ Page({
     return '广州羽毛球中心羽毛球馆';
   },
 
-  /** 定位 → planRoutes 的完整加载链；失败态写入 routeErrorText（含重试入口），绝不静默回退 */
+  /**
+   * 路线门禁：仅示例行程读取已固化 Mock，既不定位也不调用腾讯 API；
+   * 其他真实行程在任何请求发生前返回停用态。
+   */
   async loadRouteOptions(): Promise<void> {
-    // 登录态守卫沿用现有写法
-    const app = getApp<IAppOption>();
-    const guard = requireCurrentUser(app.globalData.currentUser);
-    if (!guard.ok) {
-      wx.showToast({ title: '登录状态失效，请重新登录', icon: 'none' });
-      wx.navigateTo({ url: '/pages/login/login' });
-      return;
-    }
-
-    this.setData({ routeLoading: false, routeErrorText: '' });
-
-    let origin: { latitude: number; longitude: number };
-    try {
-      origin = await this.getCurrentLocation();
-    } catch {
+    if (!isDemoTripId(this.data.trip.id)) {
       this.setData({
+        routeOptions: [],
+        routeResolvedDestination: null,
+        routesLoaded: false,
         routeLoading: false,
-        routeErrorText: '无法获取当前位置，请允许定位后查看实时路线',
+        routeErrorText: ROUTE_OPTION_DISABLED_MESSAGE,
       });
       return;
     }
 
-    this.setData({ routeLoading: true });
+    this.setData({ routeLoading: true, routeErrorText: '' });
     try {
-      const result = await routeOptionService.planRoutes({
-        origin,
+      const result = await demoRouteOptionService.planRoutes({
         destinationName: this.resolveRouteDestinationName(),
-        city: '广州市',
-        departureTime: this.data.trip.timeRange?.start,
       });
       this.setData({
         routeOptions: result.options,
