@@ -11,6 +11,9 @@ import { RealAuthService } from './services/auth-service';
 import { authRouter } from './routes/auth';
 import { RealTripService } from './services/trip-service';
 import { tripRouter } from './routes/trips';
+import { JsonCommentRepository } from './repositories/json-comment-repository';
+import { CommentService } from './services/comment-service';
+import { commentRouter } from './routes/comments';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
 export function createApp() {
@@ -22,6 +25,8 @@ export function createApp() {
   const auth = new RealAuthService(users, wechat, tokens);
   const tripRepository = new JsonTripRepository(config.tripDataFile);
   const trips = new RealTripService(tripRepository);
+  const commentRepository = new JsonCommentRepository(config.commentDataFile);
+  const comments = new CommentService(commentRepository, tripRepository);
 
   const app = express();
   app.use(express.json());
@@ -32,6 +37,8 @@ export function createApp() {
 
   app.use('/auth', authRouter(auth, tokens));
   app.use('/trips', tripRouter(trips, tokens));
+  // 评论挂在 /trips/:id/comments；tripRouter 的 /:id 只匹配单段，不会捕获多段路径
+  app.use('/trips', commentRouter(comments, tokens));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

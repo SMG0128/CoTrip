@@ -16,6 +16,8 @@ export interface AppConfig {
   dataFile: string;
   /** Trip shell 数据持久化文件路径 */
   tripDataFile: string;
+  /** 评论流数据持久化文件路径 */
+  commentDataFile: string;
 }
 
 function required(name: string): string {
@@ -35,5 +37,7 @@ export function loadConfig(): AppConfig {
     dataFile: process.env.DATA_FILE || path.resolve(__dirname, '../../data/users.json'),
     tripDataFile:
       process.env.TRIP_DATA_FILE || path.resolve(__dirname, '../../data/trips.json'),
+    commentDataFile:
+      process.env.COMMENT_DATA_FILE || path.resolve(__dirname, '../../data/comments.json'),
   };
 }

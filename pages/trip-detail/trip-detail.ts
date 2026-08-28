@@ -11,17 +11,15 @@ import { Trip } from '../../types/trip';
 import { Constraint } from '../../types/constraint';
 import { Restaurant } from '../../types/restaurant';
 import { Participant } from '../../types/participant';
+import { Location } from '../../types/location';
 import { Plan } from '../../types/plan';
 import { PlanningEngine } from '../../core/planning-engine';
 import { rankCandidates } from '../../core/candidate-ranker';
 import { tencentMapProvider } from '../../services/providers/tencent-map-provider';
-import { tripService } from '../../services/index';
-import {
-  MockRouteOptionService,
-  ROUTE_OPTION_DISABLED_MESSAGE,
-} from '../../services/route-option-service';
+import { tripService, routeOptionService, commentService } from '../../services/index';
+import { MockRouteOptionService } from '../../services/route-option-service';
 import { EventCandidateGroup } from '../../types/event-candidate';
-import { ResolvedDestination, RouteOption } from '../../types/route-option';
+import { ResolvedDestination, RouteOption, RoutePlanQuery } from '../../types/route-option';
 import { buildEventCandidateGroups } from '../../utils/event-candidates';
 import {
   extractNavigateTarget,
@@ -34,6 +32,18 @@ import {
   resolveRoomCodeDisplay,
   roomCopyFeedback,
 } from '../../utils/trip-share';
+import {
+  buildDeparturePlace,
+  loadDeparturePlaces,
+  mergeDeparturePlace,
+  saveDeparturePlaces,
+} from '../../utils/departure-places';
+import {
+  DeparturePoint,
+  PersonalRouteBlockReason,
+  resolveDefaultDeparturePlace,
+  resolvePersonalRouteGate,
+} from '../../utils/personal-route';
 import {
   buildUserComment,
   hydrateTripWithCurrentUser,
@@ -52,6 +62,11 @@ import {
   shouldShowDeleteEntry,
 } from '../../utils/trip-delete';
 import { RealTripServiceError } from '../../services/real/real-trip-service';
+import {
+  commitServerComment,
+  createTempCommentId,
+  mergeServerComments,
+} from '../../utils/comment-sync';
 
 // Debug 仅在开发版/体验版显示，正式版自动隐藏。
 function isDebugEnabled(): boolean {
@@ -63,6 +78,9 @@ function isDebugEnabled(): boolean {
 }
 
 const DEBUG_ENABLED = isDebugEnabled();
+// 内置示例行程专用路线服务：固化广州 fixture，开箱即用——
+// 示例行程与真实行程一致：首地点就绪后面板先展示「请选择出发地点」选点面板（不自动调用），
+// 选定后走本服务读取 fixture（不消费 query、不依赖出发地点），且永不触达腾讯 API。
 const demoRouteOptionService = new MockRouteOptionService();
 
 /** 新 Trip 无初始计划时生成空骨架，避免 PlanBoard 空引用 */
@@ -88,12 +106,22 @@ Page({
     rankedRestaurants: [] as ReturnType<typeof rankCandidates>,
     candidateGroups: [] as EventCandidateGroup[],
     showRoute: false,
-    // 我的推荐：路线方案选择器状态（懒加载——首次打开分段时才定位并规划）；
+    // 我的推荐：路线方案选择器状态（懒加载——首次打开分段时才走门禁并规划）；
     // expandedRouteIndex: null 表示全部收起（不变量：同一时刻展开数 ∈ {0, 1}）
     routeOptions: [] as RouteOption[],
     expandedRouteIndex: 0 as number | null,
     routeLoading: false,
     routeErrorText: '',
+    /** 被「第一个地点」门禁拦截的原因（空串 = 未被门禁拦截） */
+    routeBlockReason: '' as '' | PersonalRouteBlockReason,
+    /** 首地点已就绪但尚未选出发地点：面板显示「请选择出发地点」两按钮，不自动调用 */
+    routeNeedsOrigin: false,
+    /** 本会话选定的出发点（使用保存地点 / 地图选点），选定后才发起规划 */
+    routeOrigin: null as DeparturePoint | null,
+    /** 「使用保存地点」按钮的候选地点；无则按钮变为「设置出发地点」引导 */
+    savedDeparture: null as Location | null,
+    /** 首地点名：选点面板展示「目的地」 */
+    routeDestinationName: '',
     routesLoaded: false,
     /** 目的地解析结果（去导航的坐标兜底；来自服务返回，不本地伪造） */
     routeResolvedDestination: null as ResolvedDestination | null,
@@ -173,6 +201,23 @@ Page({
     setTimeout(() => wx.navigateBack(), 800);
   },
 
+  /**
+   * 回到本页时重新评估「我的推荐」：仅当面板正开着、且处于「缺首地点」拦截或
+   * 「等待选出发地点」状态才重走加载链（例如首地点刚生成、用户刚从「出发设置」
+   * 保存了出发点）——避免每次前后台切换都重新规划已有路线。
+   */
+  onShow() {
+    if (!this.data.showRoute || this.data.routeLoading) return;
+    if (!this.data.routeBlockReason && !this.data.routeNeedsOrigin) return;
+    this.loadRouteOptions();
+
+    // 真实行程：每次回到页面都以服务端评论流为 source of truth 刷新
+    // （示例行程纯本地展示，跳过；首次进入时 trip 尚未 bootstrap 完成，由 bootstrapTrip 拉取）
+    if (!isDemoTripId(this.data.trip.id)) {
+      this.loadServerComments(this.data.trip.id);
+    }
+  },
+
   /** 初始化行程视图 + 规划引擎 */
   bootstrapTrip(baseTrip: Trip, currentUser: Participant | null, seedDemoComments: boolean) {
     // 旧 Mock fixture 的“自己”槽位在此替换为真实 currentUser；
@@ -189,7 +234,8 @@ Page({
       trip: trip.currentPlan ? trip : { ...trip, currentPlan: buildEmptyPlan(trip.id) },
       comments,
       participantCount: trip.participantIds.length,
-      commentCount: trip.commentIds.length,
+      // 评论计数以实际评论列表为准（真实行程在服务端拉取后更新，示例行程为内置评论数）
+      commentCount: comments.length,
       roomCode: resolveRoomCodeDisplay(trip.roomCode),
       hasRoomCode: !!normalizeRoomCode(trip.roomCode),
       // 完成行程入口：仅创建者 + 进行中可见（按 id 判断，禁止昵称判断）
@@ -208,6 +254,30 @@ Page({
 
     // 用已有评论初始化约束（新 Trip 无评论，引擎生成空计划骨架）
     this.runPipeline(comments);
+
+    // 真实行程：评论以服务端为 source of truth，异步拉取并重跑管线；
+    // 示例行程（seedDemoComments=true）纯本地展示，不请求后端。
+    if (!seedDemoComments) {
+      this.loadServerComments(trip.id);
+    }
+  },
+
+  /**
+   * 真实行程评论流：拉取共享实体（tripId）下的全部评论并合入本地。
+   * 服务端为最终真相（按 id 去重）；本地未确认的乐观项暂保留，已确认项以服务端为准。
+   * 失败明确提示，保留当前列表，绝不伪造数据。
+   */
+  async loadServerComments(tripId: string): Promise<void> {
+    try {
+      const server = await commentService.listComments(tripId);
+      const merged = mergeServerComments(this.data.comments, server);
+      this.setData({ comments: merged, commentCount: merged.length });
+      if (merged.length > 0) {
+        this.runPipeline(merged);
+      }
+    } catch (error) {
+      wx.showToast({ title: '评论加载失败', icon: 'none' });
+    }
   },
 
   /** 运行完整规划管线 */
@@ -254,6 +324,12 @@ Page({
       'debugProvider.providerRefs': rankedRestaurants[0]?.providerRefs?.map((p) => `${p.provider}:${p.externalId}`) ?? [],
       'debugProvider.externalActions': rankedRestaurants[0]?.externalActions.length ?? 0,
     });
+
+    // 计划刚生成出第一个地点时，解除「行程未生成」拦截（面板正开着才重算，避免无谓请求）；
+    // 重算后因尚未选出发地点，会落到「请选择出发地点」选点面板，不会自动调用。
+    if (this.data.showRoute && this.data.routeBlockReason === 'NO_FIRST_LOCATION') {
+      this.loadRouteOptions();
+    }
   },
 
   /** 从约束构建 Provider 搜索查询（Debug 展示用） */
@@ -399,7 +475,8 @@ Page({
   onToggleRoute() {
     const nextShow = !this.data.showRoute;
     this.setData({ showRoute: nextShow });
-    // 懒加载：首次打开「我的推荐」时才定位并规划路线；失败后保留错误态，由「重新规划」显式重试
+    // 懒加载：首次打开「我的推荐」才评估状态（缺首地点拦截 / 选点面板 / 规划）；
+    // 失败后保留错误态，由「重新规划」显式重试。
     if (
       nextShow &&
       !this.data.routesLoaded &&
@@ -411,43 +488,75 @@ Page({
   },
 
   /**
-   * 推导路线规划目的地名称：
-   * 优先 currentPlan 第一个带地点 event 的 location.name；
-   * 回退 trip.title 作为 POI 检索关键词；
-   * 都没有则使用 V1 演示目的地「广州羽毛球中心羽毛球馆」（仅作为检索词传给服务，
-   * 路线数据仍由地图 Provider 真实返回，不属于伪造路线数据兜底）。
-   */
-  resolveRouteDestinationName(): string {
-    const events = this.data.trip.currentPlan?.events ?? [];
-    const located = events.find((event) => !!event.location?.name);
-    if (located?.location?.name) return located.location.name;
-    const title = this.data.trip.title.trim();
-    if (title) return title;
-    // V1 演示目的地：与 Mock 场景一致的羽毛球馆
-    return '广州羽毛球中心羽毛球馆';
-  },
-
-  /**
-   * 路线门禁：仅示例行程读取已固化 Mock，既不定位也不调用腾讯 API；
-   * 其他真实行程在任何请求发生前返回停用态。
+   * 「我的推荐」加载链。
+   *
+   * 门禁（utils/personal-route.ts）现在【仅要求计划第一个地点已就绪】才允许规划：
+   * - 缺首地点 → 「行程未生成」直接 return，绝不发起任何路线请求；
+   * - 首地点已就绪但本会话还没选出发地点 → 【不自动调用】，面板初开为
+   *   「请选择出发地点」两个按钮（使用保存地点 / 地图选点），由用户显式选点
+   *   （onUseSavedDeparture / onPickDepartureOnMap）后再进入规划分支；
+   * - 已选定出发点 → 真实行程走 routeOptionService（腾讯 direction v1，已启用）；
+   *   示例行程走 MockRouteOptionService（固化广州 fixture，不消费 query、永不触达腾讯 API）。
    */
   async loadRouteOptions(): Promise<void> {
-    if (!isDemoTripId(this.data.trip.id)) {
+    const isDemo = isDemoTripId(this.data.trip.id);
+
+    // 门禁：只要求首地点；出发地点从硬前提降级为「使用保存地点」候选（可为空）
+    const gate = resolvePersonalRouteGate({
+      departurePlaces: loadDeparturePlaces(),
+      plan: this.data.trip.currentPlan,
+    });
+    if (!gate.ok) {
       this.setData({
         routeOptions: [],
         routeResolvedDestination: null,
         routesLoaded: false,
         routeLoading: false,
-        routeErrorText: ROUTE_OPTION_DISABLED_MESSAGE,
+        routeErrorText: gate.message,
+        routeBlockReason: gate.reason,
+        routeNeedsOrigin: false,
+        routeDestinationName: '',
       });
       return;
     }
 
-    this.setData({ routeLoading: true, routeErrorText: '' });
-    try {
-      const result = await demoRouteOptionService.planRoutes({
-        destinationName: this.resolveRouteDestinationName(),
+    // 首地点已就绪但尚未选出发地点：不自动调用——面板初开为「请选择出发地点」两个按钮
+    if (!this.data.routeOrigin) {
+      this.setData({
+        routeOptions: [],
+        routeResolvedDestination: null,
+        routesLoaded: false,
+        routeLoading: false,
+        routeErrorText: '',
+        routeBlockReason: '',
+        routeNeedsOrigin: true,
+        routeDestinationName: gate.destinationName,
+        savedDeparture: gate.origin?.place ?? null,
       });
+      return;
+    }
+
+    // 已选定出发地点 → 发起规划
+    const query: RoutePlanQuery = isDemo
+      ? // 示例行程：目的地名仅作语义占位，Mock fixture 固定返回广州羽毛球中心路线，不读这个值
+        { destinationName: gate.destinationName }
+      : {
+          // 起点为本会话选定的出发点（使用保存地点 / 地图选点，不请求设备定位），终点为计划第一个地点；
+          // city 取行程自身的区域约束，缺省由 Provider 用默认城市检索。
+          origin: {
+            latitude: this.data.routeOrigin.latitude,
+            longitude: this.data.routeOrigin.longitude,
+          },
+          destinationName: gate.destinationName,
+          ...(this.data.trip.areaConstraint?.city
+            ? { city: this.data.trip.areaConstraint.city }
+            : {}),
+        };
+
+    const service = isDemo ? demoRouteOptionService : routeOptionService;
+    this.setData({ routeLoading: true, routeErrorText: '', routeBlockReason: '', routeNeedsOrigin: false });
+    try {
+      const result = await service.planRoutes(query);
       this.setData({
         routeOptions: result.options,
         expandedRouteIndex: 0,
@@ -462,6 +571,41 @@ Page({
         routeErrorText: resolveRouteErrorText(error),
       });
     }
+  },
+
+  /** 「请选择出发地点」按钮 1：使用已保存的默认出发地点；未保存时引导去「出发设置」 */
+  onUseSavedDeparture() {
+    const origin = resolveDefaultDeparturePlace(loadDeparturePlaces());
+    if (!origin) {
+      wx.showToast({ title: '还没有保存的出发地点', icon: 'none' });
+      wx.navigateTo({ url: '/pages/departure-places/departure-places' });
+      return;
+    }
+    this.setData({ routeOrigin: origin });
+    this.loadRouteOptions();
+  },
+
+  /** 「请选择出发地点」按钮 2：地图选点；选中的点同时保存为默认出发地点，供下次「使用保存地点」一键复用 */
+  onPickDepartureOnMap() {
+    wx.chooseLocation({
+      success: (res) => {
+        const place = buildDeparturePlace({
+          name: res.name,
+          address: res.address,
+          latitude: res.latitude,
+          longitude: res.longitude,
+        });
+        saveDeparturePlaces(mergeDeparturePlace(loadDeparturePlaces(), place));
+        const point = resolveDefaultDeparturePlace([place]);
+        if (!point) return; // buildDeparturePlace 保证坐标有限，此处仅做类型收窄
+        this.setData({ routeOrigin: point });
+        this.loadRouteOptions();
+      },
+      fail: (err) => {
+        if (err.errMsg && err.errMsg.includes('cancel')) return;
+        wx.showToast({ title: '打开地图失败，请检查定位授权', icon: 'none' });
+      },
+    });
   },
 
   /** 组件 toggle 事件：手风琴状态机（utils/route-options-ui.ts）——最多一条展开，点已展开项全部收起 */
@@ -489,7 +633,7 @@ Page({
     });
   },
 
-  /** 「重新规划」：清空加载标记后重走完整加载链（重新定位 + 重新规划） */
+  /** 「重新规划」：清空已加载路线后重走加载链（缺首地点时重走会回到拦截态，由面板新状态接管） */
   onRouteRetry() {
     this.setData({
       routesLoaded: false,
@@ -516,16 +660,52 @@ Page({
       return;
     }
 
-    const newComment: Comment = buildUserComment(this.data.trip.id, text, guard.user);
+    const tripId = this.data.trip.id;
 
+    // 示例行程：纯本地展示（不请求后端、不持久化），保持开箱即用
+    if (isDemoTripId(tripId)) {
+      const demoComment: Comment = buildUserComment(tripId, text, guard.user);
+      this.setData({
+        comments: [...this.data.comments, demoComment],
+        inputText: '',
+        commentCount: this.data.commentCount + 1,
+      });
+      this.runPipeline([demoComment]);
+      return;
+    }
+
+    // 真实行程：乐观提交（临时 id 本地回显）→ 服务端确认后按 id 替换合并；
+    // 失败回滚乐观项并明确提示——绝不本地假装多人评论已持久化。
+    const tempId = createTempCommentId();
+    const optimistic: Comment = {
+      id: tempId,
+      tripId,
+      userId: guard.user.id,
+      rawText: text,
+      createdAt: new Date().toISOString(),
+      aiStatus: 'processing',
+    };
     this.setData({
-      comments: [...this.data.comments, newComment],
+      comments: [...this.data.comments, optimistic],
       inputText: '',
       commentCount: this.data.commentCount + 1,
     });
+    this.runPipeline([optimistic]);
 
-    // 真实规则引擎处理，非 setTimeout 伪装
-    this.runPipeline([newComment]);
+    commentService.addComment(tripId, text).then(
+      (serverComment) => {
+        // 服务端返回为最终真相：替换本地待确认临时项，绝不整体覆盖评论集合
+        const merged = commitServerComment(this.data.comments, serverComment);
+        this.setData({ comments: merged, commentCount: merged.length });
+        this.runPipeline(merged);
+      },
+      (error) => {
+        // 发送失败：移除本地乐观项，保留其余评论，明确提示
+        const rollback = this.data.comments.filter((c) => c.id !== tempId);
+        this.setData({ comments: rollback, commentCount: rollback.length });
+        wx.showToast({ title: '评论发送失败', icon: 'none' });
+      }
+    );
   },
 
   onPlaceTap(e: WechatMiniprogram.CustomEvent) {
