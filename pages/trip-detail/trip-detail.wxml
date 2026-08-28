@@ -32,7 +32,23 @@
   </view>
 
   <view wx:if="{{showRoute}}" class="route-wrap">
+    <!-- 首地点已就绪但尚未选出发地点：不自动调用，面板初开为「请选择出发地点」两个按钮 -->
+    <view wx:if="{{routeNeedsOrigin}}" class="origin-picker">
+      <view class="origin-head">
+        <text class="origin-title">请选择出发地点</text>
+        <text class="origin-dest">目的地：{{routeDestinationName}}</text>
+      </view>
+      <view class="origin-actions">
+        <view class="origin-btn cotrip-glass cotrip-glass--neutral" bind:tap="onUseSavedDeparture">
+          <text>{{savedDeparture ? '使用保存地点' : '设置出发地点'}}</text>
+          <text wx:if="{{savedDeparture}}" class="origin-btn-sub">{{savedDeparture.name}}</text>
+        </view>
+        <view class="origin-btn cotrip-glass cotrip-glass--neutral" bind:tap="onPickDepartureOnMap">地图选点</view>
+      </view>
+      <text class="origin-hint">出发地点仅用于计算你的个人路线，不会公开给其他参与者</text>
+    </view>
     <route-options
+      wx:else
       options="{{routeOptions}}"
       expanded-index="{{expandedRouteIndex}}"
       loading="{{routeLoading}}"

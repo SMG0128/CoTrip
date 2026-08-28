@@ -1,0 +1,41 @@
+<view class="places">
+  <view class="page-head">
+    <view class="head-copy">
+      <text class="head-title">出发设置</text>
+      <text class="head-sub">保存常用出发点，「我的推荐」将用它计算个人路线；出发点仅自己可见。</text>
+    </view>
+    <image class="head-art" src="/assets/icons/utility/location.svg" mode="aspectFit" />
+  </view>
+
+  <block wx:if="{{places.length > 0}}">
+    <view
+      wx:for="{{places}}"
+      wx:key="id"
+      class="place-card"
+    >
+      <view class="place-main">
+        <view class="place-title-row">
+          <text class="place-name">{{item.name}}</text>
+          <view wx:if="{{index === 0}}" class="default-badge">默认</view>
+        </view>
+        <text wx:if="{{item.address}}" class="place-address">{{item.address}}</text>
+      </view>
+      <view class="place-delete" data-id="{{item.id}}" bind:tap="onDeletePlace">
+        <image src="/assets/icons/utility/trash.svg" mode="aspectFit" />
+      </view>
+    </view>
+  </block>
+
+  <view wx:else class="empty">
+    <image class="empty-art" src="/assets/icons/utility/luggage-line.svg" mode="aspectFit" />
+    <text class="empty-title">还没有出发地点</text>
+    <text class="empty-sub">从地图上选一个常用位置，作为行程推荐的起点</text>
+  </view>
+
+  <view class="footer">
+    <view class="add-btn cotrip-glass cotrip-glass--colored" bind:tap="onAddPlace">
+      <image class="add-icon" src="/assets/icons/utility/plus-white.svg" mode="aspectFit" />
+      <text>地图选点添加</text>
+    </view>
+  </view>
+</view>

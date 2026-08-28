@@ -9,6 +9,7 @@
     "pages/trip-history-detail/trip-history-detail",
     "pages/place-detail/place-detail",
     "pages/profile/profile",
+    "pages/departure-places/departure-places",
     "pages/join-trip/join-trip",
     "pages/profile-setup/profile-setup"
   ],
@@ -36,10 +37,10 @@
   },
   "permission": {
     "scope.userLocation": {
-      "desc": "用于为你规划到目的地的实时路线"
+      "desc": "用于选择行程区域、地图选点和定位周边范围"
     }
   },
-  "requiredPrivateInfos": ["getLocation"],
+  "requiredPrivateInfos": ["chooseLocation", "getFuzzyLocation"],
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

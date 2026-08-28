@@ -1,0 +1,181 @@
+@import "../../styles/glass.wxss";
+
+.places {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 28rpx 24rpx calc(180rpx + env(safe-area-inset-bottom));
+}
+
+/* ---- 页头 ---- */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6rpx 16rpx 30rpx;
+}
+
+.head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.head-title {
+  display: block;
+  color: #17243d;
+  font-size: 42rpx;
+  font-weight: 780;
+  letter-spacing: -1rpx;
+}
+
+.head-sub {
+  display: block;
+  margin-top: 10rpx;
+  color: #8a97ae;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.head-art {
+  flex-shrink: 0;
+  width: 96rpx;
+  height: 96rpx;
+  margin-left: 20rpx;
+  opacity: 0.9;
+}
+
+/* ---- 地点卡片 ---- */
+.place-card {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18rpx;
+  padding: 26rpx 28rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 28rpx;
+  box-shadow: 0 8rpx 26rpx rgba(60, 90, 160, 0.07);
+}
+
+.place-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+.place-name {
+  overflow: hidden;
+  color: #17243d;
+  font-size: 29rpx;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.default-badge {
+  flex-shrink: 0;
+  padding: 4rpx 14rpx;
+  color: #326bff;
+  background: #eef3ff;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 650;
+}
+
+.place-address {
+  display: block;
+  margin-top: 8rpx;
+  overflow: hidden;
+  color: #8a97ae;
+  font-size: 23rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 64rpx;
+  height: 64rpx;
+  margin-left: 16rpx;
+  background: #fdf1f2;
+  border-radius: 20rpx;
+}
+
+.place-delete image {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+/* ---- 空态 ---- */
+.empty {
+  padding: 80rpx 40rpx;
+  text-align: center;
+}
+
+.empty-art {
+  width: 160rpx;
+  height: 160rpx;
+}
+
+.empty-title {
+  display: block;
+  margin-top: 20rpx;
+  color: #17243d;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.empty-sub {
+  display: block;
+  margin-top: 10rpx;
+  color: #8a97ae;
+  font-size: 24rpx;
+}
+
+/* ---- 底部添加按钮 ---- */
+.footer {
+  position: fixed;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  padding: 18rpx 28rpx calc(18rpx + env(safe-area-inset-bottom));
+  background: rgba(247, 249, 253, 0.96);
+}
+
+/* 添加按钮：共享有色玻璃材质，纯色蓝色填充由 cotrip-glass--colored 提供 */
+.add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  min-height: 96rpx;
+  color: #ffffff;
+  border-radius: 48rpx;
+  font-size: 29rpx;
+  font-weight: 650;
+}
+
+.add-icon {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+@media (max-width: 380px) {
+  .page-head {
+    padding-left: 8rpx;
+    padding-right: 8rpx;
+  }
+
+  .head-title {
+    font-size: 38rpx;
+  }
+}

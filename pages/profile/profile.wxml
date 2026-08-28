@@ -6,7 +6,21 @@
       <text class="nickname">{{user.nickname}}</text>
       <text class="trip-count">参与过 {{tripCount}} 个行程</text>
     </view>
-    <image class="travel-art" src="/assets/3d/travel.png" mode="aspectFit" />
+    <image class="travel-art" src="/assets/icons/utility/luggage-line.svg" mode="aspectFit" />
+  </view>
+
+  <view class="settings-card">
+    <view class="settings-head">
+      <image src="/assets/icons/utility/location.svg" mode="aspectFit" />
+      <text>地点设置</text>
+    </view>
+    <view class="menu-item" bind:tap="onDeparturePlaces">
+      <view class="menu-main">
+        <view class="menu-icon"><image src="/assets/icons/utility/location.svg" mode="aspectFit" /></view>
+        <text>出发设置</text>
+      </view>
+      <image class="menu-arrow" src="/assets/icons/utility/chevron-right.svg" mode="aspectFit" />
+    </view>
   </view>
 
   <view class="settings-card">

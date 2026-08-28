@@ -1,6 +1,6 @@
 <view class="trip {{history ? 'history-trip' : 'active-trip'}}" bind:tap="onTap">
   <block wx:if="{{history}}">
-    <view class="history-icon"><image src="/assets/3d/travel.png" mode="aspectFit" /></view>
+    <view class="history-icon"><image src="/assets/icons/utility/luggage-line.svg" mode="aspectFit" /></view>
     <view class="history-content">
       <view class="title-row">
         <text class="title">{{trip.title}}</text>

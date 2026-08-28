@@ -54,6 +54,10 @@ Page({
     wx.navigateTo({ url: '/pages/profile-setup/profile-setup?mode=edit' });
   },
 
+  onDeparturePlaces() {
+    wx.navigateTo({ url: '/pages/departure-places/departure-places' });
+  },
+
   onPrivacy() {
     wx.showModal({
       title: '隐私说明',
@@ -62,18 +66,23 @@ Page({
     });
   },
 
-  onLogout() {
-    wx.showModal({
-      title: '退出登录',
-      content: '确定要退出当前账号吗？',
-      success: (res) => {
-        if (!res.confirm) return;
-        authService.logout().then(() => {
-          const app = getApp<IAppOption>();
-          app.globalData.currentUser = null;
-          wx.reLaunch({ url: '/pages/login/login' });
-        });
-      },
+  async onLogout() {
+    const { confirm } = await new Promise<{ confirm: boolean }>((resolve) => {
+      wx.showModal({
+        title: '退出登录',
+        content: '确定要退出当前账号吗？',
+        success: resolve,
+      });
     });
+    if (!confirm) return;
+    try {
+      // 清除本地登录态（token/用户缓存）；之后登录页重新 restoreSession 必然得到未登录
+      await authService.logout();
+    } finally {
+      // 即使清除过程异常也强制回到微信登录界面，避免停留在半退出状态
+      const app = getApp<IAppOption>();
+      app.globalData.currentUser = null;
+      wx.reLaunch({ url: '/pages/login/login' });
+    }
   },
 });

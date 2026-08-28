@@ -1,16 +1,41 @@
 // pages/trip-create/trip-create.ts
 // 新建行程页：区域限定、时间范围、事件简述、创建。
+// 区域限定三种方式：
+// - 指定行政区域：国内省市区级联选择（picker mode="region"）
+// - 指定地点：wx.chooseLocation 打开地图选点
+// - 指定范围：wx.getFuzzyLocation 模糊定位，构建周边范围 bounds
 // 所有权：新 Trip 的 creatorId / 默认 participant 一律来自当前真实登录用户 currentUser.id，
 // 绝不使用 Mock 占位身份（user_A / mockDevCurrentUser）。
 
 import { AreaConstraint } from '../../types/constraint';
+import { Location } from '../../types/location';
 import { TimeRange } from '../../types/time';
 import { tripService } from '../../services/index';
 import { requireCurrentUser } from '../../utils/current-user';
+import { buildRangeBounds } from '../../utils/area-range';
+import { buildRegionColumns, resolveRegionIndices, regionDisplayText } from '../../utils/china-region';
+
+type AreaMode = 'none' | 'district' | 'location' | 'range';
+
+const AREA_MODE_LABELS: Record<AreaMode, string> = {
+  none: '不限区域',
+  district: '指定行政区域',
+  location: '指定地点',
+  range: '指定范围',
+};
+
+// 模糊定位精度约 1 公里，3 公里半径可稳定覆盖周边范围
+const RANGE_RADIUS_KM = 3;
 
 Page({
   data: {
-    areaText: '不限区域',
+    areaMode: 'none' as AreaMode,
+    areaModeText: AREA_MODE_LABELS.none,
+    regionColumns: buildRegionColumns(0, 0),
+    regionValue: [0, 0, 0],
+    regionText: '',
+    locationText: '',
+    rangeText: '',
     areaConstraint: { unrestricted: true } as AreaConstraint,
     startDate: '',
     startTime: '',
@@ -19,24 +44,105 @@ Page({
     brief: '',
   },
 
+  /** 选择区域限定方式；选后由二级行完成具体取值 */
   onAreaTap() {
-    // Mock 选择器：未来支持指定地点 / 指定区域 / 地图范围
     wx.showActionSheet({
-      itemList: ['不限区域', '指定行政区域', '指定地点', '地图范围'],
+      itemList: ['不限区域', '指定行政区域', '指定地点', '指定范围'],
       success: (res) => {
-        const options = ['不限区域', '指定行政区域', '指定地点', '地图范围'];
-        const label = options[res.tapIndex];
-        const constraint: AreaConstraint =
-          res.tapIndex === 0
-            ? { unrestricted: true }
-            : res.tapIndex === 1
-              ? { district: '天河区', city: '广州市' }
-              : res.tapIndex === 2
-                ? { location: { id: 'loc_pick', name: '天河体育中心' } }
-                : { mapBounds: { northeast: { latitude: 0, longitude: 0 }, southwest: { latitude: 0, longitude: 0 } } };
-        this.setData({ areaText: label, areaConstraint: constraint });
+        const modes: AreaMode[] = ['none', 'district', 'location', 'range'];
+        const mode = modes[res.tapIndex];
+        this.setData({
+          areaMode: mode,
+          areaModeText: AREA_MODE_LABELS[mode],
+          // 切换方式后重置具体值，避免残留上一种方式的选择
+          regionColumns: buildRegionColumns(0, 0),
+          regionValue: [0, 0, 0],
+          regionText: '',
+          locationText: '',
+          rangeText: '',
+          areaConstraint: mode === 'none' ? { unrestricted: true } : {},
+        });
       },
     });
+  },
+
+  /** 指定行政区域：国内省市区三列联动，区列首位为「不限」 */
+  onRegionColumnChange(e: WechatMiniprogram.PickerColumnChange) {
+    const { column, value: index } = e.detail;
+    const [provinceIndex, cityIndex] = this.data.regionValue;
+    if (column === 0) {
+      // 换省：市、区两列重置
+      this.setData({ regionColumns: buildRegionColumns(index, 0), regionValue: [index, 0, 0] });
+    } else if (column === 1) {
+      // 换市：区列重置
+      this.setData({
+        regionColumns: buildRegionColumns(provinceIndex, index),
+        regionValue: [provinceIndex, index, 0],
+      });
+    } else {
+      this.setData({ regionValue: [provinceIndex, cityIndex, index] });
+    }
+  },
+
+  onRegionChange(e: WechatMiniprogram.PickerChange) {
+    const region = resolveRegionIndices(e.detail.value as number[]);
+    if (!region) return;
+    // 区不限（索引 0）时仅落到市级约束
+    const constraint: AreaConstraint = region.district
+      ? { city: region.city, district: region.district }
+      : { city: region.city };
+    this.setData({ regionText: regionDisplayText(region), areaConstraint: constraint });
+  },
+
+  /** 指定地点：打开微信地图选点 */
+  onChooseLocationTap() {
+    wx.chooseLocation({
+      success: (res) => {
+        const name = res.name || res.address || '指定地点';
+        const location: Location = {
+          // 微信选点不返回外部地点 ID，用坐标生成稳定记录 ID（仅用户选择结果，非 Provider 事实）
+          id: `wx_poi_${res.longitude.toFixed(6)}_${res.latitude.toFixed(6)}`,
+          name,
+          latitude: res.latitude,
+          longitude: res.longitude,
+          address: res.address || '',
+        };
+        this.setData({ locationText: name, areaConstraint: { location } });
+      },
+      fail: (err) => {
+        if (err.errMsg && err.errMsg.includes('cancel')) return;
+        wx.showToast({ title: '打开地图失败，请检查定位授权', icon: 'none' });
+      },
+    });
+  },
+
+  /** 指定范围：模糊定位当前位置，构建周边范围 */
+  onRangeTap() {
+    wx.getFuzzyLocation({
+      type: 'gcj02',
+      success: (res) => {
+        this.setData({
+          rangeText: `当前位置周边约 ${RANGE_RADIUS_KM} 公里`,
+          areaConstraint: {
+            mapBounds: buildRangeBounds(res.latitude, res.longitude, RANGE_RADIUS_KM),
+          },
+        });
+      },
+      fail: () => {
+        wx.showToast({ title: '定位失败，请检查定位授权', icon: 'none' });
+      },
+    });
+  },
+
+  /** 区域方式已选但具体值未完成时显式阻断，不静默降级为不限区域 */
+  isAreaConstraintFilled(constraint: AreaConstraint): boolean {
+    return Boolean(
+      constraint.unrestricted ||
+        constraint.district ||
+        constraint.city ||
+        constraint.location ||
+        constraint.mapBounds,
+    );
   },
 
   onStartDateChange(e: WechatMiniprogram.Input) {
@@ -58,6 +164,11 @@ Page({
 
   onCreate() {
     const { startDate, startTime, endDate, endTime, brief, areaConstraint } = this.data;
+
+    if (!this.isAreaConstraintFilled(areaConstraint)) {
+      wx.showToast({ title: '请先完成区域选择', icon: 'none' });
+      return;
+    }
 
     const timeRange: TimeRange | undefined =
       startDate && startTime

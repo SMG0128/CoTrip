@@ -1,73 +1,72 @@
-// 用户本地保存的出发地点。只保存用户显式选择的公开地点坐标，不请求设备定位。
+// utils/departure-places.ts
+// 默认出发地点管理：行程详情「我的推荐」的起始地点候选。
+// 出发地点是个人隐私数据（仅用于计算个人路线，不向其他参与者公开），
+// V1 存本地 storage，不经后端。纯函数与存储分层，纯函数可单测。
 
 import { Location } from '../types/location';
 
 const STORAGE_KEY = 'cotrip_departure_places';
 
-export interface DeparturePlace extends Location {
-  isDefault: boolean;
-  updatedAt: string;
+/** 由坐标生成稳定地点 ID（wx.chooseLocation 不返回外部地点 ID） */
+export function buildPlaceId(latitude: number, longitude: number): string {
+  return `wx_poi_${longitude.toFixed(6)}_${latitude.toFixed(6)}`;
 }
 
-export interface BuildDeparturePlaceInput {
+/** 由地图选点结果构建出发地点 */
+export function buildDeparturePlace(input: {
   name: string;
   address?: string;
   latitude: number;
   longitude: number;
-}
-
-export function buildDeparturePlace(input: BuildDeparturePlaceInput): DeparturePlace {
-  if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) {
-    throw new Error('出发地点坐标无效');
-  }
-  const now = new Date();
+}): Location {
   return {
-    id: `departure_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`,
-    name: input.name.trim() || input.address?.trim() || '地图选点',
-    address: input.address?.trim() || undefined,
+    id: buildPlaceId(input.latitude, input.longitude),
+    name: input.name || input.address || '出发地点',
     latitude: input.latitude,
     longitude: input.longitude,
-    isDefault: true,
-    updatedAt: now.toISOString(),
+    address: input.address || '',
   };
 }
 
-export function loadDeparturePlaces(): DeparturePlace[] {
+/** 合并一条出发地点：同坐标视为同一地点（更新信息并移到首位），新地点插到首位 */
+export function mergeDeparturePlace(list: Location[], place: Location): Location[] {
+  const rest = list.filter((item) => item.id !== place.id);
+  return [place, ...rest];
+}
+
+/** 删除指定出发地点，返回新列表 */
+export function removeDeparturePlace(list: Location[], id: string): Location[] {
+  return list.filter((item) => item.id !== id);
+}
+
+/** 解析 storage 原始值：损坏/缺字段数据安全丢弃，绝不抛错 */
+export function parseStoredPlaces(raw: unknown): Location[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (item): item is Location =>
+      !!item &&
+      typeof item === 'object' &&
+      typeof (item as Location).id === 'string' &&
+      typeof (item as Location).name === 'string' &&
+      typeof (item as Location).latitude === 'number' &&
+      typeof (item as Location).longitude === 'number',
+  );
+}
+
+/** 读取本地出发地点列表（首位即默认出发点） */
+export function loadDeparturePlaces(): Location[] {
   try {
-    const stored = wx.getStorageSync<unknown>(STORAGE_KEY);
-    if (!Array.isArray(stored)) return [];
-    return stored.filter(isDeparturePlace);
+    return parseStoredPlaces(wx.getStorageSync(STORAGE_KEY));
   } catch {
     return [];
   }
 }
 
-export function saveDeparturePlaces(places: DeparturePlace[]): void {
-  wx.setStorageSync(STORAGE_KEY, places);
-}
-
-/** 新选择地点成为唯一默认项；同 id 项被替换，其它项保留。 */
-export function mergeDeparturePlace(
-  existing: DeparturePlace[],
-  selected: DeparturePlace,
-): DeparturePlace[] {
-  return [
-    { ...selected, isDefault: true },
-    ...existing
-      .filter((place) => place.id !== selected.id)
-      .map((place) => ({ ...place, isDefault: false })),
-  ];
-}
-
-function isDeparturePlace(value: unknown): value is DeparturePlace {
-  if (!value || typeof value !== 'object') return false;
-  const place = value as Record<string, unknown>;
-  return typeof place.id === 'string'
-    && typeof place.name === 'string'
-    && typeof place.latitude === 'number'
-    && Number.isFinite(place.latitude)
-    && typeof place.longitude === 'number'
-    && Number.isFinite(place.longitude)
-    && typeof place.isDefault === 'boolean'
-    && typeof place.updatedAt === 'string';
+/** 持久化出发地点列表 */
+export function saveDeparturePlaces(list: Location[]): void {
+  try {
+    wx.setStorageSync(STORAGE_KEY, list);
+  } catch {
+    // 存储失败不阻断流程：列表仍在本页内存中可用
+  }
 }

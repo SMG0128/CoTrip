@@ -158,6 +158,29 @@
 .picker-text {
   color: #326bff;
   font-weight: 600;
+  max-width: 340rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 未选择时的占位文字：灰色、不加粗 */
+.picker-placeholder {
+  color: #b2bdce;
+  font-weight: 400;
+  max-width: 340rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行政区域行：picker 作为包裹元素需占满宽度，内部复用 field 样式 */
+.field-picker {
+  display: block;
+}
+
+.field-picker:last-child .field {
+  margin-bottom: 0;
 }
 
 .brief-wrap {

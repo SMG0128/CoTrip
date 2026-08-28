@@ -19,8 +19,7 @@
       <view class="hero">
         <view class="hero-copy">
           <view class="brand-row">
-            <text class="brand">CoTrip</text>
-            <image class="brand-star" src="/assets/3d/star.png" mode="aspectFit" />
+            <image class="brand-logo" src="/LOGOonlyLe.png" mode="aspectFit" />
           </view>
           <text class="tagline">AI 帮大家把想法变成共同计划</text>
         </view>
@@ -81,7 +80,7 @@
     <block wx:else>
       <view class="recommend">
         <view class="recommend-art">
-          <image src="/assets/3d/travel.png" mode="aspectFit" />
+          <image src="/assets/icons/utility/luggage-line.svg" mode="aspectFit" />
         </view>
         <view class="rec-title">还没有进行中的行程</view>
         <view class="rec-meta">邀请朋友，把大家的想法变成共同计划</view>

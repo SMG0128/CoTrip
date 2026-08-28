@@ -9,7 +9,7 @@
       <text class="title">{{trip.title}}</text>
       <text class="meta">{{participantCount}} 人参与 · 最终计划已封存</text>
     </view>
-    <image class="header-art" src="/assets/3d/travel.png" mode="aspectFit" />
+    <image class="header-art" src="/assets/icons/utility/luggage-line.svg" mode="aspectFit" />
   </view>
 
   <plan-board

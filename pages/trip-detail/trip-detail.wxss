@@ -212,6 +212,74 @@ button::after {
   padding: 0 24rpx 24rpx;
 }
 
+/* ---- 「请选择出发地点」选点面板：首地点就绪但尚未选出发点时的两个入口 ---- */
+.origin-picker {
+  box-sizing: border-box;
+  padding: 30rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.08);
+  border-radius: 36rpx;
+  box-shadow: 0 10rpx 34rpx rgba(60, 90, 160, 0.09);
+}
+
+.origin-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-bottom: 24rpx;
+}
+
+.origin-title {
+  color: #17243d;
+  font-size: 30rpx;
+  font-weight: 750;
+}
+
+.origin-dest {
+  color: #8492aa;
+  font-size: 23rpx;
+}
+
+.origin-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+/* 两个按钮共用中性透明玻璃材质（styles/glass.wxss）：边框与阴影由 cotrip-glass--neutral 提供 */
+.origin-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4rpx;
+  flex: 1;
+  min-width: 0;
+  padding: 20rpx 22rpx;
+  border-radius: 24rpx;
+  color: #326bff;
+  line-height: 1.35;
+  font-size: 25rpx;
+  font-weight: 650;
+}
+
+.origin-btn-sub {
+  overflow: hidden;
+  max-width: 100%;
+  color: #8c99b0;
+  font-size: 21rpx;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.origin-hint {
+  display: block;
+  margin-top: 20rpx;
+  color: #a5b0c2;
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
 .ideas-card {
   margin: 0 24rpx 28rpx;
   padding: 30rpx;

@@ -31,17 +31,24 @@ Page({
     this.bootstrapSession();
   },
 
-  /** 冷启动：等待启动期会话恢复结果并决定入口动作 */
+  /** 冷启动：等待启动期会话恢复完成并决定入口动作 */
   async bootstrapSession(): Promise<void> {
     const app = getApp<IAppOption>();
+    // authReady 仅作为「启动期恢复已完成」的信号，不能直接作为路由依据：
+    // 退出登录后 reLaunch 回本页时它仍持有退出前的旧会话，会把用户弹回首页。
+    try {
+      if (app.globalData.authReady) await app.globalData.authReady;
+    } catch {
+      // 忽略：下面的 restoreSession 会给出当前真实状态
+    }
+    // 重新读取当前会话：退出登录后本地登录态已清除，此处返回 null，停留在登录页。
     let session: LoginResult | null = null;
     try {
-      // authReady 内部已兜底为 null，这里再防御一次异常路径
-      session = app.globalData.authReady ? await app.globalData.authReady : null;
+      session = await authService.restoreSession();
     } catch {
       session = null;
     }
-    // 同步全局当前用户；恢复失败视为未登录
+    // 同步全局当前用户；恢复失败或已退出视为未登录
     app.globalData.currentUser = session?.user ?? null;
 
     const entry = resolveEntryAction(session);

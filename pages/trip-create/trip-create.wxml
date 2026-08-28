@@ -25,7 +25,53 @@
         <text class="field-label">区域</text>
       </view>
       <view class="field-value">
-        <text>{{areaText}}</text>
+        <text class="{{areaMode === 'none' ? 'picker-placeholder' : 'picker-text'}}">{{areaModeText}}</text>
+        <image class="arrow" src="/assets/icons/trip-create/chevron-right.svg" mode="aspectFit" />
+      </view>
+    </view>
+
+    <!-- 指定行政区域：国内省市区三列联动，区列首位为「不限」 -->
+    <picker
+      wx:if="{{areaMode === 'district'}}"
+      class="field-picker"
+      mode="multiSelector"
+      range="{{regionColumns}}"
+      value="{{regionValue}}"
+      bindcolumnchange="onRegionColumnChange"
+      bindchange="onRegionChange"
+    >
+      <view class="field">
+        <view class="field-label-group">
+          <image class="field-icon" src="/assets/icons/trip-create/area.svg" mode="aspectFit" />
+          <text class="field-label">行政区域</text>
+        </view>
+        <view class="field-value">
+          <text class="{{regionText ? 'picker-text' : 'picker-placeholder'}}">{{regionText || '选择省 / 市 / 区'}}</text>
+          <image class="arrow" src="/assets/icons/trip-create/chevron-right.svg" mode="aspectFit" />
+        </view>
+      </view>
+    </picker>
+
+    <!-- 指定地点：打开微信地图选点 -->
+    <view wx:elif="{{areaMode === 'location'}}" class="field" bind:tap="onChooseLocationTap">
+      <view class="field-label-group">
+        <image class="field-icon" src="/assets/icons/trip-create/area.svg" mode="aspectFit" />
+        <text class="field-label">地点</text>
+      </view>
+      <view class="field-value">
+        <text class="{{locationText ? 'picker-text' : 'picker-placeholder'}}">{{locationText || '打开地图选择'}}</text>
+        <image class="arrow" src="/assets/icons/trip-create/chevron-right.svg" mode="aspectFit" />
+      </view>
+    </view>
+
+    <!-- 指定范围：模糊定位当前位置周边 -->
+    <view wx:elif="{{areaMode === 'range'}}" class="field" bind:tap="onRangeTap">
+      <view class="field-label-group">
+        <image class="field-icon" src="/assets/icons/trip-create/area.svg" mode="aspectFit" />
+        <text class="field-label">范围</text>
+      </view>
+      <view class="field-value">
+        <text class="{{rangeText ? 'picker-text' : 'picker-placeholder'}}">{{rangeText || '定位当前位置'}}</text>
         <image class="arrow" src="/assets/icons/trip-create/chevron-right.svg" mode="aspectFit" />
       </view>
     </view>
@@ -44,10 +90,10 @@
       </view>
       <view class="field-value">
         <picker mode="date" bind:change="onStartDateChange">
-          <text class="picker-text">{{startDate || '选择日期'}}</text>
+          <text class="{{startDate ? 'picker-text' : 'picker-placeholder'}}">{{startDate || '选择日期'}}</text>
         </picker>
         <picker mode="time" bind:change="onStartTimeChange">
-          <text class="picker-text">{{startTime || '选择时间'}}</text>
+          <text class="{{startTime ? 'picker-text' : 'picker-placeholder'}}">{{startTime || '选择时间'}}</text>
         </picker>
       </view>
     </view>
@@ -58,10 +104,10 @@
       </view>
       <view class="field-value">
         <picker mode="date" bind:change="onEndDateChange">
-          <text class="picker-text">{{endDate || '选择日期'}}</text>
+          <text class="{{endDate ? 'picker-text' : 'picker-placeholder'}}">{{endDate || '选择日期'}}</text>
         </picker>
         <picker mode="time" bind:change="onEndTimeChange">
-          <text class="picker-text">{{endTime || '选择时间'}}</text>
+          <text class="{{endTime ? 'picker-text' : 'picker-placeholder'}}">{{endTime || '选择时间'}}</text>
         </picker>
       </view>
     </view>

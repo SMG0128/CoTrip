@@ -79,23 +79,12 @@
 
 .brand-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
 }
 
-.brand {
-  color: #326bff;
-  font-size: 62rpx;
-  line-height: 1.08;
-  font-style: italic;
-  font-weight: 850;
-  letter-spacing: -3rpx;
-  text-shadow: 0 8rpx 16rpx rgba(50, 107, 255, 0.15);
-}
-
-.brand-star {
-  width: 48rpx;
-  height: 48rpx;
-  margin: -8rpx 0 0 4rpx;
+.brand-logo {
+  width: 170rpx;
+  height: 70rpx;
 }
 
 .tagline {
@@ -183,15 +172,13 @@
   padding: 24rpx;
 }
 
-/* 新建行程入口：不使用共享封装，局部保留 100% 透明毛玻璃。 */
+/* 新建行程入口：纯色白 50% 透明度填充，不再使用毛玻璃。 */
 .quick-btn.primary {
   flex: 1.15;
   color: #326bff;
   border: 2rpx solid #4f7cff;
-  background: rgba(255, 255, 255, 0);
+  background: rgba(255, 255, 255, 0.5);
   box-shadow: 0 12rpx 28rpx rgba(50, 107, 255, 0.12);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
 }
 
 /* 历史行程入口：具体材质由共享无色玻璃类提供。 */
@@ -321,8 +308,9 @@
     padding-right: 32rpx;
   }
 
-  .brand {
-    font-size: 56rpx;
+  .brand-logo {
+    width: 154rpx;
+    height: 64rpx;
   }
 
   .quick-btn {

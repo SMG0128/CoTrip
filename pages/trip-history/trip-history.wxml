@@ -4,7 +4,7 @@
       <text class="hero-title">旅程回忆</text>
       <text class="hero-subtitle">每一次共同决定，都值得好好收藏</text>
     </view>
-    <image src="/assets/3d/travel.png" mode="aspectFit" />
+    <image src="/assets/icons/utility/luggage-line.svg" mode="aspectFit" />
   </view>
   <view class="list">
     <trip-card
