@@ -5,6 +5,7 @@
 import { Constraint } from '../types/constraint';
 import { Plan, PlanConflict } from '../types/plan';
 import { PlanEvent } from '../types/event';
+import { countSatisfiedConstraints } from './constraint-evaluator';
 
 export interface ReconcileInput {
   /** 当前计划（可能为 undefined，表示首次生成） */
@@ -52,12 +53,6 @@ function earliestAvailableUntil(constraints: Constraint[]): string | undefined {
   return untils[0];
 }
 
-/** 计算满足的约束数（简单启发式：无冲突的 HARD + 全部 SOFT 视为满足） */
-function countSatisfied(constraints: Constraint[], conflicts: PlanConflict[]): number {
-  const conflictedIds = new Set(conflicts.flatMap((c) => c.constraintIds));
-  return constraints.filter((c) => !conflictedIds.has(c.id)).length;
-}
-
 /**
  * 协调计划：应用约束，返回新版本计划。
  * 若 currentPlan 不存在，则基于约束构建一个最小骨架计划。
@@ -97,7 +92,19 @@ export function reconcilePlan(input: ReconcileInput): Plan {
   // ---- 版本递增 ----
   const version = currentPlan ? currentPlan.version + 1 : 1;
 
-  const satisfied = countSatisfied(constraints, conflicts);
+  // 先完成计划协调，再基于实际 events/location/price evidence 保守评估。
+  const evaluationPlan: Plan = {
+    id: currentPlan?.id || `plan_${tripId}`,
+    tripId,
+    version,
+    events,
+    estimatedTotalPrice: currentPlan?.estimatedTotalPrice,
+    satisfiedConstraintCount: 0,
+    totalConstraintCount: constraints.length,
+    conflicts,
+    updatedAt: new Date().toISOString(),
+  };
+  const satisfied = countSatisfiedConstraints(constraints, evaluationPlan, conflicts);
 
   return {
     id: currentPlan?.id || `plan_${tripId}`,

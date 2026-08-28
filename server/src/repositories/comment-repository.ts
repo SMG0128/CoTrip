@@ -7,6 +7,8 @@ import { Comment } from '../types/comment';
 export interface CommentRepository {
   /** 追加一条评论；并发调用也必须串行原子追加，不丢任何一条 */
   create(comment: Comment): Promise<Comment>;
+  /** 按 id 更新服务端 AI 权威状态；不存在时防御性失败。 */
+  update(comment: Comment): Promise<Comment>;
   /** 读取某个 Trip 的全部评论（按 createdAt 升序） */
   listByTrip(tripId: string): Promise<Comment[]>;
 }

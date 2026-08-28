@@ -86,8 +86,11 @@ export function formatIsoTimeShort(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  const h = d.getHours();
-  const m = d.getMinutes();
+  // 小程序当前业务时区固定为 Asia/Shanghai；显式加 UTC+8 后读取 UTC 字段，
+  // 避免 Node/服务器本机时区影响展示与测试结果。
+  const shanghai = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+  const h = shanghai.getUTCHours();
+  const m = shanghai.getUTCMinutes();
   return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}`;
 }
 

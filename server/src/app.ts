@@ -14,6 +14,8 @@ import { tripRouter } from './routes/trips';
 import { JsonCommentRepository } from './repositories/json-comment-repository';
 import { CommentService } from './services/comment-service';
 import { commentRouter } from './routes/comments';
+import { AICommentService, UnavailableAICommentService } from './services/ai-comment-service';
+import { OpenAICompatibleAICommentService } from './services/openai-compatible-ai-comment-service';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
 export function createApp() {
@@ -26,7 +28,8 @@ export function createApp() {
   const tripRepository = new JsonTripRepository(config.tripDataFile);
   const trips = new RealTripService(tripRepository);
   const commentRepository = new JsonCommentRepository(config.commentDataFile);
-  const comments = new CommentService(commentRepository, tripRepository);
+  const aiComments = createAICommentService(config);
+  const comments = new CommentService(commentRepository, tripRepository, users, aiComments);
 
   const app = express();
   app.use(express.json());
@@ -44,6 +47,19 @@ export function createApp() {
   app.use(errorHandler);
 
   return app;
+}
+
+function createAICommentService(config: ReturnType<typeof loadConfig>): AICommentService {
+  if (config.aiBaseUrl && config.aiApiKey && config.aiModel) {
+    return new OpenAICompatibleAICommentService({
+      baseUrl: config.aiBaseUrl,
+      apiKey: config.aiApiKey,
+      model: config.aiModel,
+      timeoutMs: config.aiTimeoutMs,
+    });
+  }
+  // 未配置 Provider 时明确 unresolved；服务端不提供静默规则 fallback。
+  return new UnavailableAICommentService();
 }
 
 // 直接运行时启动服务（被测试 import 时不启动）

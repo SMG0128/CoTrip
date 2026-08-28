@@ -3,6 +3,12 @@
 
 export { parseComment, parseComments, defaultParseContext } from './constraint-parser';
 export type { ParseContext, ParseResult } from './constraint-parser';
+export {
+  evaluateConstraintAgainstPlan,
+  evaluateConstraintsAgainstPlan,
+  countSatisfiedConstraints,
+} from './constraint-evaluator';
+export type { ConstraintSatisfaction, ConstraintEvaluation } from './constraint-evaluator';
 export { ConstraintStore } from './constraint-store';
 export { detectConflicts } from './conflict-detector';
 export type { ConflictDetectionInput } from './conflict-detector';

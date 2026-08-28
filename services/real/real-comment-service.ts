@@ -4,13 +4,17 @@ import { appConfig } from '../../config/auth';
 import { Comment } from '../../types/comment';
 import { CommentService } from '../comment-service';
 
-/** 后端评论结构（无前端 AI 状态字段） */
+/** 后端 CommentDTO：author 与 AI 状态均为服务端权威数据。 */
 interface BackendComment {
   id: string;
   tripId: string;
   userId: string;
   rawText: string;
   createdAt: string;
+  aiStatus: Comment['aiStatus'];
+  aiSource: NonNullable<Comment['aiSource']>;
+  aiAnalysis?: Comment['aiAnalysis'];
+  author: NonNullable<Comment['author']>;
 }
 
 interface CommentsResponse {
@@ -25,9 +29,9 @@ interface BackendError {
   error?: { code?: string; message?: string };
 }
 
-/** 后端评论 → 前端评论：AI 状态在 pipeline 重算前先标记为待处理 */
+/** 后端评论 → 前端评论：保留服务端权威作者、AI 状态与结构化分析。 */
 function hydrate(comment: BackendComment): Comment {
-  return { ...comment, aiStatus: 'unresolved' };
+  return { ...comment };
 }
 
 export class RealCommentServiceError extends Error {

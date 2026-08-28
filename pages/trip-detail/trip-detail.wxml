@@ -8,7 +8,7 @@
   <view class="header">
     <view class="header-info">
       <text class="title">{{trip.title}}</text>
-      <text class="meta">{{participantCount}} 人参与 · AI 已整理 {{commentCount}} 条需求</text>
+      <text class="meta">{{participantCount}} 人参与 · {{commentCount}} 条想法</text>
     </view>
     <view wx:if="{{canDeleteTrip}}" class="delete-btn {{isDeletingTrip ? 'loading' : ''}}" bind:tap="onDeleteTripTap">
       <image src="/assets/icons/utility/trash.svg" mode="aspectFit" />

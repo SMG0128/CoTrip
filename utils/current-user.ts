@@ -145,6 +145,12 @@ export function buildUserComment(
     rawText,
     createdAt: now.toISOString(),
     aiStatus: 'processing',
+    aiSource: 'none',
+    author: {
+      id: currentUser.id,
+      nickname: currentUser.nickname,
+      avatarUrl: currentUser.avatarUrl ?? '',
+    },
   };
 }
 

@@ -10,6 +10,9 @@ import { JsonTripRepository } from '../src/repositories/json-trip-repository';
 import { JsonCommentRepository } from '../src/repositories/json-comment-repository';
 import { CommentService } from '../src/services/comment-service';
 import { Trip } from '../src/types/trip';
+import { User } from '../src/types/user';
+import { JsonUserRepository } from '../src/repositories/json-user-repository';
+import { AICommentService, UnavailableAICommentService } from '../src/services/ai-comment-service';
 import { record } from './run-tests';
 
 function fixture(overrides: Partial<Trip> = {}): Trip {
@@ -32,15 +35,42 @@ interface Harness {
   directory: string;
   trips: JsonTripRepository;
   comments: JsonCommentRepository;
+  users: JsonUserRepository;
   service: CommentService;
 }
 
-function setup(): Harness {
+const userA: User = {
+  id: 'usr_A',
+  wechatOpenId: 'openid_A_private',
+  nickname: '真实用户 A',
+  avatarUrl: 'https://example.test/a.png',
+  profileCompleted: true,
+  createdAt: 1,
+  updatedAt: 1,
+};
+
+const userB: User = {
+  id: 'usr_B',
+  wechatOpenId: 'openid_B_private',
+  nickname: '真实用户 B',
+  avatarUrl: 'https://example.test/b.png',
+  profileCompleted: true,
+  createdAt: 2,
+  updatedAt: 2,
+};
+
+function setup(ai: AICommentService = new UnavailableAICommentService()): Harness {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cotrip-comments-'));
+  fs.writeFileSync(
+    path.join(directory, 'users.json'),
+    JSON.stringify({ users: [userA, userB] }),
+    'utf8',
+  );
   const trips = new JsonTripRepository(path.join(directory, 'trips.json'));
   const comments = new JsonCommentRepository(path.join(directory, 'comments.json'));
-  const service = new CommentService(comments, trips);
-  return { directory, trips, comments, service };
+  const users = new JsonUserRepository(path.join(directory, 'users.json'));
+  const service = new CommentService(comments, trips, users, ai);
+  return { directory, trips, comments, users, service };
 }
 
 export async function runTripCommentTests(): Promise<void> {
@@ -90,6 +120,8 @@ export async function runTripCommentTests(): Promise<void> {
       const restarted = new CommentService(
         new JsonCommentRepository(path.join(directory, 'comments.json')),
         new JsonTripRepository(path.join(directory, 'trips.json')),
+        new JsonUserRepository(path.join(directory, 'users.json')),
+        new UnavailableAICommentService(),
       );
       const list = await restarted.listComments('usr_A', 'trip_T');
       assert.deepStrictEqual(
@@ -160,6 +192,100 @@ export async function runTripCommentTests(): Promise<void> {
         () => service.addComment('usr_A', 'trip_T', '   '),
         (error: Error & { code?: string }) => error.code === 'COMMENT_INVALID_INPUT',
       );
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  await record('comments 作者: A/B 互看均返回最新 PublicUser 投影且不泄露 openid', async () => {
+    const { directory, trips, users, service } = setup();
+    try {
+      await trips.create(fixture());
+      await trips.addParticipant('trip_T', 'usr_B');
+      await service.addComment('usr_A', 'trip_T', 'A1');
+      await service.addComment('usr_B', 'trip_T', 'B1');
+
+      const seenByA = await service.listComments('usr_A', 'trip_T');
+      const seenByB = await service.listComments('usr_B', 'trip_T');
+      const aFromB = seenByB.find((comment) => comment.userId === 'usr_A');
+      const bFromA = seenByA.find((comment) => comment.userId === 'usr_B');
+      assert.deepStrictEqual(aFromB?.author, {
+        id: userA.id,
+        nickname: userA.nickname,
+        avatarUrl: userA.avatarUrl,
+      });
+      assert.deepStrictEqual(bFromA?.author, {
+        id: userB.id,
+        nickname: userB.nickname,
+        avatarUrl: userB.avatarUrl,
+      });
+      assert.ok(!JSON.stringify(seenByA).includes('openid_'), 'CommentDTO 不得泄露 openid');
+
+      await users.update({ ...userA, nickname: 'A 的新昵称', updatedAt: 3 });
+      const refreshed = await service.listComments('usr_B', 'trip_T');
+      assert.strictEqual(
+        refreshed.find((comment) => comment.userId === 'usr_A')?.author.nickname,
+        'A 的新昵称',
+        '历史评论作者必须动态使用最新公开资料',
+      );
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  await record('comments AI failure: 评论仍持久化且服务端权威状态为 unresolved', async () => {
+    const failingAI: AICommentService = {
+      source: 'provider',
+      analyzeComment: async () => { throw new Error('provider down'); },
+    };
+    const { directory, trips, service } = setup(failingAI);
+    try {
+      await trips.create(fixture());
+      const created = await service.addComment('usr_A', 'trip_T', '我想吃越南菜');
+      assert.strictEqual(created.aiStatus, 'unresolved');
+      assert.strictEqual(created.aiSource, 'provider');
+
+      const restarted = new CommentService(
+        new JsonCommentRepository(path.join(directory, 'comments.json')),
+        new JsonTripRepository(path.join(directory, 'trips.json')),
+        new JsonUserRepository(path.join(directory, 'users.json')),
+        new UnavailableAICommentService(),
+      );
+      const persisted = await restarted.listComments('usr_A', 'trip_T');
+      assert.strictEqual(persisted.length, 1, 'AI 失败不能导致评论消失');
+      assert.strictEqual(persisted[0].aiStatus, 'unresolved');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  await record('comments AI success: A/B GET 同一评论得到相同持久化 accepted 状态', async () => {
+    const successfulAI: AICommentService = {
+      source: 'provider',
+      analyzeComment: async () => ({
+        intent: 'preference',
+        constraints: [{
+          type: 'PREFERENCE',
+          scope: 'DINING',
+          priority: 'SOFT',
+          value: { keyword: 'VIETNAMESE', note: '越南菜' },
+        }],
+        confidence: 0.95,
+        requiresConfirmation: false,
+      }),
+    };
+    const { directory, trips, service } = setup(successfulAI);
+    try {
+      await trips.create(fixture());
+      await trips.addParticipant('trip_T', 'usr_B');
+      const created = await service.addComment('usr_A', 'trip_T', '我想吃越南菜');
+      const seenByA = await service.listComments('usr_A', 'trip_T');
+      const seenByB = await service.listComments('usr_B', 'trip_T');
+      assert.strictEqual(created.aiStatus, 'accepted');
+      assert.strictEqual(seenByA[0].id, seenByB[0].id);
+      assert.strictEqual(seenByA[0].aiStatus, 'accepted');
+      assert.strictEqual(seenByB[0].aiStatus, 'accepted');
+      assert.deepStrictEqual(seenByA[0].aiAnalysis, seenByB[0].aiAnalysis);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

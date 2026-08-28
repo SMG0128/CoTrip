@@ -111,7 +111,33 @@ function makeBasePlan(): Plan {
   ];
   const plan = reconcilePlan({ currentPlan: makeBasePlan(), constraints, conflicts, tripId: 'trip_test' });
   assert(plan.conflicts.length === 1, '冲突应传递到计划');
-  assert(plan.satisfiedConstraintCount === 1, `冲突约束不计入满足，应满足 1 条，实际 ${plan.satisfiedConstraintCount}`);
+  assert(plan.satisfiedConstraintCount === 0, `无 evidence 的偏好不能因“无冲突”被满足，实际 ${plan.satisfiedConstraintCount}`);
+}
+
+// ---- 6. 空计划：已识别需求也必须是 0 / N ----
+{
+  const emptyPlan: Plan = {
+    ...makeBasePlan(),
+    events: [],
+  };
+  const vietnamese = makeConstraint({
+    id: 'c_vietnamese',
+    type: 'PREFERENCE',
+    scope: 'DINING',
+    value: { keyword: 'VIETNAMESE', note: '越南菜' },
+  });
+  const one = reconcilePlan({ currentPlan: emptyPlan, constraints: [vietnamese], conflicts: [], tripId: 'trip_test' });
+  assert(one.totalConstraintCount === 1 && one.satisfiedConstraintCount === 0, '空计划“想吃越南菜”必须 0 / 1');
+
+  const tianhe = makeConstraint({
+    id: 'c_tianhe',
+    type: 'LOCATION',
+    scope: 'SPORT',
+    priority: 'HARD',
+    value: { district: '天河区' },
+  });
+  const two = reconcilePlan({ currentPlan: emptyPlan, constraints: [tianhe, vietnamese], conflicts: [], tripId: 'trip_test' });
+  assert(two.totalConstraintCount === 2 && two.satisfiedConstraintCount === 0, '空计划两个需求必须 0 / 2');
 }
 
 console.log('✅ plan-reconciler.test.ts 全部通过');

@@ -1,10 +1,10 @@
 // components/comment-item/index.ts
 // 评论条目组件：展示用户昵称、原始文本与 AI 状态。
-// 身份解析按 ID 优先匹配当前登录用户（currentUser），其次才匹配 Mock 参与者。
+// 真实评论只使用服务端 author；Mock 参与者解析严格限制在唯一 Demo Trip。
 
 import { Comment } from '../../types/comment';
 import { mockParticipants } from '../../mock/mock-user';
-import { resolveAuthorAvatar, resolveAuthorDisplayName } from '../../utils/current-user';
+import { resolveCommentAuthorPresentation } from '../../utils/comment-author';
 
 Component({
   properties: {
@@ -22,10 +22,7 @@ Component({
       if (!comment) return;
       const app = getApp<IAppOption>();
       const currentUser = app.globalData.currentUser;
-      this.setData({
-        nickname: resolveAuthorDisplayName(comment.userId, currentUser, mockParticipants),
-        avatarUrl: resolveAuthorAvatar(comment.userId, currentUser, mockParticipants),
-      });
+      this.setData(resolveCommentAuthorPresentation(comment, currentUser, mockParticipants));
     },
   },
 });

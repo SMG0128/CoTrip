@@ -28,6 +28,20 @@ export class JsonCommentRepository implements CommentRepository {
     return Promise.resolve(comment);
   }
 
+  update(comment: Comment): Promise<Comment> {
+    const current = this.load();
+    if (!current.comments.some((candidate) => candidate.id === comment.id)) {
+      throw new AppError(404, 'COMMENT_NOT_FOUND', '评论不存在');
+    }
+    const nextStore: Store = {
+      comments: current.comments.map((candidate) =>
+        candidate.id === comment.id ? comment : candidate
+      ),
+    };
+    this.save(nextStore);
+    return Promise.resolve(comment);
+  }
+
   listByTrip(tripId: string): Promise<Comment[]> {
     const list = this.load().comments
       .filter((comment) => comment.tripId === tripId)
@@ -45,7 +59,7 @@ export class JsonCommentRepository implements CommentRepository {
       if (!Array.isArray(parsed.comments)) {
         throw new Error('invalid comment store');
       }
-      return { comments: parsed.comments as Comment[] };
+      return { comments: (parsed.comments as Partial<Comment>[]).map(normalizeComment) };
     } catch {
       throw new AppError(500, 'COMMENT_PERSISTENCE_FAILURE', '评论数据读取失败');
     }
@@ -67,4 +81,29 @@ export class JsonCommentRepository implements CommentRepository {
       throw new AppError(500, 'COMMENT_PERSISTENCE_FAILURE', '评论数据保存失败');
     }
   }
+}
+
+function normalizeComment(comment: Partial<Comment>): Comment {
+  const validStatuses: Comment['aiStatus'][] = [
+    'processing',
+    'accepted',
+    'conflict',
+    'unresolved',
+    'waiting_confirm',
+  ];
+  const validSources: Comment['aiSource'][] = ['provider', 'rule_fallback', 'none'];
+  return {
+    id: String(comment.id ?? ''),
+    tripId: String(comment.tripId ?? ''),
+    userId: String(comment.userId ?? ''),
+    rawText: String(comment.rawText ?? ''),
+    createdAt: String(comment.createdAt ?? ''),
+    aiStatus: validStatuses.includes(comment.aiStatus as Comment['aiStatus'])
+      ? comment.aiStatus as Comment['aiStatus']
+      : 'unresolved',
+    aiSource: validSources.includes(comment.aiSource as Comment['aiSource'])
+      ? comment.aiSource as Comment['aiSource']
+      : 'none',
+    ...(comment.aiAnalysis ? { aiAnalysis: comment.aiAnalysis } : {}),
+  };
 }

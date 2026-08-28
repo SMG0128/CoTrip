@@ -1,7 +1,8 @@
 // core/constraint-parser.ts
 // 规则解析器：将自然语言评论解析为结构化 Constraint。
-// 注意：这是"规则 Parser"，不是最终 AI。AIService 接口保持抽象，
-// 未来可替换为 LLMAIService，Parser 只是当前本地实现。
+// 注意：这是 Demo / 开发用规则 Parser，不是真实 AI。
+// 真实评论链路只消费 server AICommentService 返回并持久化的结构化分析；
+// Provider 不可用时保持 unresolved，绝不静默调用本 Parser 假装 AI 成功。
 
 import { Comment } from '../types/comment';
 import {

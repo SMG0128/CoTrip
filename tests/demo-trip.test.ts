@@ -1,6 +1,6 @@
 // tests/demo-trip.test.ts
 // 内置示例行程（Demo Trip）测试：
-// - 全局 Mock 模式已移除：auth / trip 走真实实现；真实行程路线服务临时全局禁用
+// - 全局 Mock 模式已移除：auth / trip / 真实行程路线均走真实实现
 // - 首页合并：唯一示例行程 + 真实行程并存；真实 0 条时示例仍可见
 // - MOCK 标签仅示例行程显示，真实行程永不显示（含标题误导防御）
 // - 示例行程写后端动作被守卫阻止；无可用房间号 → 分享安全回退首页
@@ -20,7 +20,7 @@ import { buildTripSharePayload } from '../utils/trip-share';
 import { authService, routeOptionService, tripService } from '../services/index';
 import { RealAuthService } from '../services/real/real-auth-service';
 import { RealTripService } from '../services/real/real-trip-service';
-import { DisabledRouteOptionService } from '../services/route-option-service';
+import { RealRouteOptionService } from '../services/route-option-service';
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(`断言失败: ${msg}`);
@@ -92,15 +92,10 @@ export async function runDemoTripTests(): Promise<void> {
   assert(!sharePayload.hasRoomCode, '示例行程分享不带 roomCode');
   assert(sharePayload.path === '/pages/home/home', '示例行程分享安全回退到首页');
 
-  // ---- 8. 登录/行程保持真实；真实行程路线入口全局禁用，禁止误触腾讯 API ----
+  // ---- 8. 登录/行程/真实路线保持真实；Demo 的 MockRouteOptionService 由页面局部隔离 ----
   assert(authService instanceof RealAuthService, '登录走 RealAuthService');
   assert(tripService instanceof RealTripService, '行程走 RealTripService');
-  assert(routeOptionService instanceof DisabledRouteOptionService, '真实行程路线服务使用禁用实现');
-  const routeDisabled = await routeOptionService.planRoutes({ destinationName: '任意地点' }).then(
-    () => false,
-    () => true
-  );
-  assert(routeDisabled, '禁用实现必须在调用腾讯 Provider 前直接失败');
+  assert(routeOptionService instanceof RealRouteOptionService, '真实行程路线服务使用真实 Provider adapter');
 
   // ---- 9. 构建隔离：每次构建独立副本，页面内推导不污染 fixture ----
   const first = buildDemoTrip();

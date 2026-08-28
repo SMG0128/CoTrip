@@ -1,6 +1,6 @@
 # CoTrip Backend V0.2 — Real Trip Persistence
 
-CoTrip 后端提供真实微信登录与按用户隔离的 Trip shell 持久化：
+CoTrip 后端提供真实微信登录、按用户隔离的 Trip shell，以及共享评论流持久化：
 
 ```
 小程序 → wx.login() → code → CoTrip Backend → 微信 code2Session → openid
@@ -30,9 +30,19 @@ WECHAT_SECRET=你的小程序AppSecret
 AUTH_TOKEN_SECRET=一段足够长的随机字符串
 PORT=3000
 # 可选：TRIP_DATA_FILE=/自定义路径/trips.json
+
+# 可选：OpenAI-compatible 评论分析 Provider（三项齐全才启用）
+AI_BASE_URL=https://provider.example/v1
+AI_API_KEY=仅服务端保存的密钥
+AI_MODEL=模型名
+AI_TIMEOUT_MS=15000
 ```
 
 > 切勿提交真实凭据。`.env` 已在 `.gitignore` 中忽略。
+
+未配置完整 AI Provider 时，评论仍会成功持久化并返回 `aiStatus: "unresolved"`；
+服务端不会静默调用规则 Parser 或伪造 `accepted`。Provider 响应必须通过严格 JSON
+schema 与领域值校验后，才会作为 `aiAnalysis` 持久化。
 
 ## 3. 运行后端
 
@@ -86,6 +96,8 @@ export const authConfig = {
 | POST | `/trips/join` | 用 Bearer 身份幂等加入 ACTIVE Trip；请求体只需 `roomCode` |
 | GET | `/trips/:id` | 读取当前用户参与的单个 Trip（需登录） |
 | POST | `/trips/:id/complete` | 发起人完成 ACTIVE Trip（需登录） |
+| GET | `/trips/:id/comments` | 读取成员共享评论流，返回公开 `author` 与服务端权威 `aiStatus` |
+| POST | `/trips/:id/comments` | 追加评论；作者只取 Bearer 身份，AI 失败不回滚评论 |
 
 错误统一返回：
 
@@ -99,7 +111,10 @@ export const authConfig = {
 - 小程序只持有 CoTrip token 与 CoTrip userId。
 - 业务代码统一使用 `User.id`，不使用 openid。
 - Trip 的 `creatorId` / `participantIds` 只来自已校验 token，客户端提交的身份字段会被忽略。
-- `server/data/users.json` 与 `server/data/trips.json` 均在 Git 忽略范围内。
+- 评论 DTO 的 `author` 每次从 `UserRepository` 动态投影，只包含 `id/nickname/avatarUrl`；
+  `openid`、`session_key` 等认证字段不会进入评论响应。
+- `AI_API_KEY` 只存在于 `server/.env`，绝不进入小程序包。
+- `server/data/users.json`、`server/data/trips.json` 与 `server/data/comments.json` 均在 Git 忽略范围内。
 
 ## 测试
 
@@ -107,4 +122,4 @@ export const authConfig = {
 npm test
 ```
 
-运行 TypeScript 检查，以及认证、Trip 身份隔离、多人 Join、幂等与 JSON 重启持久化测试。
+运行 TypeScript 检查，以及认证、Trip 身份隔离、多人 Join、评论作者投影、AI 降级与 JSON 重启持久化测试。

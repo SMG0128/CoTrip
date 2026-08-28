@@ -35,7 +35,8 @@ export const tripService: TripService = new RealTripService();
 // 评论流：一律真实后端（共享实体持久化，禁止本地 mock 假装多人评论已实现）。
 export const commentService: CommentService = new RealCommentService();
 
-export const aiService: AIService = new MockAIService();
+// 仅供固定 Demo/开发预览；真实评论 AI 位于 server，且不会引用本实例。
+export const demoAIService: AIService = new MockAIService();
 export const mapService: MapService = new MockMapService();
 export const placeService: PlaceService = new MockPlaceService();
 export const notificationService: NotificationService = new MockNotificationService();

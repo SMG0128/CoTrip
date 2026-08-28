@@ -67,6 +67,8 @@ import {
   createTempCommentId,
   mergeServerComments,
 } from '../../utils/comment-sync';
+import { evaluateRealCommentPlan } from '../../utils/real-comment-planning';
+import { resolveTripDetailOnShowActions } from '../../utils/trip-detail-on-show';
 
 // Debug 仅在开发版/体验版显示，正式版自动隐藏。
 function isDebugEnabled(): boolean {
@@ -207,15 +209,21 @@ Page({
    * 保存了出发点）——避免每次前后台切换都重新规划已有路线。
    */
   onShow() {
-    if (!this.data.showRoute || this.data.routeLoading) return;
-    if (!this.data.routeBlockReason && !this.data.routeNeedsOrigin) return;
-    this.loadRouteOptions();
-
+    const actions = resolveTripDetailOnShowActions({
+      tripId: this.data.trip.id,
+      showRoute: this.data.showRoute,
+      routeLoading: this.data.routeLoading,
+      routeBlockReason: this.data.routeBlockReason,
+      routeNeedsOrigin: this.data.routeNeedsOrigin,
+    });
     // 真实行程：每次回到页面都以服务端评论流为 source of truth 刷新
     // （示例行程纯本地展示，跳过；首次进入时 trip 尚未 bootstrap 完成，由 bootstrapTrip 拉取）
-    if (!isDemoTripId(this.data.trip.id)) {
+    if (actions.refreshComments) {
       this.loadServerComments(this.data.trip.id);
     }
+
+    // 路线恢复是独立生命周期；它的门禁不得阻断上面的评论刷新。
+    if (actions.loadRouteOptions) this.loadRouteOptions();
   },
 
   /** 初始化行程视图 + 规划引擎 */
@@ -223,7 +231,9 @@ Page({
     // 旧 Mock fixture 的“自己”槽位在此替换为真实 currentUser；
     // 新 Trip 本来就是 currentUser.id，hydrate 不产生任何变化。
     const trip = hydrateTripWithCurrentUser(baseTrip, currentUser);
-    const comments = seedDemoComments ? (mockComments as Comment[]) : ([] as Comment[]);
+    const comments = seedDemoComments
+      ? mockComments.map((comment) => ({ ...comment, tripId: trip.id }))
+      : ([] as Comment[]);
     const tripDate = trip.timeRange?.start?.slice(0, 10) ?? '2026-08-22';
     const timezone = trip.timeRange?.timezone ?? 'Asia/Shanghai';
 
@@ -272,9 +282,7 @@ Page({
       const server = await commentService.listComments(tripId);
       const merged = mergeServerComments(this.data.comments, server);
       this.setData({ comments: merged, commentCount: merged.length });
-      if (merged.length > 0) {
-        this.runPipeline(merged);
-      }
+      this.runPipeline(merged);
     } catch (error) {
       wx.showToast({ title: '评论加载失败', icon: 'none' });
     }
@@ -282,6 +290,33 @@ Page({
 
   /** 运行完整规划管线 */
   runPipeline(comments: Comment[]) {
+    // 真实评论只消费服务端权威 aiStatus/aiAnalysis，绝不调用规则 Parser 或 Mock AI。
+    if (!isDemoTripId(this.data.trip.id)) {
+      const currentPlan = this.data.trip.currentPlan ?? buildEmptyPlan(this.data.trip.id);
+      const result = evaluateRealCommentPlan(currentPlan, comments);
+      const ranked = rankCandidates({
+        restaurants: realRestaurants,
+        constraints: result.constraints,
+      });
+      const rankedRestaurants = ranked.map((entry) => entry.restaurant);
+      this.setData({
+        trip: { ...this.data.trip, currentPlan: result.plan },
+        restaurants: rankedRestaurants,
+        rankedRestaurants: ranked,
+        candidateGroups: buildEventCandidateGroups(result.plan, ranked),
+        debugConstraints: result.constraints,
+        debugPlanVersion: result.plan.version,
+        debugConflictCount: result.plan.conflicts.length,
+        debugUnresolved: result.unresolvedCommentIds,
+        'debugProvider.searchQuery': this.buildSearchQuery(result.constraints),
+        'debugProvider.rawResultCount': realRestaurants.length,
+        'debugProvider.selectedEntity': rankedRestaurants[0]?.name ?? '',
+        'debugProvider.providerRefs': rankedRestaurants[0]?.providerRefs?.map((p) => `${p.provider}:${p.externalId}`) ?? [],
+        'debugProvider.externalActions': rankedRestaurants[0]?.externalActions.length ?? 0,
+      });
+      return;
+    }
+
     if (!this.engine) return;
     const result = this.engine.processComments(comments);
 
@@ -684,13 +719,19 @@ Page({
       rawText: text,
       createdAt: new Date().toISOString(),
       aiStatus: 'processing',
+      aiSource: 'none',
+      author: {
+        id: guard.user.id,
+        nickname: guard.user.nickname,
+        avatarUrl: guard.user.avatarUrl ?? '',
+      },
     };
     this.setData({
       comments: [...this.data.comments, optimistic],
       inputText: '',
       commentCount: this.data.commentCount + 1,
     });
-    this.runPipeline([optimistic]);
+    this.runPipeline(this.data.comments);
 
     commentService.addComment(tripId, text).then(
       (serverComment) => {

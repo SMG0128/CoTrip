@@ -1,6 +1,6 @@
 // services/route-option-service.ts
-// 「我的推荐」路线方案服务：disabled 阻断真实请求，mock 返回固化 fixture，
-// real 实现保留供后续恢复腾讯 direction v1；所有失败都真实抛错，绝不隐式 fallback。
+// 「我的推荐」路线方案服务：real 调用腾讯 Provider，mock 仅返回 Demo 固化 fixture；
+// disabled 保留作显式熔断实现。所有失败都真实抛错，绝不隐式 fallback。
 
 import { RouteOptionService, RoutePlanQuery, RoutePlanResult } from '../types/route-option';
 import {
@@ -12,10 +12,10 @@ import { MOCK_ROUTE_DESTINATION, mockRouteOptions } from '../mock/mock-route-opt
 
 export { RouteOptionError };
 
-/** 临时产品门禁：真实行程不得调用腾讯路线 API。 */
+/** 显式熔断提示；只有调用方主动选择 Disabled 实现时生效。 */
 export const ROUTE_OPTION_DISABLED_MESSAGE = '路线规划暂仅供示例行程预览';
 
-/** 全局禁用实现：始终在 Provider 调用前失败，防止任何真实行程误触腾讯 API。 */
+/** 禁用实现：始终在 Provider 调用前失败。 */
 export class DisabledRouteOptionService implements RouteOptionService {
   async planRoutes(_query: RoutePlanQuery): Promise<RoutePlanResult> {
     throw new RouteOptionError('PROVIDER_ERROR', ROUTE_OPTION_DISABLED_MESSAGE);

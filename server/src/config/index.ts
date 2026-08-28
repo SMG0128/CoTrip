@@ -18,6 +18,11 @@ export interface AppConfig {
   tripDataFile: string;
   /** 评论流数据持久化文件路径 */
   commentDataFile: string;
+  /** OpenAI-compatible 评论分析 Provider；三项齐全才启用。 */
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+  aiModel?: string;
+  aiTimeoutMs: number;
 }
 
 function required(name: string): string {
@@ -39,5 +44,9 @@ export function loadConfig(): AppConfig {
       process.env.TRIP_DATA_FILE || path.resolve(__dirname, '../../data/trips.json'),
     commentDataFile:
       process.env.COMMENT_DATA_FILE || path.resolve(__dirname, '../../data/comments.json'),
+    aiBaseUrl: process.env.AI_BASE_URL?.trim() || undefined,
+    aiApiKey: process.env.AI_API_KEY?.trim() || undefined,
+    aiModel: process.env.AI_MODEL?.trim() || undefined,
+    aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS || 15000),
   };
 }

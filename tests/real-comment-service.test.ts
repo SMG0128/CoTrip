@@ -75,6 +75,9 @@ export async function runRealCommentServiceTests(): Promise<void> {
           userId: 'usr_A',
           rawText: 'A1',
           createdAt: '2026-08-28T10:00:00.000Z',
+          aiStatus: 'accepted',
+          aiSource: 'provider',
+          author: { id: 'usr_A', nickname: '真实用户 A', avatarUrl: 'https://img/a.png' },
         },
         {
           id: 'comment_2',
@@ -82,6 +85,9 @@ export async function runRealCommentServiceTests(): Promise<void> {
           userId: 'usr_B',
           rawText: 'B1',
           createdAt: '2026-08-28T10:01:00.000Z',
+          aiStatus: 'unresolved',
+          aiSource: 'none',
+          author: { id: 'usr_B', nickname: '真实用户 B', avatarUrl: 'https://img/b.png' },
         },
       ],
     })
@@ -96,7 +102,10 @@ export async function runRealCommentServiceTests(): Promise<void> {
     comments.some((c) => c.rawText === 'B1' && c.userId === 'usr_B'),
     '包含 B 的评论'
   );
-  assert(comments.every((c) => c.aiStatus === 'unresolved'), '后端评论 hydrate 出默认 AI 状态');
+  assert(comments[0].aiStatus === 'accepted', '必须保留服务端权威 accepted 状态');
+  assert(comments[1].aiStatus === 'unresolved', '必须保留服务端权威 unresolved 状态');
+  assert(comments[0].author?.nickname === '真实用户 A', 'B 能看到 A 的服务端公开资料');
+  assert(comments[1].author?.nickname === '真实用户 B', 'A 能看到 B 的服务端公开资料');
   const listRequest = listRequests[0];
   assert(listRequest.method === 'GET', 'listComments 应使用 GET');
   assert(
@@ -124,6 +133,9 @@ export async function runRealCommentServiceTests(): Promise<void> {
           userId: 'usr_B',
           rawText: 'B1',
           createdAt: '2026-08-28T10:01:00.000Z',
+          aiStatus: 'unresolved',
+          aiSource: 'none',
+          author: { id: 'usr_B', nickname: '真实用户 B', avatarUrl: 'https://img/b.png' },
         },
       },
       201

@@ -8,6 +8,29 @@ export type AIStatus =
   | 'unresolved'
   | 'waiting_confirm';
 
+export type AICommentSource = 'provider' | 'rule_fallback' | 'none';
+
+export interface CommentAuthor {
+  id: string;
+  nickname: string;
+  avatarUrl: string;
+}
+
+export interface CommentConstraintDraft {
+  type: 'AVAILABILITY' | 'LOCATION' | 'BUDGET' | 'PREFERENCE';
+  scope: 'TRIP' | 'SPORT' | 'DINING' | 'TRANSPORT';
+  priority: 'HARD' | 'SOFT';
+  value: Record<string, unknown>;
+}
+
+export interface AICommentAnalysis {
+  intent: 'constraint' | 'preference' | 'chat' | 'unclear';
+  constraints: CommentConstraintDraft[];
+  confidence: number;
+  requiresConfirmation: boolean;
+  summary?: string;
+}
+
 export interface Comment {
   id: string;
   tripId: string;
@@ -16,4 +39,10 @@ export interface Comment {
   rawText: string;
   createdAt: string;
   aiStatus: AIStatus;
+  /** 真实评论由服务端返回；Demo fixture 可省略。 */
+  aiSource?: AICommentSource;
+  /** 仅包含服务端 schema/domain validation 后的结构化结果。 */
+  aiAnalysis?: AICommentAnalysis;
+  /** 真实评论必须由服务端动态投影；Demo fixture 可通过隔离的 Mock 参与者解析。 */
+  author?: CommentAuthor;
 }

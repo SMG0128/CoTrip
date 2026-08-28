@@ -38,7 +38,7 @@ const STATUS_MAP: Record<AIStatus, StatusVisual> = {
     icon: '/assets/icons/status/warning.svg',
   },
   unresolved: {
-    label: '暂无法满足',
+    label: '未解析',
     color: '#71809c',
     bg: '#f0f2f6',
     border: '#d8dee8',

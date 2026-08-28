@@ -1,6 +1,6 @@
 // services/ai-service.ts
-// AI 服务接口：负责自然语言理解、Constraint 提取、Plan 生成。
-// 当前仅提供 Mock 实现，不调用任何真实大模型。
+// 本地 Demo AI 服务接口：负责规则 Constraint 提取与示例 Plan 生成。
+// 真实评论 AI 接口位于 server，客户端绝不持有 Provider key。
 
 import { Constraint } from '../types/constraint';
 import { Plan } from '../types/plan';
