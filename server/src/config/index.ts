@@ -18,10 +18,15 @@ export interface AppConfig {
   tripDataFile: string;
   /** 评论流数据持久化文件路径 */
   commentDataFile: string;
+  /** 评论分析 Provider 选择：openai_compatible（默认）或 cloudbase_gateway。 */
+  aiProvider?: 'openai_compatible' | 'cloudbase_gateway';
   /** OpenAI-compatible 评论分析 Provider；三项齐全才启用。 */
   aiBaseUrl?: string;
   aiApiKey?: string;
   aiModel?: string;
+  /** CloudBase HTTP Function 网关；URL + Secret 齐全才启用。 */
+  aiGatewayUrl?: string;
+  aiGatewaySecret?: string;
   aiTimeoutMs: number;
 }
 
@@ -44,9 +49,13 @@ export function loadConfig(): AppConfig {
       process.env.TRIP_DATA_FILE || path.resolve(__dirname, '../../data/trips.json'),
     commentDataFile:
       process.env.COMMENT_DATA_FILE || path.resolve(__dirname, '../../data/comments.json'),
+    aiProvider:
+      (process.env.AI_PROVIDER?.trim() as AppConfig['aiProvider']) || undefined,
     aiBaseUrl: process.env.AI_BASE_URL?.trim() || undefined,
     aiApiKey: process.env.AI_API_KEY?.trim() || undefined,
     aiModel: process.env.AI_MODEL?.trim() || undefined,
+    aiGatewayUrl: process.env.AI_GATEWAY_URL?.trim() || undefined,
+    aiGatewaySecret: process.env.AI_GATEWAY_SECRET?.trim() || undefined,
     aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS || 15000),
   };
 }

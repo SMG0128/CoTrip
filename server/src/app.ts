@@ -16,6 +16,7 @@ import { CommentService } from './services/comment-service';
 import { commentRouter } from './routes/comments';
 import { AICommentService, UnavailableAICommentService } from './services/ai-comment-service';
 import { OpenAICompatibleAICommentService } from './services/openai-compatible-ai-comment-service';
+import { CloudBaseGatewayAICommentService } from './services/cloudbase-gateway-ai-comment-service';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
 export function createApp() {
@@ -50,6 +51,17 @@ export function createApp() {
 }
 
 function createAICommentService(config: ReturnType<typeof loadConfig>): AICommentService {
+  if (config.aiProvider === 'cloudbase_gateway') {
+    if (config.aiGatewayUrl && config.aiGatewaySecret) {
+      return new CloudBaseGatewayAICommentService({
+        gatewayUrl: config.aiGatewayUrl,
+        secret: config.aiGatewaySecret,
+        timeoutMs: config.aiTimeoutMs,
+      });
+    }
+    // 网关配置不齐时明确 unresolved；绝不静默回退。
+    return new UnavailableAICommentService();
+  }
   if (config.aiBaseUrl && config.aiApiKey && config.aiModel) {
     return new OpenAICompatibleAICommentService({
       baseUrl: config.aiBaseUrl,

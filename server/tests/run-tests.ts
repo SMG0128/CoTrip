@@ -9,6 +9,7 @@ import { runTripDeleteTests } from './trip-delete.test';
 import { runTripJoinTests } from './trip-join.test';
 import { runTripCommentTests } from './trip-comments.test';
 import { runAICommentServiceTests } from './ai-comment-service.test';
+import { runCloudBaseGatewayTests } from './cloudbase-gateway-ai-comment-service.test';
 
 interface TestResult {
   name: string;
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
   await runTripJoinTests();
   await runTripCommentTests();
   await runAICommentServiceTests();
+  await runCloudBaseGatewayTests();
 
   let failed = 0;
   for (const r of results) {

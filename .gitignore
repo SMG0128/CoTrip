@@ -39,3 +39,13 @@ server/dist/
 server/dist-test/
 server/.env
 server/data/
+
+# CloudBase HTTP 函数：本地依赖、模板下载缓存与打包产物不入库
+# （index.js / package.json / scf_bootstrap / cloudbaserc.json / lib / tests 纳入 Git）
+CloudBase/c/node_modules/
+CloudBase/c/cloudbase-template.json
+CloudBase/c/cloudbase-template.en.json
+CloudBase/c/README_cn.md
+CloudBase/c/README_en.md
+CloudBase/c/.env
+CloudBase/c.zip
