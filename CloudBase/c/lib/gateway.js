@@ -6,7 +6,7 @@
 
 const { isAuthorized } = require('./auth');
 const { parseJsonBody, validateAnalyzeInput } = require('./request-parser');
-const { extractJsonContent, isValidGatewayAnalysis } = require('./ai-response-parser');
+const { extractJsonContent, validateGatewayAnalysis } = require('./ai-response-parser');
 
 function json(status, body) {
   return {
@@ -66,7 +66,13 @@ function createGateway({ aiProvider, secret, maxBodyBytes = 64 * 1024, maxRawTex
       return json(502, { ok: false, error: 'AI_INVALID_RESPONSE' });
     }
 
-    if (!isValidGatewayAnalysis(analysis)) {
+    const validation = validateGatewayAnalysis(analysis);
+    if (!validation.ok) {
+      console.error(
+        '[cotrip-ai-analyze] invalid AI response:',
+        validation.failurePath,
+        validation.failureReasonCode,
+      );
       return json(502, { ok: false, error: 'AI_INVALID_RESPONSE' });
     }
 

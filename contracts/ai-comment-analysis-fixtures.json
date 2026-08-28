@@ -1,0 +1,181 @@
+{
+  "valid": [
+    {
+      "name": "mixed availability and dining preference",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [
+          {
+            "type": "AVAILABILITY",
+            "scope": "TRIP",
+            "priority": "HARD",
+            "value": {
+              "availableUntil": "2026-08-29T17:00:00+08:00"
+            }
+          },
+          {
+            "type": "PREFERENCE",
+            "scope": "DINING",
+            "priority": "SOFT",
+            "value": {
+              "keyword": "越南菜"
+            }
+          }
+        ],
+        "confidence": 0.96,
+        "requiresConfirmation": false,
+        "summary": "必须在下午五点前离开，并偏好越南菜"
+      }
+    },
+    {
+      "name": "chat without constraints",
+      "analysis": {
+        "intent": "chat",
+        "constraints": [],
+        "confidence": 0.99,
+        "requiresConfirmation": false,
+        "summary": "普通聊天"
+      }
+    },
+    {
+      "name": "all value schemas",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [
+          {
+            "type": "AVAILABILITY",
+            "scope": "SPORT",
+            "priority": "HARD",
+            "value": {
+              "availableAfter": "2026-08-29T09:00:00+08:00",
+              "availableUntil": "2026-08-29T11:00:00+08:00"
+            }
+          },
+          {
+            "type": "LOCATION",
+            "scope": "TRIP",
+            "priority": "HARD",
+            "value": {
+              "city": "广州",
+              "district": "天河区"
+            }
+          },
+          {
+            "type": "BUDGET",
+            "scope": "DINING",
+            "priority": "HARD",
+            "value": {
+              "min": 50,
+              "max": 150,
+              "currency": "CNY",
+              "unit": "PER_PERSON",
+              "preference": "HIGH_QUALITY"
+            }
+          },
+          {
+            "type": "PREFERENCE",
+            "scope": "TRANSPORT",
+            "priority": "SOFT",
+            "value": {
+              "keyword": "地铁",
+              "note": "少换乘"
+            }
+          }
+        ],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "availability before alias",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [{ "type": "AVAILABILITY", "scope": "TRIP", "priority": "HARD", "value": { "before": "17:00" } }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0].value",
+      "failureReasonCode": "UNEXPECTED_KEY"
+    },
+    {
+      "name": "availability time without date",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [{ "type": "AVAILABILITY", "scope": "TRIP", "priority": "HARD", "value": { "availableUntil": "17:00" } }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0].value.availableUntil",
+      "failureReasonCode": "INVALID_DATETIME"
+    },
+    {
+      "name": "availability date without time and timezone",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [{ "type": "AVAILABILITY", "scope": "TRIP", "priority": "HARD", "value": { "availableUntil": "2026-08-29" } }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0].value.availableUntil",
+      "failureReasonCode": "INVALID_DATETIME"
+    },
+    {
+      "name": "availability value extra reason",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [{ "type": "AVAILABILITY", "scope": "TRIP", "priority": "HARD", "value": { "availableUntil": "2026-08-29T17:00:00+08:00", "reason": "extra" } }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0].value",
+      "failureReasonCode": "UNEXPECTED_KEY"
+    },
+    {
+      "name": "preference cuisine alias",
+      "analysis": {
+        "intent": "preference",
+        "constraints": [{ "type": "PREFERENCE", "scope": "DINING", "priority": "SOFT", "value": { "cuisine": "越南菜" } }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0].value",
+      "failureReasonCode": "UNEXPECTED_KEY"
+    },
+    {
+      "name": "preference value extra category",
+      "analysis": {
+        "intent": "preference",
+        "constraints": [{ "type": "PREFERENCE", "scope": "DINING", "priority": "SOFT", "value": { "keyword": "越南菜", "category": "food" } }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0].value",
+      "failureReasonCode": "UNEXPECTED_KEY"
+    },
+    {
+      "name": "constraint extra description",
+      "analysis": {
+        "intent": "constraint",
+        "constraints": [{ "type": "AVAILABILITY", "scope": "TRIP", "priority": "HARD", "value": { "availableUntil": "2026-08-29T17:00:00+08:00" }, "description": "extra" }],
+        "confidence": 0.9,
+        "requiresConfirmation": false
+      },
+      "failurePath": "constraints[0]",
+      "failureReasonCode": "UNEXPECTED_KEY"
+    },
+    {
+      "name": "top-level extra reasoning",
+      "analysis": {
+        "intent": "chat",
+        "constraints": [],
+        "confidence": 0.9,
+        "requiresConfirmation": false,
+        "reasoning": "extra"
+      },
+      "failurePath": "$",
+      "failureReasonCode": "UNEXPECTED_KEY"
+    }
+  ]
+}

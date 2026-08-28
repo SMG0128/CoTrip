@@ -4,9 +4,17 @@
 const assert = require('assert');
 const { record } = require('./run-tests');
 const { createGateway } = require('../lib/gateway');
+const { createCloudBaseAIProvider } = require('../lib/cloudbase-ai');
 const { safeEqual } = require('../lib/auth');
-const { stripMarkdownFence, extractJsonContent, isValidGatewayAnalysis } = require('../lib/ai-response-parser');
+const {
+  stripMarkdownFence,
+  extractJsonContent,
+  validateGatewayAnalysis,
+  isValidGatewayAnalysis,
+} = require('../lib/ai-response-parser');
+const { SYSTEM_PROMPT } = require('../lib/prompt');
 const { parseJsonBody, validateAnalyzeInput } = require('../lib/request-parser');
+const CONTRACT_FIXTURES = require('../../../contracts/ai-comment-analysis-fixtures.json');
 
 const SECRET = 'cotrip-test-secret';
 const VALID_ANALYSIS = {
@@ -29,6 +37,17 @@ function gateway(aiProvider = providerReturning(JSON.stringify(VALID_ANALYSIS)))
 }
 function authHeaders() {
   return { authorization: `Bearer ${SECRET}` };
+}
+
+async function captureConsoleError(action) {
+  const original = console.error;
+  const calls = [];
+  console.error = (...args) => calls.push(args);
+  try {
+    return { result: await action(), calls };
+  } finally {
+    console.error = original;
+  }
 }
 
 async function runGatewayTests() {
@@ -94,7 +113,7 @@ async function runGatewayTests() {
 
   await record('analyze: AI 输出 shape 非法 → 502 AI_INVALID_RESPONSE', async () => {
     const bad = { intent: 'hacked', constraints: [], confidence: 'x', requiresConfirmation: false };
-    const res = await gateway(providerReturning(JSON.stringify(bad))).handle({ method: 'POST', url: '/analyze', headers: authHeaders(), bodyText: JSON.stringify({ rawText: '想打羽毛球' }) });
+    const { result: res } = await captureConsoleError(() => gateway(providerReturning(JSON.stringify(bad))).handle({ method: 'POST', url: '/analyze', headers: authHeaders(), bodyText: JSON.stringify({ rawText: '想打羽毛球' }) }));
     assert.strictEqual(res.status, 502);
     assert.strictEqual(res.body.error, 'AI_INVALID_RESPONSE');
   });
@@ -142,9 +161,84 @@ async function runGatewayTests() {
 
   await record('parser: isValidGatewayAnalysis 规则', () => {
     assert.strictEqual(isValidGatewayAnalysis(VALID_ANALYSIS), true);
-    assert.strictEqual(isValidGatewayAnalysis({ intent: 'constraint', constraints: [], confidence: 0.5, requiresConfirmation: false }), true);
+    assert.strictEqual(isValidGatewayAnalysis({ intent: 'constraint', constraints: [], confidence: 0.5, requiresConfirmation: false }), false);
     assert.strictEqual(isValidGatewayAnalysis(null), false);
     assert.strictEqual(isValidGatewayAnalysis({ intent: 'chat' }), false);
+  });
+
+  for (const fixture of CONTRACT_FIXTURES.valid) {
+    await record(`contract valid: ${fixture.name}`, () => {
+      assert.deepStrictEqual(validateGatewayAnalysis(fixture.analysis), { ok: true });
+    });
+  }
+
+  for (const fixture of CONTRACT_FIXTURES.invalid) {
+    await record(`contract invalid: ${fixture.name}`, () => {
+      assert.deepStrictEqual(validateGatewayAnalysis(fixture.analysis), {
+        ok: false,
+        failurePath: fixture.failurePath,
+        failureReasonCode: fixture.failureReasonCode,
+      });
+    });
+  }
+
+  await record('contract canonical: mixed 与 chat 均通过 Gateway', () => {
+    const mixed = CONTRACT_FIXTURES.valid.find((fixture) => fixture.name === 'mixed availability and dining preference');
+    const chat = CONTRACT_FIXTURES.valid.find((fixture) => fixture.name === 'chat without constraints');
+    assert.strictEqual(isValidGatewayAnalysis(mixed.analysis), true);
+    assert.strictEqual(mixed.analysis.constraints[0].value.availableUntil, '2026-08-29T17:00:00+08:00');
+    assert.strictEqual(mixed.analysis.constraints[1].value.keyword, '越南菜');
+    assert.strictEqual(isValidGatewayAnalysis(chat.analysis), true);
+    assert.deepStrictEqual(chat.analysis.constraints, []);
+  });
+
+  await record('gateway diagnostics: 只记录路径和原因码，客户端只见通用错误', async () => {
+    const fixture = CONTRACT_FIXTURES.invalid.find((candidate) => candidate.name === 'availability value extra reason');
+    const rawText = 'private-comment-text';
+    const { result: res, calls } = await captureConsoleError(() => gateway(
+      providerReturning(JSON.stringify(fixture.analysis)),
+    ).handle({
+      method: 'POST',
+      url: '/analyze',
+      headers: authHeaders(),
+      bodyText: JSON.stringify({ rawText }),
+    }));
+    assert.strictEqual(res.status, 502);
+    assert.deepStrictEqual(res.body, { ok: false, error: 'AI_INVALID_RESPONSE' });
+    const logged = JSON.stringify(calls);
+    assert.ok(logged.includes(fixture.failurePath));
+    assert.ok(logged.includes(fixture.failureReasonCode));
+    assert.ok(!logged.includes(rawText));
+    assert.ok(!logged.includes('extra'));
+  });
+
+  await record('prompt: 精确 schema、ISO、失败策略和 canonical examples 齐全', () => {
+    assert.ok(SYSTEM_PROMPT.includes('禁止任何其他字段'));
+    assert.ok(SYSTEM_PROMPT.includes('"availableUntil"?: string'));
+    assert.ok(SYSTEM_PROMPT.includes('2026-08-29T17:00:00+08:00'));
+    assert.ok(SYSTEM_PROMPT.includes('"keyword"?: string'));
+    assert.ok(SYSTEM_PROMPT.includes('"intent":"unclear","constraints":[]'));
+    assert.ok(SYSTEM_PROMPT.includes('"rawText":"哈哈哈哈"'));
+  });
+
+  await record('@cloudbase/ai: generateText 不注入未支持的 structured-output 参数', async () => {
+    let input;
+    const provider = createCloudBaseAIProvider({
+      createModel() {
+        return {
+          async generateText(candidate) {
+            input = candidate;
+            return { text: JSON.stringify(VALID_ANALYSIS) };
+          },
+        };
+      },
+    });
+    await provider.analyze({ rawText: '想吃越南菜', context: null });
+    assert.strictEqual(input.response_format, undefined);
+    assert.strictEqual(input.responseFormat, undefined);
+    assert.strictEqual(input.json_schema, undefined);
+    assert.strictEqual(input.jsonSchema, undefined);
+    assert.strictEqual(input.messages[0].content, SYSTEM_PROMPT);
   });
 
   await record('parser: validateAnalyzeInput 规则', () => {
