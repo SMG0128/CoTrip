@@ -71,6 +71,59 @@
     </view>
   </view>
 
+  <!-- 行程协调状态区：Server authoritative（示例行程为确定性 Mock）；
+       展示为「共同需求」统计 + 冲突提示 + AI 协调建议（建议 ≠ 最终计划）。
+       文案一律由 utils/coordination-ui.ts 的 coordVM 派生，页面不重算。 -->
+  <view wx:if="{{coordVM.showCard}}" class="coordination-card">
+    <view class="coordination-head">
+      <view class="coordination-title">
+        <text>共同需求</text>
+        <text wx:if="{{coordVM.badgeText}}" class="coordination-badge">{{coordVM.badgeText}}</text>
+      </view>
+      <view wx:if="{{coordVM.aiUnavailableText}}" class="coordination-note">{{coordVM.aiUnavailableText}}</view>
+    </view>
+
+    <view class="coordination-stats">
+      <view wx:for="{{coordVM.stats}}" wx:key="label" class="coordination-stat">
+        <text class="stat-value">{{item.value}}</text>
+        <text class="stat-label">{{item.label}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{coordVM.conflictBannerText}}" class="coordination-conflict">
+      <text>{{coordVM.conflictBannerText}}</text>
+    </view>
+    <view wx:elif="{{coordVM.tensionBannerText}}" class="coordination-tension">
+      <text>{{coordVM.tensionBannerText}}</text>
+    </view>
+
+    <view wx:if="{{coordVM.availabilityText}}" class="coordination-row">
+      <text class="row-key">共同时间</text>
+      <text class="row-value">{{coordVM.availabilityText}}</text>
+    </view>
+    <view wx:if="{{coordVM.budgetText}}" class="coordination-row">
+      <text class="row-key">共同预算</text>
+      <text class="row-value">{{coordVM.budgetText}}</text>
+    </view>
+
+    <view wx:if="{{coordVM.proposal}}" class="coordination-proposal">
+      <view class="proposal-head">
+        <text class="proposal-label">AI 协调建议</text>
+        <text class="proposal-status">{{coordVM.proposal.statusText}}</text>
+      </view>
+      <text class="proposal-summary">{{coordVM.proposal.summary}}</text>
+      <view wx:for="{{coordVM.proposal.suggestions}}" wx:key="index" class="proposal-suggestion">
+        <text class="suggestion-message">{{item.message}}</text>
+        <text wx:if="{{item.requiresConfirmation}}" class="suggestion-confirm">待成员确认</text>
+      </view>
+    </view>
+
+    <view class="coordination-actions">
+      <view class="coordination-btn" bind:tap="onAnalyzeCoordination" wx:if="{{coordVM.showGenerateButton}}">生成协调建议</view>
+      <view class="coordination-btn disabled" wx:if="{{coordinationLoading}}">{{coordVM.generateButtonLabel}}</view>
+    </view>
+  </view>
+
   <view wx:if="{{debugEnabled}}" class="debug-panel {{debugExpanded ? 'expanded' : ''}}">
     <view class="debug-header" bind:tap="onDebugToggle">
       <view class="debug-title">

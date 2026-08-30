@@ -18,6 +18,8 @@ export interface AppConfig {
   tripDataFile: string;
   /** 评论流数据持久化文件路径 */
   commentDataFile: string;
+  /** Constraint Ledger 数据持久化文件路径 */
+  constraintDataFile: string;
   /** 评论分析 Provider 选择：openai_compatible（默认）或 cloudbase_gateway。 */
   aiProvider?: 'openai_compatible' | 'cloudbase_gateway';
   /** OpenAI-compatible 评论分析 Provider；三项齐全才启用。 */
@@ -49,6 +51,8 @@ export function loadConfig(): AppConfig {
       process.env.TRIP_DATA_FILE || path.resolve(__dirname, '../../data/trips.json'),
     commentDataFile:
       process.env.COMMENT_DATA_FILE || path.resolve(__dirname, '../../data/comments.json'),
+    constraintDataFile:
+      process.env.CONSTRAINT_DATA_FILE || path.resolve(__dirname, '../../data/constraints.json'),
     aiProvider:
       (process.env.AI_PROVIDER?.trim() as AppConfig['aiProvider']) || undefined,
     aiBaseUrl: process.env.AI_BASE_URL?.trim() || undefined,

@@ -15,15 +15,18 @@ import { NotificationService } from './notification-service';
 import { ExternalActionService } from './external-action-service';
 import { AuthService } from './auth-service';
 import { RouteOptionService } from '../types/route-option';
+import { CoordinationService } from './coordination-service';
 
 import { MockAIService } from './mock/mock-ai-service';
 import { MockMapService } from './mock/mock-map-service';
 import { MockPlaceService } from './mock/mock-place-service';
 import { MockNotificationService } from './mock/mock-notification-service';
 import { MockExternalActionService } from './mock/mock-external-action-service';
+import { MockCoordinationService } from './mock/mock-coordination-service';
 import { RealAuthService } from './real/real-auth-service';
 import { RealTripService } from './real/real-trip-service';
 import { RealCommentService } from './real/real-comment-service';
+import { RealCoordinationService } from './real/real-coordination-service';
 import { RealRouteOptionService } from './route-option-service';
 
 // 认证：一律真实后端（wx.login → CoTrip Backend），后端不可用时登录明确失败。
@@ -34,6 +37,10 @@ export const tripService: TripService = new RealTripService();
 
 // 评论流：一律真实后端（共享实体持久化，禁止本地 mock 假装多人评论已实现）。
 export const commentService: CommentService = new RealCommentService();
+
+// 协调状态：真实行程走 Server Constraint Ledger + Server evaluator + 真实 AI；
+// 示例行程（demo-local-trip）由页面按固定 ID 切换到 Mock（见 trip-detail 门禁）。
+export const coordinationService: CoordinationService = new RealCoordinationService();
 
 // 仅供固定 Demo/开发预览；真实评论 AI 位于 server，且不会引用本实例。
 export const demoAIService: AIService = new MockAIService();
@@ -59,5 +66,6 @@ export type {
   ExternalActionService,
   AuthService,
   RouteOptionService,
+  CoordinationService,
 };
 export type { TripJoinPreview } from './trip-service';

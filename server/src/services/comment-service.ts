@@ -11,6 +11,7 @@ import { Trip } from '../types/trip';
 import { toPublicUser } from '../types/user';
 import { AICommentAnalysis } from '../types/ai-comment';
 import { AICommentService, AICommentServiceError } from './ai-comment-service';
+import { ConstraintLedgerService } from './constraint-ledger-service';
 import { AppError } from '../types/errors';
 
 function generateCommentId(now: Date): string {
@@ -23,6 +24,8 @@ export class CommentService {
     private readonly trips: TripRepository,
     private readonly users: UserRepository,
     private readonly ai: AICommentService,
+    /** 可选：注入后启用 Constraint Ledger 持久化（真实行程必须注入；单元测试可不注入） */
+    private readonly ledger?: ConstraintLedgerService,
   ) {}
 
   /** 权限校验：目标 Trip 存在且当前用户为成员 */
@@ -116,6 +119,28 @@ export class CommentService {
         currentPlan: trip.currentPlan ?? null,
         existingRelevantConstraints,
       });
+      // 约束持久化必须在评论状态更新前完成：
+      // comment 已落库 → AI 成功 → constraint 写入 Ledger → 评论权威状态更新
+      if (this.ledger) {
+        const constraints = await this.ledger.persistFromAnalysis(
+          {
+            tripId: trip.id,
+            commentId: comment.id,
+            userId: comment.userId,
+            createdAt: comment.createdAt,
+          },
+          analysis,
+        );
+        if (constraints.length === 0) {
+          // AI 声称有约束但全部无法规范化持久化：不伪造权威状态
+          const unresolved: Comment = {
+            ...comment,
+            aiStatus: 'unresolved',
+            aiSource: this.ai.source,
+          };
+          return this.comments.update(unresolved);
+        }
+      }
       const updated: Comment = {
         ...comment,
         aiStatus: statusForAnalysis(analysis),

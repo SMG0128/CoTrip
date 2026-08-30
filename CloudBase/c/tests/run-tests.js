@@ -18,9 +18,11 @@ async function record(name, fn) {
 module.exports.record = record;
 
 const { runGatewayTests } = require('./gateway.test');
+const { runCoordinateTests } = require('./coordinate.test');
 
 async function main() {
   await runGatewayTests();
+  await runCoordinateTests();
 
   let failed = 0;
   for (const r of results) {

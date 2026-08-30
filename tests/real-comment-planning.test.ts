@@ -63,4 +63,25 @@ assert(withUnresolved.constraints.length === 0, '未解析评论不得形成 Con
 assert(withUnresolved.plan.totalConstraintCount === 0, '未解析评论不得错误增加 N');
 assert(withUnresolved.plan.satisfiedConstraintCount === 0, '未解析评论不得 accepted/satisfied');
 
+// 真实行程绝不运行前端规则解析器兜底：
+// rawText 明显含可解析约束（「必须 18:00 后」「预算必须 500 以内」），
+// 但 Server 尚未给出 aiAnalysis（processing）→ 不得从原文自解析出约束。
+const processing: Comment = {
+  ...comments[0],
+  id: 'comment_processing',
+  rawText: '我 18:00 后才有空，预算必须 500 以内',
+  aiStatus: 'processing',
+  aiSource: 'none',
+  aiAnalysis: undefined,
+};
+const withProcessing = evaluateRealCommentPlan(emptyPlan, [processing]);
+assert(withProcessing.constraints.length === 0, 'processing 评论不得被前端规则解析器兜底成约束');
+assert(withProcessing.plan.totalConstraintCount === 0, 'processing 评论不得增加 N');
+assert(withProcessing.unresolvedCommentIds.includes('comment_processing'), 'processing 评论应进入未解析集合');
+// 约束必须全部来自服务端 aiAnalysis（provider），禁止任何 mock/本地来源
+assert(
+  withProcessing.constraints.every((c) => c.sourceCommentId === 'comment_1' || c.sourceCommentId === 'comment_2'),
+  '真实行程约束只能来自服务端 accepted 评论'
+);
+
 console.log('✅ real-comment-planning.test.ts 全部通过');

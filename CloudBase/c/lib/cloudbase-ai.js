@@ -9,6 +9,7 @@
 // POST {aiBaseUrl}/ai/{provider}/chat/completions 的默认通道。
 
 const { SYSTEM_PROMPT } = require('./prompt');
+const { COORDINATION_SYSTEM_PROMPT } = require('./coordinate-prompt');
 
 function createCloudBaseAIProvider(ai) {
   return {
@@ -23,6 +24,25 @@ function createCloudBaseAIProvider(ai) {
           {
             role: 'user',
             content: JSON.stringify({ rawText, context: context || null }),
+          },
+        ],
+      });
+      if (result && result.error) {
+        throw new Error('AI_PROVIDER_ERROR');
+      }
+      return { text: result && typeof result.text === 'string' ? result.text : '' };
+    },
+    /** 协调建议：输入是 Server 已验证的 coordination context。返回 { text }。 */
+    async coordinate(coordinationInput) {
+      const model = ai.createModel('hunyuan-v3');
+      const result = await model.generateText({
+        model: 'hy3',
+        temperature: 0,
+        messages: [
+          { role: 'system', content: COORDINATION_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: JSON.stringify({ coordination: coordinationInput }),
           },
         ],
       });

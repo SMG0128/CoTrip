@@ -65,10 +65,38 @@ function validateAnalyzeInput(body, maxRawTextLength = MAX_RAW_TEXT_LENGTH) {
   return { ok: true, value: { rawText, context } };
 }
 
+/**
+ * /coordinate 输入校验（网关侧粗校验）。
+ * 请求体：{ coordination: { tripId, participants, constraints, deterministicEvaluation, conflicts } }
+ * 网关只做结构存在性粗校验；权威校验在 CoTrip Server。
+ */
+function validateCoordinateInput(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'INVALID_INPUT' };
+  }
+  const coordination = body.coordination;
+  if (!coordination || typeof coordination !== 'object' || Array.isArray(coordination)) {
+    return { ok: false, error: 'COORDINATION_REQUIRED' };
+  }
+  if (typeof coordination.tripId !== 'string' || !coordination.tripId) {
+    return { ok: false, error: 'TRIP_ID_REQUIRED' };
+  }
+  if (
+    !Array.isArray(coordination.constraints)
+    || !Array.isArray(coordination.conflicts)
+    || !coordination.deterministicEvaluation
+    || typeof coordination.deterministicEvaluation !== 'object'
+  ) {
+    return { ok: false, error: 'COORDINATION_SHAPE_INVALID' };
+  }
+  return { ok: true, value: coordination };
+}
+
 module.exports = {
   MAX_BODY_BYTES,
   MAX_RAW_TEXT_LENGTH,
   readBody,
   parseJsonBody,
   validateAnalyzeInput,
+  validateCoordinateInput,
 };

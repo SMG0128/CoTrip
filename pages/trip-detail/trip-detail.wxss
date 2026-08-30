@@ -289,6 +289,177 @@ button::after {
   box-shadow: 0 10rpx 34rpx rgba(60, 90, 160, 0.09);
 }
 
+/* 行程协调状态区：低于评论卡片一级，展示 Server authoritative 统计 + 冲突 + AI 建议 */
+.coordination-card {
+  margin: 0 24rpx 28rpx;
+  padding: 28rpx;
+  background: #f8fafd;
+  border: 1rpx solid rgba(122, 147, 194, 0.12);
+  border-radius: 28rpx;
+}
+
+.coordination-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.coordination-title {
+  display: flex;
+  align-items: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2b3a55;
+}
+
+.coordination-badge {
+  margin-left: 12rpx;
+  padding: 4rpx 14rpx;
+  font-size: 20rpx;
+  font-weight: 500;
+  color: #8a6d1a;
+  background: #fdf3d7;
+  border-radius: 999rpx;
+}
+
+.coordination-note {
+  font-size: 22rpx;
+  color: #98a2b3;
+}
+
+.coordination-stats {
+  display: flex;
+  margin-bottom: 20rpx;
+}
+
+.coordination-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2b3a55;
+}
+
+.stat-label {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #8a94a6;
+}
+
+.coordination-conflict {
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+  font-size: 24rpx;
+  color: #9a3b3b;
+  background: #fbecec;
+  border-radius: 16rpx;
+}
+
+.coordination-tension {
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+  font-size: 24rpx;
+  color: #7a5b12;
+  background: #fdf6e0;
+  border-radius: 16rpx;
+}
+
+.coordination-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8rpx 0;
+}
+
+.row-key {
+  font-size: 24rpx;
+  color: #8a94a6;
+}
+
+.row-value {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #2b3a55;
+}
+
+.coordination-proposal {
+  margin-top: 16rpx;
+  padding: 20rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(122, 147, 194, 0.12);
+  border-radius: 20rpx;
+}
+
+.proposal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+}
+
+.proposal-label {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #2b3a55;
+}
+
+.proposal-status {
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  color: #3b6ea5;
+  background: #eaf1fb;
+  border-radius: 999rpx;
+}
+
+.proposal-summary {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #3b4a66;
+}
+
+.proposal-suggestion {
+  display: flex;
+  align-items: center;
+  margin-top: 12rpx;
+}
+
+.suggestion-message {
+  flex: 1;
+  font-size: 22rpx;
+  color: #4a5872;
+}
+
+.suggestion-confirm {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: #8a6d1a;
+}
+
+.coordination-actions {
+  margin-top: 16rpx;
+}
+
+.coordination-btn {
+  display: inline-flex;
+  padding: 12rpx 28rpx;
+  font-size: 24rpx;
+  color: #3b6ea5;
+  background: #eaf1fb;
+  border-radius: 999rpx;
+}
+
+.coordination-btn.disabled {
+  color: #98a2b3;
+  background: #eef1f5;
+}
+
 .ideas-head {
   display: flex;
   align-items: center;

@@ -16,7 +16,16 @@ import { Plan } from '../../types/plan';
 import { PlanningEngine } from '../../core/planning-engine';
 import { rankCandidates } from '../../core/candidate-ranker';
 import { tencentMapProvider } from '../../services/providers/tencent-map-provider';
-import { tripService, routeOptionService, commentService } from '../../services/index';
+import {
+  tripService,
+  routeOptionService,
+  commentService,
+  coordinationService,
+} from '../../services/index';
+import { MockCoordinationService } from '../../services/mock/mock-coordination-service';
+import { TripCoordinationState } from '../../types/coordination';
+import { CoordinationResult } from '../../services/coordination-service';
+import { buildCoordinationVM, CoordinationVM } from '../../utils/coordination-ui';
 import { MockRouteOptionService } from '../../services/route-option-service';
 import { EventCandidateGroup } from '../../types/event-candidate';
 import { ResolvedDestination, RouteOption, RoutePlanQuery } from '../../types/route-option';
@@ -90,6 +99,16 @@ const DEBUG_ENABLED = isDebugEnabled();
 // 选定后走本服务读取 fixture（不消费 query、不依赖出发地点），且永不触达腾讯 API。
 const demoRouteOptionService = new MockRouteOptionService();
 
+/** 协调区初始空态视图模型（页面加载完成前展示） */
+function buildInitialCoordinationVM(): CoordinationVM {
+  return buildCoordinationVM({
+    coordination: null,
+    proposal: null,
+    coordinationUnavailable: false,
+    loading: false,
+  });
+}
+
 /** 新 Trip 无初始计划时生成空骨架，避免 PlanBoard 空引用 */
 function buildEmptyPlan(tripId: string): Plan {
   return {
@@ -140,6 +159,13 @@ Page({
     detailBottomPadding: DETAIL_BOTTOM_PADDING_BASE,
     participantCount: 0,
     commentCount: 0,
+    // 行程协调状态（Server authoritative；示例行程使用 Mock；AI 未配置时 coordinationUnavailable=true）
+    coordination: null as TripCoordinationState | null,
+    coordinationProposal: null as CoordinationResult['proposal'] | null,
+    coordinationUnavailable: false,
+    coordinationLoading: false,
+    /** 协调区展示视图模型（由 utils/coordination-ui.ts 派生，仅渲染用，不重算） */
+    coordVM: buildInitialCoordinationVM(),
     // 完成行程：仅 owner + ACTIVE 展示入口；请求进行中防重复点击
     canCompleteTrip: false,
     isCompletingTrip: false,
@@ -237,6 +263,8 @@ Page({
     // （示例行程纯本地展示，跳过；首次进入时 trip 尚未 bootstrap 完成，由 bootstrapTrip 拉取）
     if (actions.refreshComments) {
       this.loadServerComments(this.data.trip.id);
+      // 新评论可能产生新约束 → 协调状态随之刷新（Server 重算，不信任本地）
+      this.loadCoordination(this.data.trip.id);
     }
 
     // 路线恢复是独立生命周期；它的门禁不得阻断上面的评论刷新。
@@ -305,6 +333,9 @@ Page({
     if (!seedDemoComments) {
       this.loadServerComments(trip.id);
     }
+
+    // 协调状态（真实行程 → Server；示例行程 → Mock），AI 未配置时 coordinationUnavailable=true
+    this.loadCoordination(trip.id);
   },
 
   /**
@@ -320,6 +351,114 @@ Page({
       this.runPipeline(merged);
     } catch (error) {
       wx.showToast({ title: '评论加载失败', icon: 'none' });
+    }
+  },
+
+  /**
+   * 加载行程协调状态（Server authoritative；示例行程使用 Mock，真实行程严禁 fallback）。
+   * 协调状态来自 Server Constraint Ledger + deterministic evaluator：
+   * 页面不重算、不信任本地约束，只渲染 Server 结果。
+   * AI 协调建议失败时 coordinationUnavailable=true，保留确定性状态，不伪造建议。
+   */
+  async loadCoordination(tripId: string): Promise<void> {
+    if (isDemoTripId(tripId)) {
+      // 示例行程：纯本地 Mock（确定性 mock data），与真实行程严格隔离
+      const mock = new MockCoordinationService();
+      try {
+        const result = await mock.getCoordination(tripId);
+        this.setData({
+          coordination: result.coordination,
+          coordinationProposal: result.proposal ?? null,
+          coordinationUnavailable: result.coordinationUnavailable,
+          coordinationLoading: false,
+          coordVM: buildCoordinationVM({
+            coordination: result.coordination,
+            proposal: result.proposal ?? null,
+            coordinationUnavailable: result.coordinationUnavailable,
+            loading: false,
+          }),
+        });
+      } catch {
+        this.setData({ coordinationLoading: false, coordVM: buildInitialCoordinationVM() });
+      }
+      return;
+    }
+
+    this.setData({ coordinationLoading: true });
+    try {
+      const result = await coordinationService.getCoordination(tripId);
+      this.setData({
+        coordination: result.coordination,
+        coordinationProposal: result.proposal ?? null,
+        coordinationUnavailable: result.coordinationUnavailable,
+        coordinationLoading: false,
+        coordVM: buildCoordinationVM({
+          coordination: result.coordination,
+          proposal: result.proposal ?? null,
+          coordinationUnavailable: result.coordinationUnavailable,
+          loading: false,
+        }),
+      });
+    } catch (error) {
+      // 协调状态加载失败：保留空状态，不伪造、不阻断页面
+      this.setData({
+        coordination: null,
+        coordinationProposal: null,
+        coordinationUnavailable: true,
+        coordinationLoading: false,
+        coordVM: buildCoordinationVM({
+          coordination: null,
+          proposal: null,
+          coordinationUnavailable: true,
+          loading: false,
+        }),
+      });
+    }
+  },
+
+  /** 请求 AI 协调建议（真实行程专用；示例行程用 Mock 即时返回） */
+  async onAnalyzeCoordination() {
+    const tripId = this.data.trip.id;
+    if (isDemoTripId(tripId)) {
+      const mock = new MockCoordinationService();
+      const result = await mock.analyze(tripId);
+      this.setData({
+        coordinationProposal: result.proposal ?? null,
+        coordinationUnavailable: result.coordinationUnavailable,
+        coordVM: buildCoordinationVM({
+          coordination: this.data.coordination,
+          proposal: result.proposal ?? null,
+          coordinationUnavailable: result.coordinationUnavailable,
+          loading: false,
+        }),
+      });
+      return;
+    }
+    this.setData({ coordinationLoading: true });
+    try {
+      const result = await coordinationService.analyze(tripId);
+      this.setData({
+        coordination: result.coordination,
+        coordinationProposal: result.proposal ?? null,
+        coordinationUnavailable: result.coordinationUnavailable,
+        coordinationLoading: false,
+        coordVM: buildCoordinationVM({
+          coordination: result.coordination,
+          proposal: result.proposal ?? null,
+          coordinationUnavailable: result.coordinationUnavailable,
+          loading: false,
+        }),
+      });
+    } catch {
+      this.setData({
+        coordinationLoading: false,
+        coordVM: buildCoordinationVM({
+          coordination: this.data.coordination,
+          proposal: this.data.coordinationProposal,
+          coordinationUnavailable: this.data.coordinationUnavailable,
+          loading: false,
+        }),
+      });
     }
   },
 
