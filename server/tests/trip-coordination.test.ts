@@ -31,6 +31,7 @@ import {
 } from '../src/services/ai-comment-service';
 import { TripConstraint } from '../src/types/trip-constraint';
 import { TripCoordinationProposal } from '../src/types/trip-coordination-proposal';
+import { TripCoordinationAIInput } from '../src/types/trip-coordination-ai-input';
 import { record } from './run-tests';
 
 function fixture(overrides: Partial<Trip> = {}): Trip {
@@ -110,7 +111,7 @@ function setup(commentAI: AICommentService = new UnavailableCommentAI()): Harnes
   const commentService = new CommentService(comments, trips, users, commentAI, ledger);
   const evaluator = new TripConstraintEvaluator();
   let coordinationAI: TripCoordinationAIService = new UnavailableCoordinationAI();
-  const coordination = new TripCoordinationService(trips, constraints, evaluator, coordinationAI);
+  const coordination = new TripCoordinationService(trips, constraints, evaluator, coordinationAI, comments, ledger);
   return {
     directory, constraints, ledger, evaluator, coordination, commentService, trips,
     setCoordinatorAI(ai: TripCoordinationAIService) {
@@ -318,8 +319,8 @@ export async function runTripCoordinationTests(): Promise<void> {
     }
   });
 
-  // ---------- PHASE 4：supersession ----------
-  await record('coordination: 同 user+type+scope 新约束替代旧约束（保留历史+标记 SUPERSEDED）', async () => {
+  // ---------- PHASE 4：supersession（REVIEW 1/2：确认前旧 HARD 保持 ACTIVE） ----------
+  await record('coordination: 同 user+type+scope 新 HARD 候选在确认前不得 SUPERSEDED 旧约束', async () => {
     const h = setup(new StubAICommentService([
       okAnalysis([availabilityUntil('17:00')]),
       okAnalysis([availabilityUntil('18:00')]),
@@ -330,12 +331,18 @@ export async function runTripCoordinationTests(): Promise<void> {
       await h.commentService.addComment('usr_A', 'trip_T', '改了，我六点前走');
       const list = await h.constraints.listByTrip('trip_T');
       assert.strictEqual(list.length, 2, '旧约束不得删除，必须保留历史');
-      const oldC = list[0];
-      const newC = list[1];
-      assert.strictEqual(oldC.status, 'SUPERSEDED', '旧约束必须标记 SUPERSEDED');
+      const oldC = list.find((c) => c.value.until === '17:00');
+      const newC = list.find((c) => c.value.until === '18:00');
+      assert.ok(oldC && newC, '应存在旧/新两条约束');
+      assert.strictEqual(oldC.status, 'ACTIVE', '确认前旧 HARD 必须保持 ACTIVE');
       assert.strictEqual(newC.status, 'ACTIVE');
       assert.strictEqual(newC.supersedesConstraintId, oldC.id, '新约束必须记录替代来源');
       assert.strictEqual(newC.requiresConfirmation, true, '替代旧 HARD 约束必须 requiresConfirmation');
+      // 确定性状态：候选可见，且确认前共同时间不得因新评论放宽旧 HARD（保守取 min）
+      const state = h.evaluator.evaluate({ tripId: 'trip_T', constraints: list, participantIds: ['usr_A'] });
+      assert.strictEqual(state.requiresConfirmation, true, '存在待确认替代时必须标记');
+      assert.strictEqual(state.supersessionCandidates.length, 1, '必须暴露 supersession 候选');
+      assert.deepStrictEqual(state.commonAvailability, { after: undefined, until: '17:00' }, '确认前不能放宽旧 HARD');
     } finally {
       fs.rmSync(h.directory, { recursive: true, force: true });
     }
@@ -435,11 +442,12 @@ export async function runTripCoordinationTests(): Promise<void> {
     }
   });
 
-  // ---------- PHASE 8：privacy（不传 openid/avatar） ----------
-  await record('coordination: AI 输入最小化隐私（仅匿名 label，无 openid/avatar）', async () => {
+  // ---------- PHASE 8：privacy（REVIEW 13：不传任何真实 id） ----------
+  await record('coordination: AI 输入最小化隐私（仅匿名 label，无 openid/userId/avatar）', async () => {
     const h = setup();
     try {
       await h.trips.create(fixture({ participantIds: ['usr_A', 'usr_B'] }));
+      await h.constraints.create(constraint({ id: 'c1', userId: 'usr_A', sourceCommentId: 'comment_1', value: { after: '14:00' } }));
       let captured: unknown = null;
       const ai = new StubCoordinationAIService((input) => {
         captured = input;
@@ -447,15 +455,19 @@ export async function runTripCoordinationTests(): Promise<void> {
       });
       h.setCoordinatorAI(ai);
       await h.coordination.analyze('usr_A', 'trip_T');
-      const input = captured as { participants: Array<{ id: string; label: string }> };
-      assert.strictEqual(input.participants.length, 2);
-      for (const p of input.participants) {
-        assert.ok(p.label.startsWith('成员'), '参与者必须匿名 label');
-        assert.ok(!p.id.includes('openid'), '不得泄漏 openid');
+      const input = captured as TripCoordinationAIInput;
+      assert.deepStrictEqual(input.participants, ['成员A', '成员B'], '参与者只能是匿名 label');
+      assert.strictEqual(input.constraints.length, 1);
+      for (const constraint of input.constraints) {
+        assert.ok(!('userId' in constraint), 'constraints 不得含 userId');
+        assert.ok(!('sourceCommentId' in constraint), 'constraints 不得含 sourceCommentId');
+        assert.ok(!('tripId' in constraint), 'constraints 不得含 tripId');
+        assert.ok(constraint.authorLabel.startsWith('成员'), '作者必须匿名 label');
       }
       const serialized = JSON.stringify(input);
       assert.ok(!serialized.includes('openid'), '不得包含 openid');
       assert.ok(!serialized.includes('avatarUrl'), '不得包含 avatar');
+      assert.ok(!serialized.includes('usr_A') && !serialized.includes('usr_B'), '不得包含真实 userId surrogate');
     } finally {
       fs.rmSync(h.directory, { recursive: true, force: true });
     }

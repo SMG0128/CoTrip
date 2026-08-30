@@ -119,35 +119,40 @@ export class CommentService {
         currentPlan: trip.currentPlan ?? null,
         existingRelevantConstraints,
       });
-      // 约束持久化必须在评论状态更新前完成：
-      // comment 已落库 → AI 成功 → constraint 写入 Ledger → 评论权威状态更新
-      if (this.ledger) {
-        const constraints = await this.ledger.persistFromAnalysis(
-          {
-            tripId: trip.id,
-            commentId: comment.id,
-            userId: comment.userId,
-            createdAt: comment.createdAt,
-          },
-          analysis,
-        );
-        if (constraints.length === 0) {
-          // AI 声称有约束但全部无法规范化持久化：不伪造权威状态
-          const unresolved: Comment = {
-            ...comment,
-            aiStatus: 'unresolved',
-            aiSource: this.ai.source,
-          };
-          return this.comments.update(unresolved);
-        }
-      }
+      // Production Readiness（REVIEW 6）—— 权威持久化顺序：
+      //   1) 先落盘评论权威状态（accepted + aiAnalysis）：analysis 是唯一可重放权威源，
+      //      无论后续 ledger 是否失败都不丢失，backfill 可自愈。
+      //   2) 再 materialize Constraint Ledger（幂等）。
+      //   3) ledger 返回空（AI 有约束但全部无法规范化）→ 评论标 unresolved（保留 aiAnalysis 供审计）。
+      //   4) ledger 写失败 → 保持 accepted + aiAnalysis，不伪造「完全处理成功」也不丢失 analysis。
       const updated: Comment = {
         ...comment,
         aiStatus: statusForAnalysis(analysis),
         aiSource: this.ai.source,
         aiAnalysis: analysis,
       };
-      return this.comments.update(updated);
+      const persisted = await this.comments.update(updated);
+      if (this.ledger) {
+        try {
+          const constraints = await this.ledger.persistFromAnalysis(
+            {
+              tripId: trip.id,
+              commentId: comment.id,
+              userId: comment.userId,
+              createdAt: comment.createdAt,
+            },
+            analysis,
+          );
+          if (constraints.length === 0) {
+            // AI 声称有约束但全部无法规范化持久化：不伪造权威状态（保留 aiAnalysis）
+            return this.comments.update({ ...persisted, aiStatus: 'unresolved' });
+          }
+        } catch {
+          // Ledger materialization 暂时失败：评论保持 accepted + aiAnalysis（权威源已落盘），
+          // 下次读取/backfill 自动 reconciliation；不把整体状态标成「完全处理成功」。
+        }
+      }
+      return persisted;
     } catch (error) {
       const updated: Comment = {
         ...comment,

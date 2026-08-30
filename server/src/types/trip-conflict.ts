@@ -9,6 +9,7 @@ export type TripConflictStatus = 'OPEN' | 'RESOLVED';
 export type TripConflictReasonCode =
   | 'NO_COMMON_AVAILABILITY'
   | 'BUDGET_RANGE_EMPTY'
+  | 'BUDGET_UNIT_MISMATCH'
   | 'CITY_MISMATCH'
   | 'PREFERENCE_DIVERGENCE';
 

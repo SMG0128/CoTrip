@@ -12,6 +12,7 @@ import { runAICommentServiceTests } from './ai-comment-service.test';
 import { runAICommentContractTests } from './ai-comment-contract.test';
 import { runCloudBaseGatewayTests } from './cloudbase-gateway-ai-comment-service.test';
 import { runTripCoordinationTests } from './trip-coordination.test';
+import { runProductionReadinessTests } from './production-readiness.test';
 
 interface TestResult {
   name: string;
@@ -44,6 +45,7 @@ async function main(): Promise<void> {
   await runAICommentContractTests();
   await runCloudBaseGatewayTests();
   await runTripCoordinationTests();
+  await runProductionReadinessTests();
 
   let failed = 0;
   for (const r of results) {

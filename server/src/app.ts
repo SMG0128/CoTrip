@@ -57,6 +57,8 @@ export function createApp() {
     constraintRepository,
     coordinationEvaluator,
     aiCoordination,
+    commentRepository,
+    ledger,
   );
 
   const app = express();

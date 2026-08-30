@@ -3,7 +3,9 @@
 // 禁止生成没有来源的神秘 constraint。
 // status 语义：
 //   ACTIVE     → 参与确定性评估
-//   SUPERSEDED → 被同 user+type+scope 的新约束替代（保留历史，不删除）
+//   SUPERSEDED → 已被「已确认的替代」或「同一 source 评论的最新 analysis」替代
+//                （保留历史，不删除）。注意：普通 supersession 候选在 V1 确认机制落地前
+//                不会自动标记 SUPERSEDED——旧 HARD 约束保持 ACTIVE，直到成员明确确认。
 //   WITHDRAWN  → 用户主动撤销（V1 预留）
 
 export type TripConstraintType = 'AVAILABILITY' | 'LOCATION' | 'BUDGET' | 'PREFERENCE';
@@ -23,7 +25,7 @@ export interface TripConstraint {
   priority: TripConstraintPriority;
   /** 规范化后的值：
    *  AVAILABILITY → { after?: string(HH:mm), until?: string(HH:mm) }
-   *  BUDGET       → { min?: number, max?: number }
+   *  BUDGET       → { min?: number, max?: number, currency?: string, unit?: string }
    *  LOCATION     → { city?: string, district?: string, poi?: string, locationId?: string }
    *  PREFERENCE   → { category?: string, tags?: string[] }
    */

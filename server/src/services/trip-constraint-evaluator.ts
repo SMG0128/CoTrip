@@ -3,10 +3,17 @@
 // 输出：TripCoordinationState（含 commonAvailability/commonBudget + conflicts）。
 //
 // 规则：
-//   AVAILABILITY(HARD) → after 取 max、until 取 min；after>until → NO_COMMON_AVAILABILITY
-//   BUDGET(HARD)       → min 取 max、max 取 min；min>max → BUDGET_RANGE_EMPTY
-//   LOCATION(HARD)     → 不同 city → CITY_MISMATCH（V1 不推断 district/POI 距离兼容性）
+//   AVAILABILITY(HARD) → 同一 user 的约束先合并为自身窗口（after 取 max、until 取 min），
+//                        再跨 user 求交集（after 取 max、until 取 min）；
+//                        after>until → NO_COMMON_AVAILABILITY
+//                        （跨午夜：同一 user 窗口内 until<after 时 until 视为次日，REVIEW 10）
+//   BUDGET(HARD)       → currency/unit 不一致时不合并（BUDGET_UNIT_MISMATCH，不假算）；
+//                        兼容单位下 min 取 max、max 取 min；min>max → BUDGET_RANGE_EMPTY
+//   LOCATION(HARD)     → 仅 HARD + 有 city 时判不同 city → CITY_MISMATCH
+//                        （SOFT location / district/POI 无 Provider evidence 不推断，REVIEW 12）
 //   PREFERENCE(SOFT)   → 不同偏好 → PREFERENCE_DIVERGENCE（SOFT_TENSION，非 HARD_CONFLICT）
+// 稳定 identity（REVIEW 9）：conflict id 由 tripId+reasonCode+dimension+排序后的
+//   constraintIds 生成，相同 authoritative input → 相同 id。
 
 import {
   TripConstraint,
@@ -113,13 +120,15 @@ function buildConflict(
   participantUserIds: string[],
   now: Date,
 ): TripConflict {
+  // REVIEW 9：constraintIds 去重排序后参与 id 生成，保证相同 authoritative input → 相同 identity
+  const ids = [...new Set(constraintIds)].sort();
   return {
-    id: conflictId(input.tripId, reasonCode, dimension, constraintIds.join(',').slice(0, 16)),
+    id: conflictId(input.tripId, reasonCode, dimension, ids.join(',')),
     tripId: input.tripId,
     kind,
     dimension,
-    constraintIds: [...constraintIds],
-    participantUserIds: [...participantUserIds],
+    constraintIds: ids,
+    participantUserIds: [...new Set(participantUserIds)],
     reasonCode,
     status: 'OPEN',
     createdAt: now.toISOString(),
@@ -189,31 +198,41 @@ export class TripConstraintEvaluator {
     );
     if (hardAvailability.length === 0) return undefined;
 
-    let afterMinutes = 0; // 默认一天开始
-    let untilMinutes: number | null = null;
-    let hasAfter = false;
-    let hasUntil = false;
-
+    // REVIEW 10：同一 user 的多个 AVAILABILITY 约束先合并为自身窗口，
+    // 使「A: 23:00 后 + A: 次日 02:00 前」能被识别为跨午夜窗口，而不是误判为冲突。
+    const perUser = new Map<string, { after: number | null; until: number | null }>();
     for (const constraint of hardAvailability) {
       const value = asAvailability(constraint.value);
+      const entry = perUser.get(constraint.userId) ?? { after: null, until: null };
       if (value.after !== undefined) {
         const parsed = parseTime(value.after);
-        if (parsed !== null) {
-          hasAfter = true;
-          afterMinutes = Math.max(afterMinutes, parsed);
-        }
+        if (parsed !== null) entry.after = entry.after === null ? parsed : Math.max(entry.after, parsed);
       }
       if (value.until !== undefined) {
         const parsed = parseTime(value.until);
-        if (parsed !== null) {
-          hasUntil = true;
-          untilMinutes = untilMinutes === null ? parsed : Math.min(untilMinutes, parsed);
-        }
+        if (parsed !== null) entry.until = entry.until === null ? parsed : Math.min(entry.until, parsed);
       }
+      perUser.set(constraint.userId, entry);
     }
 
-    const after = hasAfter ? minutesToTime(afterMinutes) : undefined;
-    const until = hasUntil && untilMinutes !== null ? minutesToTime(untilMinutes) : undefined;
+    let afterMinutes = 0; // 默认一天开始
+    let untilMinutes: number | null = null;
+    for (const entry of perUser.values()) {
+      let after = entry.after;
+      let until = entry.until;
+      // 跨午夜：同一 user 窗口 until < after 时视为跨天（如 23:00-02:00 → until 归入次日）
+      if (after !== null && until !== null && until < after) {
+        until += 1440;
+      }
+      if (after !== null) afterMinutes = Math.max(afterMinutes, after);
+      if (until !== null) untilMinutes = untilMinutes === null ? until : Math.min(untilMinutes, until);
+    }
+    const hasAfter = [...perUser.values()].some((entry) => entry.after !== null);
+    const hasUntil = [...perUser.values()].some((entry) => entry.until !== null);
+
+    // 输出墙钟（跨天窗口归一化到 0-1439）
+    const after = hasAfter ? minutesToTime(afterMinutes % 1440) : undefined;
+    const until = hasUntil && untilMinutes !== null ? minutesToTime(untilMinutes % 1440) : undefined;
 
     if (hasAfter && hasUntil && afterMinutes > (untilMinutes ?? Number.MAX_SAFE_INTEGER)) {
       conflicts.push(
@@ -243,6 +262,30 @@ export class TripConstraintEvaluator {
       (constraint) => constraint.type === 'BUDGET' && constraint.priority === 'HARD',
     );
     if (hardBudget.length === 0) return undefined;
+
+    // REVIEW 11：只有兼容单位（currency + unit）才能直接求交集。
+    // 单位缺失时按缺省值（CNY / TOTAL）处理；存在不一致 → 不假算，报 BUDGET_UNIT_MISMATCH。
+    const currencies = new Set<string>();
+    const units = new Set<string>();
+    for (const constraint of hardBudget) {
+      const value = constraint.value as Record<string, unknown>;
+      currencies.add(typeof value.currency === 'string' && value.currency ? value.currency : 'CNY');
+      units.add(typeof value.unit === 'string' && value.unit ? value.unit : 'TOTAL');
+    }
+    if (currencies.size > 1 || units.size > 1) {
+      conflicts.push(
+        buildConflict(
+          input,
+          'HARD_CONFLICT',
+          'BUDGET',
+          'BUDGET_UNIT_MISMATCH',
+          hardBudget.map((constraint) => constraint.id),
+          [...new Set(hardBudget.map((constraint) => constraint.userId))],
+          now,
+        ),
+      );
+      return undefined; // 不产出 commonBudget：无法确定性合并
+    }
 
     let min: number | null = null;
     let max: number | null = null;
