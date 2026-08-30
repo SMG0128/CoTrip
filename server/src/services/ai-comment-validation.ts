@@ -25,6 +25,11 @@ function hasOnlyKeys(value: Record<string, unknown>, allowed: string[]): boolean
   return Object.keys(value).every((key) => allowed.includes(key));
 }
 
+function isValidIsoDateTime(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    && Number.isFinite(Date.parse(value));
+}
+
 function validateValue(type: ConstraintDraftType, value: unknown): Record<string, unknown> {
   if (!isRecord(value)) invalid();
 
@@ -34,7 +39,7 @@ function validateValue(type: ConstraintDraftType, value: unknown): Record<string
     const until = value.availableUntil;
     if (typeof after !== 'string' && typeof until !== 'string') invalid();
     for (const candidate of [after, until]) {
-      if (candidate !== undefined && (typeof candidate !== 'string' || !Number.isFinite(Date.parse(candidate)))) {
+      if (candidate !== undefined && (typeof candidate !== 'string' || !isValidIsoDateTime(candidate))) {
         invalid();
       }
     }
