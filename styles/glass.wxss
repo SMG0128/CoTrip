@@ -19,7 +19,7 @@
 
 .cotrip-glass--neutral {
   background: rgba(255, 255, 255, 0);
-  border-color: #e4e8ef;
+  border-color: #e5e7eb;
   box-shadow:
     0 0 0 1rpx rgba(255, 255, 255, 0.55),
     0 0 16rpx rgba(255, 255, 255, 0.5),
