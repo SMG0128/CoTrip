@@ -69,6 +69,11 @@ import {
 } from '../../utils/comment-sync';
 import { evaluateRealCommentPlan } from '../../utils/real-comment-planning';
 import { resolveTripDetailOnShowActions } from '../../utils/trip-detail-on-show';
+import {
+  buildKeyboardHeightPatch,
+  COMPOSER_BOTTOM_DEFAULT,
+  DETAIL_BOTTOM_PADDING_BASE,
+} from '../../utils/comment-composer';
 
 // Debug 仅在开发版/体验版显示，正式版自动隐藏。
 function isDebugEnabled(): boolean {
@@ -128,6 +133,11 @@ Page({
     /** 目的地解析结果（去导航的坐标兜底；来自服务返回，不本地伪造） */
     routeResolvedDestination: null as ResolvedDestination | null,
     inputText: '',
+    // 键盘避让：真实键盘高度（px，来自 wx.onKeyboardHeightChange），0 = 键盘收起。
+    // 单位换算与 bottom/留白计算见 utils/comment-composer.ts。
+    keyboardHeight: 0,
+    composerBottom: COMPOSER_BOTTOM_DEFAULT,
+    detailBottomPadding: DETAIL_BOTTOM_PADDING_BASE,
     participantCount: 0,
     commentCount: 0,
     // 完成行程：仅 owner + ACTIVE 展示入口；请求进行中防重复点击
@@ -161,8 +171,15 @@ Page({
   engine: null as PlanningEngine | null,
   /** 进入页面时的初始快照，供 Debug 面板「重置」恢复（示例与真实 Trip 各自正确复位） */
   initialSnapshot: null as { trip: Trip; comments: Comment[] } | null,
+  /** 键盘高度监听器引用：onLoad 注册、onUnload 移除，防止重复注册/内存泄漏 */
+  keyboardHeightHandler: null as WechatMiniprogram.OnKeyboardHeightChangeCallback | null,
 
   onLoad(options?: Record<string, string | undefined>) {
+    // 键盘避让：注册真实键盘高度监听（页面卸载时必须在 onUnload 中 off，见下）
+    const keyboardHeightHandler = this.onKeyboardHeightChange.bind(this);
+    this.keyboardHeightHandler = keyboardHeightHandler;
+    wx.onKeyboardHeightChange(keyboardHeightHandler);
+
     const app = getApp<IAppOption>();
     const currentUser = app.globalData.currentUser;
     const requestedTripId = options?.tripId;
@@ -224,6 +241,24 @@ Page({
 
     // 路线恢复是独立生命周期；它的门禁不得阻断上面的评论刷新。
     if (actions.loadRouteOptions) this.loadRouteOptions();
+  },
+
+  /**
+   * wx.onKeyboardHeightChange 回调：把真实键盘高度（px）写入 data。
+   * 输入栏 bottom 与页面底部留白随键盘同步（换算见 utils/comment-composer.ts）：
+   * height > 0 → 输入栏紧贴键盘上沿；height = 0 → 恢复到底部安全区位置。
+   * 回调中的 height 是 px，绝不能当 rpx 使用。
+   */
+  onKeyboardHeightChange(res: WechatMiniprogram.OnKeyboardHeightChangeListenerResult) {
+    this.setData(buildKeyboardHeightPatch(res.height));
+  },
+
+  /** 页面卸载：必须移除全局键盘监听，防止重复注册与内存泄漏 */
+  onUnload() {
+    if (this.keyboardHeightHandler) {
+      wx.offKeyboardHeightChange(this.keyboardHeightHandler);
+      this.keyboardHeightHandler = null;
+    }
   },
 
   /** 初始化行程视图 + 规划引擎 */
