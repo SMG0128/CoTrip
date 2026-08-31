@@ -12,14 +12,12 @@ import {
   COMMENT_EVALUATION_REASON_MAX_LENGTH,
   CommentEvaluationRecord,
 } from '../types/ai-comment-evaluation';
+import { AIEnvelopeValidationResult } from '../types/ai-envelope';
+import { validateAIUIConfig } from './ai-ui-config-validation';
 
-export interface CommentEvaluationValidationResult {
-  ok: boolean;
-  failurePath?: string;
-  failureReasonCode?: string;
-}
+export type CommentEvaluationValidationResult = AIEnvelopeValidationResult;
 
-function fail(path: string, reasonCode: string): CommentEvaluationValidationResult {
+function fail(path: string, reasonCode: string): AIEnvelopeValidationResult {
   return { ok: false, failurePath: path, failureReasonCode: reasonCode };
 }
 
@@ -72,7 +70,22 @@ export function validateCommentEvaluationEnvelope(
     return fail('decision.reason', 'DECISION_REASON_REQUIRED');
   }
 
-  return { ok: true };
+  // 统一 Envelope：评论判断阶段没有 itinerary，ui 只能是安全空值
+  const ui = validateAIUIConfig(envelope.ui, {
+    newEventIds: new Set<string>(),
+    previousEventIds: new Set<string>(),
+    allowRemovals: false,
+  });
+  if (!ui.ok) {
+    return { ok: false, failurePath: ui.failurePath, failureReasonCode: ui.failureReasonCode };
+  }
+  if (envelope.meta !== undefined && envelope.meta !== null) {
+    if (typeof envelope.meta !== 'object' || Array.isArray(envelope.meta)) {
+      return fail('meta', 'META_OBJECT_REQUIRED');
+    }
+  }
+
+  return { ok: true, ui: ui.ui };
 }
 
 /**

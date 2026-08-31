@@ -2,6 +2,7 @@
 
 import { TripAIContext } from './ai-preprocess';
 import { TripPlan } from './trip-plan';
+import { TripLatestAIUI } from './ai-envelope';
 
 export type TripStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -23,6 +24,12 @@ export interface Trip {
    * 首版完整行程 snapshot。创建行程时恒缺省——PREPROCESS 绝不生成 itinerary。
    */
   currentPlan?: TripPlan;
+  /**
+   * AI Trip Pipeline V2 Stage 3：最近一次 INITIAL_GENERATION / TRIP_UPDATE 的 UI 语义提示。
+   * 与 currentPlan 同一次原子写入；planVersion 不等于当前计划版本时前端必须忽略。
+   * 只保留最新一条，不保存历史、不保存 AI 原始响应。
+   */
+  latestAIUI?: TripLatestAIUI;
   commentIds: string[];
   constraintIds: string[];
   /** AI Trip Pipeline V2：创建时 PREPROCESS 生成的结构化上下文；AI 不可用或缺席时为 undefined */

@@ -77,6 +77,7 @@ import {
   mergeServerComments,
 } from '../../utils/comment-sync';
 import { evaluateRealCommentPlan } from '../../utils/real-comment-planning';
+import { AIUIViewModel, buildEventUIFlags, resolveAIUIViewModel } from '../../utils/ai-ui-config';
 import { resolveTripDetailOnShowActions } from '../../utils/trip-detail-on-show';
 import {
   buildKeyboardHeightPatch,
@@ -166,6 +167,12 @@ Page({
     coordinationLoading: false,
     /** 协调区展示视图模型（由 utils/coordination-ui.ts 派生，仅渲染用，不重算） */
     coordVM: buildInitialCoordinationVM(),
+    /**
+     * AI Trip Pipeline V2 Stage 3：服务端下发的 UI 语义提示（哪些条目变化 / 高亮 / 一句消息）。
+     * 仅承载语义，视觉表现由 WXML / WXSS 决定；版本过期时自动降级为空（见 utils/ai-ui-config.ts）。
+     */
+    aiUI: null as AIUIViewModel | null,
+    aiEventFlags: [] as ReturnType<typeof buildEventUIFlags>,
     // 完成行程：仅 owner + ACTIVE 展示入口；请求进行中防重复点击
     canCompleteTrip: false,
     isCompletingTrip: false,
@@ -316,6 +323,9 @@ Page({
       // 删除行程入口：仅创建者可见；示例行程永不显示（hydrate 后 owner 判断会误命中 demo）
       canDeleteTrip: shouldShowDeleteEntry(trip, currentUser),
     });
+
+    // 消费服务端下发的 AI UI 语义提示（版本不匹配时自动降级为空）
+    this.applyAIUIState(trip);
 
     // 初始化规划引擎，注入初始计划
     this.engine = new PlanningEngine({
@@ -926,22 +936,47 @@ Page({
   },
 
   /**
-   * 评论提交成功后拉取服务端首版行程（AI Trip Pipeline V2 Stage 2）。
-   * 仅在本地尚无计划、服务端已生成时更新，避免覆盖页面既有状态；
+   * 评论提交成功后拉取服务端最新行程（AI Trip Pipeline V2 Stage 2 / Stage 3）。
+   *
+   * 服务端可能在本次评论后：生成首版（无计划 → v1）或更新计划（vN → vN+1）。
+   * 因此按**版本号**决定是否采纳：仅当服务端版本更新时替换本地计划，
+   * 绝不用旧版本覆盖新版本。计划是否变化完全由服务端 pipeline 决定，
+   * 前端不根据评论文本做任何推断。
    * 失败静默保留当前状态，绝不伪造计划。
    */
   async refreshGeneratedPlan(tripId: string): Promise<void> {
     if (isDemoTripId(tripId)) return;
-    if (this.data.trip.currentPlan && this.data.trip.currentPlan.events.length > 0) return;
     try {
       const trip = await tripService.getTrip(tripId);
-      const generated = trip?.currentPlan;
-      if (!generated || generated.events.length === 0) return;
-      this.setData({ trip: { ...this.data.trip, currentPlan: generated } });
+      const serverPlan = trip?.currentPlan;
+      if (!serverPlan || serverPlan.events.length === 0) return;
+
+      const localVersion = this.data.trip.currentPlan?.version ?? 0;
+      if (serverPlan.version <= localVersion) return;
+
+      const nextTrip = {
+        ...this.data.trip,
+        currentPlan: serverPlan,
+        latestAIUI: trip?.latestAIUI,
+      };
+      this.setData({ trip: nextTrip });
+      this.applyAIUIState(nextTrip);
       this.runPipeline(this.data.comments);
     } catch {
-      // 首版尚未生成或网络失败：保留当前状态，等待下次进入页面刷新
+      // 尚未生成/更新或网络失败：保留当前状态，等待下次进入页面刷新
     }
+  },
+
+  /**
+   * 消费服务端下发的 AI UI 语义配置。
+   * 只做语义 → ViewModel 的整理；颜色、字体、动画等视觉表现由 WXML / WXSS 决定。
+   */
+  applyAIUIState(trip: Trip): void {
+    const aiUI = resolveAIUIViewModel(trip);
+    this.setData({
+      aiUI: aiUI.isCurrent ? aiUI : null,
+      aiEventFlags: buildEventUIFlags(trip.currentPlan, aiUI),
+    });
   },
 
   onPlaceTap(e: WechatMiniprogram.CustomEvent) {

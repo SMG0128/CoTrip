@@ -3,12 +3,10 @@
 // decision.canGenerateTrip 必须是 false。任何违例一律拒绝，不落库。
 
 import { AITripPreprocessEnvelope, TripAIContext, TripPreprocessTripInput } from '../types/ai-preprocess';
+import { AIEnvelopeValidationResult } from '../types/ai-envelope';
+import { validateAIUIConfig } from './ai-ui-config-validation';
 
-export interface PreprocessEnvelopeValidationResult {
-  ok: boolean;
-  failurePath?: string;
-  failureReasonCode?: string;
-}
+export type PreprocessEnvelopeValidationResult = AIEnvelopeValidationResult;
 
 function fail(path: string, reasonCode: string): PreprocessEnvelopeValidationResult {
   return { ok: false, failurePath: path, failureReasonCode: reasonCode };
@@ -73,7 +71,22 @@ export function validatePreprocessEnvelope(value: unknown): PreprocessEnvelopeVa
     }
   }
 
-  return { ok: true };
+  // 统一 Envelope：PREPROCESS 阶段没有 itinerary，ui 只能是安全空值
+  const ui = validateAIUIConfig(envelope.ui, {
+    newEventIds: new Set<string>(),
+    previousEventIds: new Set<string>(),
+    allowRemovals: false,
+  });
+  if (!ui.ok) {
+    return { ok: false, failurePath: ui.failurePath, failureReasonCode: ui.failureReasonCode };
+  }
+  if (envelope.meta !== undefined && envelope.meta !== null) {
+    if (typeof envelope.meta !== 'object' || Array.isArray(envelope.meta)) {
+      return fail('meta', 'META_OBJECT_REQUIRED');
+    }
+  }
+
+  return { ok: true, ui: ui.ui };
 }
 
 /** 验证通过后构造可持久化的 AI Context；tripInput 由 Server 侧原始请求提供，不信任 AI 回显。 */

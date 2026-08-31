@@ -5,6 +5,7 @@ import { AreaConstraint } from './constraint';
 import { TimeRange } from './time';
 import { Plan } from './plan';
 import { TripAIContext } from './ai-preprocess';
+import { TripLatestAIUI } from './ai-envelope';
 
 export type TripStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -24,6 +25,11 @@ export interface Trip {
   areaConstraint?: AreaConstraint;
   timeRange?: TimeRange;
   currentPlan?: Plan;
+  /**
+   * AI Trip Pipeline V2 Stage 3：服务端随新计划版本下发的 UI 语义提示。
+   * planVersion 与 currentPlan.version 不一致时必须忽略（见 utils/ai-ui-config.ts）。
+   */
+  latestAIUI?: TripLatestAIUI;
   commentIds: string[];
   constraintIds: string[];
   /** AI Trip Pipeline V2：创建时服务端 PREPROCESS 生成的结构化上下文；AI 不可用时缺省 */

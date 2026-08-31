@@ -6,6 +6,7 @@
 // requestType 复用 types/ai-preprocess.ts 的 AIRequestType，不另立第二套枚举。
 
 import { AIRequestType, TripAIContext, TripPreprocessTripInput } from './ai-preprocess';
+import { AIEnvelopeBase, AIMeta, AIUIConfig } from './ai-envelope';
 
 /** 送入 AI 的评论视图：只带判断所需内容，不带作者身份（隐私最小化） */
 export interface CommentEvaluationCommentInput {
@@ -44,15 +45,15 @@ export interface CommentEvaluationAnalysis {
 }
 
 /** COMMENT_EVALUATION 统一 Envelope：trip 恒为 null */
-export interface AICommentEvaluationEnvelope {
+export interface AICommentEvaluationEnvelope extends AIEnvelopeBase {
   schemaVersion: string;
   requestType: 'COMMENT_EVALUATION';
   status: 'success';
   analysis: CommentEvaluationAnalysis;
   decision: CommentEvaluationDecision;
   trip: null;
-  ui?: Record<string, unknown>;
-  meta?: Record<string, unknown>;
+  ui?: AIUIConfig;
+  meta?: AIMeta;
 }
 
 /** 评估失败的具名原因；绝不伪装成「判定为不相关」 */

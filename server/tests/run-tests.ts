@@ -14,6 +14,8 @@ import { runCloudBaseGatewayTests } from './cloudbase-gateway-ai-comment-service
 import { runTripCoordinationTests } from './trip-coordination.test';
 import { runTripPreprocessTests } from './trip-preprocess.test';
 import { runTripPlanGenerationTests } from './trip-plan-generation.test';
+import { runAIEnvelopeTests } from './ai-envelope.test';
+import { runTripUpdateTests } from './trip-update.test';
 import { runProductionReadinessTests } from './production-readiness.test';
 
 interface TestResult {
@@ -49,6 +51,8 @@ async function main(): Promise<void> {
   await runTripCoordinationTests();
   await runTripPreprocessTests();
   await runTripPlanGenerationTests();
+  await runAIEnvelopeTests();
+  await runTripUpdateTests();
   await runProductionReadinessTests();
 
   let failed = 0;

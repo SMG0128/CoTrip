@@ -1,32 +1,40 @@
-// AI Trip Pipeline V2 · Stage 2 编排：COMMENT_EVALUATION → 条件触发 INITIAL_GENERATION。
+// AI Trip Pipeline V2 · Stage 2 + Stage 3 编排：
+//   COMMENT_EVALUATION → 条件触发 INITIAL_GENERATION（首版）或 TRIP_UPDATE（改版）
 //
 // 语义顺序（评论保存永远不依赖 AI 成功）：
-//   评论已保存 → COMMENT_EVALUATION → 若满足触发条件 → INITIAL_GENERATION → 落 currentPlan
+//   评论已保存 → COMMENT_EVALUATION → 若满足触发条件 → 生成/更新 → 落 currentPlan
 //
-// 触发条件（三者同时成立，缺一不可）：
-//   currentPlan 不存在
-//   AND decision.relevant === true
-//   AND decision.usable === true
+// 首版触发条件（currentPlan 不存在）：
+//   relevant === true AND usable === true
 //
-// 明确不做（留给 Stage 3）：已有 currentPlan 时即使 updateRequired=true 也绝不更新，
-// 不调用 TRIP_UPDATE。本文件只保存判断结果。
+// 更新触发条件（currentPlan 已存在）：
+//   relevant === true AND usable === true AND updateRequired === true
+//   —— updateRequired 是最终开关：「好的」「看起来不错」这类 relevant 但
+//      updateRequired=false 的评论绝不改动计划。
 //
-// 并发与幂等（§首版唯一性）：
-//   1) 进程内 in-flight 闸门：同一 trip 同时只允许一次 INITIAL_GENERATION 在途。
-//      Node 单线程下，「读 currentPlan → 检查闸门 → 占用闸门」之间没有 await，
-//      因此这段是原子的，近同时到达的第二条 usable 评论必然看到闸门已被占用。
-//   2) 提交点 compare-and-set：写入前重新读取权威 Trip，若 currentPlan 已存在则放弃本次结果，
-//      绝不覆盖已有首版。闸门是内存态（重启即失效），CAS 才是最终保证。
+// 并发与幂等：
+//   首版 —— 进程内 in-flight 闸门 + 提交点存在性检查，保证首版唯一。
+//   更新 —— 版本 compare-and-set：更新绑定 baseVersion，提交时要求
+//           currentPlan.version === baseVersion。被抢先时不覆盖新版本，
+//           而是做**一次**受控重读 + 重新生成（MAX_TRIP_UPDATE_ATTEMPTS=2），
+//           仍冲突则放弃本次过期结果。绝不无限重试、绝不无条件覆盖、不引入分布式锁。
 
 import { Comment } from '../types/comment';
 import { Trip } from '../types/trip';
+import { TripPlan } from '../types/trip-plan';
 import { TripRepository } from '../repositories/trip-repository';
+import { AIUIConfig, TripLatestAIUI, emptyAIUIConfig } from '../types/ai-envelope';
 import {
   CommentEvaluationAIInput,
   CommentEvaluationCommentInput,
   CommentEvaluationRecord,
 } from '../types/ai-comment-evaluation';
 import { InitialGenerationAIInput } from '../types/ai-initial-generation';
+import {
+  MAX_TRIP_UPDATE_ATTEMPTS,
+  TripUpdateAIInput,
+  TripUpdateCommentEvaluationInput,
+} from '../types/ai-trip-update';
 import {
   CommentEvaluationAIError,
   CommentEvaluationAIService,
@@ -35,6 +43,7 @@ import {
   InitialGenerationAIError,
   InitialGenerationAIService,
 } from './initial-generation-ai-service';
+import { TripUpdateAIError, TripUpdateAIService, UnavailableTripUpdateAIService } from './trip-update-ai-service';
 import {
   buildCommentEvaluationRecord,
   validateCommentEvaluationEnvelope,
@@ -43,13 +52,16 @@ import {
   buildTripPlanFromEnvelope,
   validateInitialGenerationEnvelope,
 } from './initial-generation-ai-validation';
+import { buildUpdatedTripPlan, validateTripUpdateEnvelope } from './trip-update-ai-validation';
 import { TripPreprocessTripInput } from '../types/ai-preprocess';
+
+export type PlanMutation = 'none' | 'initial_generation' | 'trip_update';
 
 export interface ProcessCommentResult {
   /** 评估记录；成功评估或明确不可用，绝不伪造 */
   evaluation: CommentEvaluationRecord;
-  /** 本次调用是否真正落库了首版行程 */
-  planGenerated: boolean;
+  /** 本次调用对 currentPlan 实际做了什么 */
+  mutation: PlanMutation;
 }
 
 export class TripPlanGenerationService {
@@ -60,6 +72,8 @@ export class TripPlanGenerationService {
     private readonly trips: TripRepository,
     private readonly evaluationAI: CommentEvaluationAIService,
     private readonly generationAI: InitialGenerationAIService,
+    /** Stage 3：未注入时行为与 Stage 2 完全一致（永不更新计划） */
+    private readonly updateAI: TripUpdateAIService = new UnavailableTripUpdateAIService(),
   ) {}
 
   /**
@@ -69,15 +83,28 @@ export class TripPlanGenerationService {
   async processComment(comment: Comment, trip: Trip): Promise<ProcessCommentResult> {
     const evaluation = await this.evaluateComment(comment, trip);
     if (evaluation.status !== 'evaluated') {
-      // 评估未成功：绝不据此触发生成，也绝不把它当成「判定为不相关」
-      return { evaluation, planGenerated: false };
+      // 评估未成功：绝不据此触发任何计划变更，也绝不当成「判定为不相关」
+      return { evaluation, mutation: 'none' };
     }
     if (!evaluation.relevant || !evaluation.usable) {
-      // 无关评论、或 relevant 但 unusable（例如「我觉得可以」）都不得触发首版生成
-      return { evaluation, planGenerated: false };
+      // 无关评论、或 relevant 但 unusable（例如「我觉得可以」）都不得改动计划
+      return { evaluation, mutation: 'none' };
     }
-    const planGenerated = await this.generateInitialPlanIfAbsent(comment, trip);
-    return { evaluation, planGenerated };
+
+    const latest = await this.trips.findById(trip.id);
+    if (!latest) return { evaluation, mutation: 'none' };
+
+    if (!latest.currentPlan) {
+      const generated = await this.generateInitialPlanIfAbsent(comment, latest);
+      return { evaluation, mutation: generated ? 'initial_generation' : 'none' };
+    }
+
+    // 已有计划：只有明确要求修改的评论才允许触发 TRIP_UPDATE
+    if (!evaluation.updateRequired) {
+      return { evaluation, mutation: 'none' };
+    }
+    const updated = await this.updatePlan(comment, latest, evaluation);
+    return { evaluation, mutation: updated ? 'trip_update' : 'none' };
   }
 
   private buildTripInput(trip: Trip): TripPreprocessTripInput {
@@ -101,10 +128,7 @@ export class TripPlanGenerationService {
     };
   }
 
-  private async evaluateComment(
-    comment: Comment,
-    trip: Trip,
-  ): Promise<CommentEvaluationRecord> {
+  private async evaluateComment(comment: Comment, trip: Trip): Promise<CommentEvaluationRecord> {
     const input: CommentEvaluationAIInput = {
       title: trip.title,
       tripInput: this.buildTripInput(trip),
@@ -140,6 +164,21 @@ export class TripPlanGenerationService {
     }
   }
 
+  /** 与新计划同一次原子写入的 UI 提示 */
+  private buildLatestAIUI(
+    requestType: TripLatestAIUI['requestType'],
+    planVersion: number,
+    ui: AIUIConfig | undefined,
+    updatedAt: string,
+  ): TripLatestAIUI {
+    return {
+      planVersion,
+      requestType,
+      ui: ui ?? emptyAIUIConfig(),
+      updatedAt,
+    };
+  }
+
   /**
    * 仅当权威 Trip 仍无 currentPlan 时生成首版并落库。
    * 返回是否真正写入；任何拒绝路径都保持 currentPlan 原样。
@@ -148,14 +187,9 @@ export class TripPlanGenerationService {
     const tripId = trip.id;
 
     // —— 以下同步段无 await，保证「查计划 → 查闸门 → 占闸门」原子 ——
-    const beforeGate = await this.trips.findById(tripId);
-    if (!beforeGate) return false;
-    if (beforeGate.currentPlan) {
-      // 已有首版：Stage 2 绝不重复生成，也绝不执行 TRIP_UPDATE
-      return false;
-    }
+    if (trip.currentPlan) return false;
     if (this.generating.has(tripId)) {
-      // 同一 trip 已有生成在途：近同时到达的第二条 usable 评论在此止步
+      // 同一 trip 已有首版生成在途：近同时到达的第二条 usable 评论在此止步
       return false;
     }
     this.generating.add(tripId);
@@ -163,9 +197,9 @@ export class TripPlanGenerationService {
 
     try {
       const input: InitialGenerationAIInput = {
-        title: beforeGate.title,
-        tripInput: this.buildTripInput(beforeGate),
-        aiContext: beforeGate.aiContext ?? null,
+        title: trip.title,
+        tripInput: this.buildTripInput(trip),
+        aiContext: trip.aiContext ?? null,
         triggeringComment: this.toCommentInput(comment),
       };
 
@@ -178,7 +212,7 @@ export class TripPlanGenerationService {
         return false;
       }
 
-      // 提交点 compare-and-set：重新读取权威 Trip，已有首版则放弃本次结果
+      // 提交点检查：重新读取权威 Trip，已有首版则放弃本次结果
       const latest = await this.trips.findById(tripId);
       if (!latest) return false;
       if (latest.currentPlan) {
@@ -186,9 +220,14 @@ export class TripPlanGenerationService {
         return false;
       }
 
-      const plan = buildTripPlanFromEnvelope(envelope, tripId, new Date().toISOString());
-      // 完整 snapshot 原子写入（仓库整体替换 + 临时文件 rename）
-      await this.trips.update({ ...latest, currentPlan: plan });
+      const updatedAt = new Date().toISOString();
+      const plan = buildTripPlanFromEnvelope(envelope, tripId, updatedAt);
+      // 完整 snapshot 与 UI 提示同一次原子写入
+      await this.trips.update({
+        ...latest,
+        currentPlan: plan,
+        latestAIUI: this.buildLatestAIUI('INITIAL_GENERATION', plan.version, validation.ui, updatedAt),
+      });
       return true;
     } catch (error) {
       const reasonCode =
@@ -198,5 +237,86 @@ export class TripPlanGenerationService {
     } finally {
       this.generating.delete(tripId);
     }
+  }
+
+  /**
+   * TRIP_UPDATE：基于当前版本生成新版本，版本 compare-and-set 落库。
+   *
+   * 被其他更新抢先时不覆盖新版本，而是重新读取当前计划并重新生成一次
+   * （总尝试次数上限 MAX_TRIP_UPDATE_ATTEMPTS）；仍冲突则放弃本次过期结果。
+   */
+  private async updatePlan(
+    comment: Comment,
+    trip: Trip,
+    evaluation: Extract<CommentEvaluationRecord, { status: 'evaluated' }>,
+  ): Promise<boolean> {
+    const commentEvaluation: TripUpdateCommentEvaluationInput = {
+      commentIntent: evaluation.commentIntent,
+      relevant: evaluation.relevant,
+      usable: evaluation.usable,
+      updateRequired: evaluation.updateRequired,
+      reason: evaluation.reason,
+    };
+
+    let base: Trip = trip;
+    for (let attempt = 0; attempt < MAX_TRIP_UPDATE_ATTEMPTS; attempt += 1) {
+      const basePlan: TripPlan | undefined = base.currentPlan;
+      if (!basePlan) {
+        // 计划在此期间被删除：Stage 3 不负责重建首版
+        return false;
+      }
+      const baseVersion = basePlan.version;
+
+      const input: TripUpdateAIInput = {
+        title: base.title,
+        tripInput: this.buildTripInput(base),
+        aiContext: base.aiContext ?? null,
+        currentPlan: basePlan,
+        triggeringComment: this.toCommentInput(comment),
+        commentEvaluation,
+        baseVersion,
+      };
+
+      let envelope;
+      try {
+        envelope = await this.updateAI.updateTrip(input);
+      } catch (error) {
+        const reasonCode = error instanceof TripUpdateAIError ? error.code : 'AI_REQUEST_FAILED';
+        console.warn(`TRIP_UPDATE 调用失败（${reasonCode}），currentPlan 保持 v${baseVersion}`);
+        return false;
+      }
+
+      const validation = validateTripUpdateEnvelope(envelope, basePlan);
+      if (!validation.ok) {
+        console.warn(
+          `TRIP_UPDATE 响应验证失败（${validation.failureReasonCode} @ ${validation.failurePath}），currentPlan 保持 v${baseVersion}`,
+        );
+        return false;
+      }
+
+      // —— 提交点 compare-and-set ——
+      const latest = await this.trips.findById(base.id);
+      if (!latest || !latest.currentPlan) return false;
+      if (latest.currentPlan.version !== baseVersion) {
+        // 已被其他更新抢先：绝不用过期结果覆盖更新后的计划
+        console.warn(
+          `TRIP_UPDATE 版本冲突：base v${baseVersion} → 当前 v${latest.currentPlan.version}`,
+        );
+        base = latest; // 受控重读，基于最新版本再生成一次
+        continue;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const plan = buildUpdatedTripPlan(envelope, latest.currentPlan, updatedAt);
+      await this.trips.update({
+        ...latest,
+        currentPlan: plan,
+        latestAIUI: this.buildLatestAIUI('TRIP_UPDATE', plan.version, validation.ui, updatedAt),
+      });
+      return true;
+    }
+
+    console.warn('TRIP_UPDATE 连续版本冲突，放弃本次过期结果（不重试、不覆盖）');
+    return false;
   }
 }

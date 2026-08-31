@@ -8,6 +8,7 @@ import './plan-reconciler.test';
 import './constraint-evaluator.test';
 import './real-comment-planning.test';
 import './coordination-ui.test';
+import './ai-ui-config.test';
 import './trip-detail-on-show.test';
 import './comment-composer.test';
 import './comment-author.test';

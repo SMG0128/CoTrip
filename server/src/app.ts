@@ -42,6 +42,11 @@ import {
 } from './services/initial-generation-ai-service';
 import { CloudBaseGatewayInitialGenerationAIService } from './services/cloudbase-gateway-initial-generation-ai-service';
 import { TripPlanGenerationService } from './services/trip-plan-generation-service';
+import {
+  TripUpdateAIService,
+  UnavailableTripUpdateAIService,
+} from './services/trip-update-ai-service';
+import { CloudBaseGatewayTripUpdateAIService } from './services/cloudbase-gateway-trip-update-ai-service';
 import { coordinationRouter } from './routes/coordination';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
@@ -59,11 +64,12 @@ export function createApp() {
   const aiComments = createAICommentService(config);
   const constraintRepository = new JsonConstraintRepository(config.constraintDataFile);
   const ledger = new ConstraintLedgerService(constraintRepository);
-  // AI Trip Pipeline V2 Stage 2：评论评估 + 首版行程生成
+  // AI Trip Pipeline V2 Stage 2/3：评论评估 + 首版生成 + 相关评论触发的行程更新
   const planGeneration = new TripPlanGenerationService(
     tripRepository,
     createCommentEvaluationAIService(config),
     createInitialGenerationAIService(config),
+    createTripUpdateAIService(config),
   );
   const comments = new CommentService(
     commentRepository,
@@ -185,6 +191,20 @@ function createInitialGenerationAIService(
   }
   // 未配置：currentPlan 保持缺省，绝不伪造首版行程
   return new UnavailableInitialGenerationAIService();
+}
+
+function createTripUpdateAIService(
+  config: ReturnType<typeof loadConfig>,
+): TripUpdateAIService {
+  if (config.aiGatewayUrl && config.aiGatewaySecret) {
+    return new CloudBaseGatewayTripUpdateAIService({
+      gatewayUrl: config.aiGatewayUrl,
+      secret: config.aiGatewaySecret,
+      timeoutMs: config.aiTimeoutMs,
+    });
+  }
+  // 未配置：currentPlan 保持旧版本，评论与评估照常保存，绝不伪造更新
+  return new UnavailableTripUpdateAIService();
 }
 
 // 直接运行时启动服务（被测试 import 时不启动）

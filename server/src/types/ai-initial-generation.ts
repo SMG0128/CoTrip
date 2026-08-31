@@ -8,6 +8,7 @@
 // 绝不产出已验证的场馆、坐标、价格、评分。校验层主动拒绝这些字段。
 
 import { TripAIContext, TripPreprocessTripInput } from './ai-preprocess';
+import { AIEnvelopeBase, AIMeta, AIUIConfig } from './ai-envelope';
 import { CommentEvaluationCommentInput } from './ai-comment-evaluation';
 import { TripPlanEventType, TripPlanLocationRequirement, TripPlanTimeRange } from './trip-plan';
 
@@ -22,6 +23,11 @@ export interface InitialGenerationAIInput {
 
 /** AI 线上格式的行程条目；经校验后映射为 TripPlanEvent */
 export interface AITripItem {
+  /**
+   * 仅 TRIP_UPDATE 允许携带：引用旧计划中被保留/修改的条目 id。
+   * INITIAL_GENERATION 不得携带（此时没有既有条目，id 由服务端生成）。
+   */
+  id?: string;
   type: TripPlanEventType;
   title: string;
   time: TripPlanTimeRange;
@@ -41,15 +47,15 @@ export interface InitialGenerationDecision {
 }
 
 /** INITIAL_GENERATION 统一 Envelope：trip 必须非 null */
-export interface AIInitialGenerationEnvelope {
+export interface AIInitialGenerationEnvelope extends AIEnvelopeBase {
   schemaVersion: string;
   requestType: 'INITIAL_GENERATION';
   status: 'success';
-  analysis?: Record<string, unknown>;
+  analysis: Record<string, unknown>;
   decision: InitialGenerationDecision;
   trip: AITripSnapshot;
-  ui?: Record<string, unknown>;
-  meta?: Record<string, unknown>;
+  ui?: AIUIConfig;
+  meta?: AIMeta;
 }
 
 /** 首版行程条目数上界：防止 AI 返回超长 itinerary 撑爆存储 */
