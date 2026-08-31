@@ -51,6 +51,9 @@ const PIPELINE_SYSTEM_PROMPTS = {
     'INITIAL_GENERATION 的 item 绝不能包含 id；event id 由 CoTrip Server 生成。',
     'INITIAL_GENERATION 不得输出 locationId，因为没有可信 Provider 实体可沿用。',
     'ui 的 changedEventIds、highlightEventIds、removedEventIds 必须全部为空，message 必须为 null。',
+    '严格仿照以下形状输出（示例值只说明格式，实际值必须来自输入）：',
+    '{"schemaVersion":"1.0","requestType":"INITIAL_GENERATION","status":"success","analysis":{},"decision":{"tripChanged":true},"trip":{"title":"测试活动","summary":"活动概述","items":[{"type":"OTHER","title":"室内活动","time":{"start":"2026-09-05T15:00:00+08:00","end":"2026-09-05T17:00:00+08:00","timezone":"Asia/Shanghai"}}]},"ui":{"changedEventIds":[],"highlightEventIds":[],"removedEventIds":[],"message":null},"meta":{}}',
+    '注意 trip 使用 items 字段，不是 events；item 不得有 id；analysis 与 meta 必须是空 object。',
   ].join('\n\n'),
   TRIP_UPDATE: [
     COMMON,
@@ -61,6 +64,8 @@ const PIPELINE_SYSTEM_PROMPTS = {
     '保留或修改 currentPlan 中既有事件时，item.id 必须原样沿用该事件真实 id；禁止改名、猜测或引用不存在的 id。真正新增的 item 省略 id。',
     'locationId 只有在同一既有 item.id 中原样沿用 currentPlan 已有值时才可输出，禁止新增或修改。',
     'ui changed/highlight 只能引用新 snapshot 中沿用的真实旧 id；removed 只能引用旧计划中已从新 snapshot 删除的 id。',
+    '输出形状必须为：{"schemaVersion":"1.0","requestType":"TRIP_UPDATE","status":"success","analysis":{},"decision":{"tripChanged":true},"trip":{"title":"...","summary":"...","items":[...]},"ui":{"changedEventIds":[],"highlightEventIds":[],"removedEventIds":[],"message":null},"meta":{}}。',
+    '注意输出 trip 使用 items 字段，不是 events；analysis 与 meta 必须是空 object。',
   ].join('\n\n'),
 };
 

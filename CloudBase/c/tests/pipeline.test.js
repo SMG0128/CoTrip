@@ -457,6 +457,8 @@ async function runPipelineTests() {
     }
     assert.ok(PIPELINE_SYSTEM_PROMPTS.INITIAL_GENERATION.includes('绝不能包含 id'));
     assert.ok(PIPELINE_SYSTEM_PROMPTS.INITIAL_GENERATION.includes('真实价格'));
+    assert.ok(PIPELINE_SYSTEM_PROMPTS.INITIAL_GENERATION.includes('"requestType":"INITIAL_GENERATION"'));
+    assert.ok(PIPELINE_SYSTEM_PROMPTS.INITIAL_GENERATION.includes('不是 events'));
     assert.ok(PIPELINE_SYSTEM_PROMPTS.TRIP_UPDATE.includes('无关活动、时间、说明和有效约束必须保持稳定'));
     assert.ok(PIPELINE_SYSTEM_PROMPTS.TRIP_UPDATE.includes('item.id 必须原样沿用'));
   });
