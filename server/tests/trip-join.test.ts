@@ -32,7 +32,24 @@ function fixture(overrides: Partial<Trip> = {}): Trip {
     initialBrief: '去顺德吃东西',
     areaConstraint: { district: '顺德区', privateCoordinate: 'hidden' },
     timeRange: { start: '2026-08-25T09:00:00+08:00' },
-    currentPlan: { internal: true },
+    // 已生成首版行程：必须留在私有字段中，绝不能出现在公开 join preview 里
+    currentPlan: {
+      id: 'plan_trip_join_v1',
+      tripId: 'trip_join',
+      version: 1,
+      events: [
+        {
+          id: 'event_trip_join_1_1',
+          type: 'DINING',
+          title: '私有内部行程条目',
+          time: { start: '2026-08-25T12:00:00+08:00', timezone: 'Asia/Shanghai' },
+        },
+      ],
+      satisfiedConstraintCount: 0,
+      totalConstraintCount: 0,
+      conflicts: [],
+      updatedAt: '2026-08-24T10:00:00.000Z',
+    },
     commentIds: ['comment_private'],
     constraintIds: ['constraint_private'],
     ...overrides,

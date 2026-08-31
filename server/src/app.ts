@@ -31,6 +31,17 @@ import {
   UnavailableTripPreprocessAIService,
 } from './services/trip-preprocess-ai-service';
 import { CloudBaseGatewayTripPreprocessAIService } from './services/cloudbase-gateway-trip-preprocess-ai-service';
+import {
+  CommentEvaluationAIService,
+  UnavailableCommentEvaluationAIService,
+} from './services/comment-evaluation-ai-service';
+import { CloudBaseGatewayCommentEvaluationAIService } from './services/cloudbase-gateway-comment-evaluation-ai-service';
+import {
+  InitialGenerationAIService,
+  UnavailableInitialGenerationAIService,
+} from './services/initial-generation-ai-service';
+import { CloudBaseGatewayInitialGenerationAIService } from './services/cloudbase-gateway-initial-generation-ai-service';
+import { TripPlanGenerationService } from './services/trip-plan-generation-service';
 import { coordinationRouter } from './routes/coordination';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
@@ -48,12 +59,19 @@ export function createApp() {
   const aiComments = createAICommentService(config);
   const constraintRepository = new JsonConstraintRepository(config.constraintDataFile);
   const ledger = new ConstraintLedgerService(constraintRepository);
+  // AI Trip Pipeline V2 Stage 2：评论评估 + 首版行程生成
+  const planGeneration = new TripPlanGenerationService(
+    tripRepository,
+    createCommentEvaluationAIService(config),
+    createInitialGenerationAIService(config),
+  );
   const comments = new CommentService(
     commentRepository,
     tripRepository,
     users,
     aiComments,
     ledger,
+    planGeneration,
   );
 
   const aiCoordination = createTripCoordinationAIService(config);
@@ -137,6 +155,36 @@ function createAICommentService(config: ReturnType<typeof loadConfig>): AICommen
   }
   // 未配置 Provider 时明确 unresolved；服务端不提供静默规则 fallback。
   return new UnavailableAICommentService();
+}
+
+// Stage 2 的两个 requestType 与 PREPROCESS / 协调保持一致：只认网关配置，
+// 不复用 AI_PROVIDER（那是评论约束分析的 OpenAI-compatible 开关），且不新增任何 secret。
+function createCommentEvaluationAIService(
+  config: ReturnType<typeof loadConfig>,
+): CommentEvaluationAIService {
+  if (config.aiGatewayUrl && config.aiGatewaySecret) {
+    return new CloudBaseGatewayCommentEvaluationAIService({
+      gatewayUrl: config.aiGatewayUrl,
+      secret: config.aiGatewaySecret,
+      timeoutMs: config.aiTimeoutMs,
+    });
+  }
+  // 未配置：评论照常保存，评估记录标记 unavailable，绝不用规则冒充判断
+  return new UnavailableCommentEvaluationAIService();
+}
+
+function createInitialGenerationAIService(
+  config: ReturnType<typeof loadConfig>,
+): InitialGenerationAIService {
+  if (config.aiGatewayUrl && config.aiGatewaySecret) {
+    return new CloudBaseGatewayInitialGenerationAIService({
+      gatewayUrl: config.aiGatewayUrl,
+      secret: config.aiGatewaySecret,
+      timeoutMs: config.aiTimeoutMs,
+    });
+  }
+  // 未配置：currentPlan 保持缺省，绝不伪造首版行程
+  return new UnavailableInitialGenerationAIService();
 }
 
 // 直接运行时启动服务（被测试 import 时不启动）

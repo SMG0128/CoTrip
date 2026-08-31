@@ -913,6 +913,8 @@ Page({
         const merged = commitServerComment(this.data.comments, serverComment);
         this.setData({ comments: merged, commentCount: merged.length });
         this.runPipeline(merged);
+        // 首条 usable 评论可能已在服务端生成首版行程：拉一次让它可见
+        this.refreshGeneratedPlan(tripId);
       },
       (error) => {
         // 发送失败：移除本地乐观项，保留其余评论，明确提示
@@ -921,6 +923,25 @@ Page({
         wx.showToast({ title: '评论发送失败', icon: 'none' });
       }
     );
+  },
+
+  /**
+   * 评论提交成功后拉取服务端首版行程（AI Trip Pipeline V2 Stage 2）。
+   * 仅在本地尚无计划、服务端已生成时更新，避免覆盖页面既有状态；
+   * 失败静默保留当前状态，绝不伪造计划。
+   */
+  async refreshGeneratedPlan(tripId: string): Promise<void> {
+    if (isDemoTripId(tripId)) return;
+    if (this.data.trip.currentPlan && this.data.trip.currentPlan.events.length > 0) return;
+    try {
+      const trip = await tripService.getTrip(tripId);
+      const generated = trip?.currentPlan;
+      if (!generated || generated.events.length === 0) return;
+      this.setData({ trip: { ...this.data.trip, currentPlan: generated } });
+      this.runPipeline(this.data.comments);
+    } catch {
+      // 首版尚未生成或网络失败：保留当前状态，等待下次进入页面刷新
+    }
   },
 
   onPlaceTap(e: WechatMiniprogram.CustomEvent) {

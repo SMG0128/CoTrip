@@ -12,6 +12,7 @@ import { toPublicUser } from '../types/user';
 import { AICommentAnalysis } from '../types/ai-comment';
 import { AICommentService, AICommentServiceError } from './ai-comment-service';
 import { ConstraintLedgerService } from './constraint-ledger-service';
+import { TripPlanGenerationService } from './trip-plan-generation-service';
 import { AppError } from '../types/errors';
 
 function generateCommentId(now: Date): string {
@@ -26,6 +27,12 @@ export class CommentService {
     private readonly ai: AICommentService,
     /** 可选：注入后启用 Constraint Ledger 持久化（真实行程必须注入；单元测试可不注入） */
     private readonly ledger?: ConstraintLedgerService,
+    /**
+     * 可选：注入后启用 AI Trip Pipeline V2 Stage 2
+     * （COMMENT_EVALUATION → 首条 usable 评论触发 INITIAL_GENERATION）。
+     * 未注入时评论行为与 Stage 1 完全一致。
+     */
+    private readonly planGeneration?: TripPlanGenerationService,
   ) {}
 
   /** 权限校验：目标 Trip 存在且当前用户为成员 */
@@ -92,7 +99,29 @@ export class CommentService {
       // 评论主体已持久化；commentIds 仅作展示索引，缺失时可降级按评论仓库读取
     }
     const analyzed = await this.analyzeAndPersist(comment, trip);
-    return this.toDTO(analyzed);
+    // Stage 2：评论已权威落库之后才进入 COMMENT_EVALUATION → 条件触发 INITIAL_GENERATION。
+    // 该阶段任何失败都不得影响评论本身（评论此刻已保存成功）。
+    const evaluated = await this.runPlanPipeline(analyzed, trip);
+    return this.toDTO(evaluated);
+  }
+
+  /**
+   * COMMENT_EVALUATION（+ 条件触发 INITIAL_GENERATION）。
+   * 传入的 comment 必须是 analyzeAndPersist 之后的最新版本，
+   * 否则附加 evaluation 时会覆盖掉刚写入的 aiAnalysis。
+   *
+   * 优雅降级：AI 超时/不可用/响应非法/评估记录写库失败，一律返回已保存的评论，
+   * 绝不抛出到 addComment，也绝不伪造 evaluation 或 currentPlan。
+   */
+  private async runPlanPipeline(comment: Comment, trip: Trip): Promise<Comment> {
+    if (!this.planGeneration) return comment;
+    try {
+      const result = await this.planGeneration.processComment(comment, trip);
+      return await this.comments.update({ ...comment, evaluation: result.evaluation });
+    } catch {
+      // 评论主体已持久化；评估记录缺失时下次可重新评估，不阻断评论创建
+      return comment;
+    }
   }
 
   private async analyzeAndPersist(comment: Comment, trip: Trip): Promise<Comment> {

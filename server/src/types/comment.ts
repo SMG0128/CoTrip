@@ -2,6 +2,7 @@
 // userId 仅表示「评论作者」，绝不是评论流列表的读取范围——读取必须按 tripId。
 
 import { AICommentAnalysis, AICommentSource } from './ai-comment';
+import { CommentEvaluationRecord } from './ai-comment-evaluation';
 
 export type CommentAIStatus =
   | 'processing'
@@ -25,6 +26,12 @@ export interface Comment {
   aiSource: AICommentSource;
   /** 仅保存通过 schema + domain validation 的结构化结果。 */
   aiAnalysis?: AICommentAnalysis;
+  /**
+   * AI Trip Pipeline V2 Stage 2：COMMENT_EVALUATION 结果（有界记录）。
+   * 存在即表示该评论已被评估过，避免读取页面/普通 API 调用触发重复评估。
+   * 评估失败时记录 status='unavailable' + 具名 reasonCode，绝不伪造判定结论。
+   */
+  evaluation?: CommentEvaluationRecord;
 }
 
 /** 评论 API 的公开作者投影；不包含 openid、session_key 或其它认证字段。 */

@@ -1,6 +1,7 @@
 // 后端独立 Trip 模型；不依赖微信小程序 runtime 类型。
 
 import { TripAIContext } from './ai-preprocess';
+import { TripPlan } from './trip-plan';
 
 export type TripStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -17,7 +18,11 @@ export interface Trip {
   initialBrief: string;
   areaConstraint?: unknown;
   timeRange?: unknown;
-  currentPlan?: unknown;
+  /**
+   * AI Trip Pipeline V2 Stage 2：首条 relevant && usable 评论触发 INITIAL_GENERATION 后写入的
+   * 首版完整行程 snapshot。创建行程时恒缺省——PREPROCESS 绝不生成 itinerary。
+   */
+  currentPlan?: TripPlan;
   commentIds: string[];
   constraintIds: string[];
   /** AI Trip Pipeline V2：创建时 PREPROCESS 生成的结构化上下文；AI 不可用或缺席时为 undefined */

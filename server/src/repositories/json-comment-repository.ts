@@ -105,5 +105,7 @@ function normalizeComment(comment: Partial<Comment>): Comment {
       ? comment.aiSource as Comment['aiSource']
       : 'none',
     ...(comment.aiAnalysis ? { aiAnalysis: comment.aiAnalysis } : {}),
+    // Stage 2 评估记录：与 aiAnalysis 一致按原样保留，重启后不丢失「已评估过」的事实
+    ...(comment.evaluation ? { evaluation: comment.evaluation } : {}),
   };
 }

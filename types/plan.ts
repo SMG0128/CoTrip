@@ -37,6 +37,11 @@ export interface Plan {
   tripId: string;
   version: number;
   events: PlanEvent[];
+  /**
+   * AI Trip Pipeline V2：INITIAL_GENERATION 首版行程的结构化概述。
+   * 由服务端生成并落库；本地规则引擎产出的计划不带该字段。
+   */
+  summary?: string;
   estimatedTotalPrice?: Price;
   satisfiedConstraintCount: number;
   totalConstraintCount: number;
