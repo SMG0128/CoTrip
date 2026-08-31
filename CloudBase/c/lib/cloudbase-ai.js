@@ -10,6 +10,7 @@
 
 const { SYSTEM_PROMPT } = require('./prompt');
 const { COORDINATION_SYSTEM_PROMPT } = require('./coordinate-prompt');
+const { PIPELINE_SYSTEM_PROMPTS } = require('./pipeline-prompt');
 
 function createCloudBaseAIProvider(ai) {
   return {
@@ -49,6 +50,25 @@ function createCloudBaseAIProvider(ai) {
       if (result && result.error) {
         throw new Error('AI_PROVIDER_ERROR');
       }
+      return { text: result && typeof result.text === 'string' ? result.text : '' };
+    },
+    /** AI Trip Pipeline V2：四类请求复用同一 hy3 provider/model，不新增凭据。 */
+    async tripPipeline(requestType, input) {
+      const systemPrompt = PIPELINE_SYSTEM_PROMPTS[requestType];
+      if (!systemPrompt) throw new Error('AI_REQUEST_TYPE_UNSUPPORTED');
+      const model = ai.createModel('hunyuan-v3');
+      const result = await model.generateText({
+        model: 'hy3',
+        temperature: 0,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: JSON.stringify({ requestType, input }),
+          },
+        ],
+      });
+      if (result && result.error) throw new Error('AI_PROVIDER_ERROR');
       return { text: result && typeof result.text === 'string' ? result.text : '' };
     },
   };

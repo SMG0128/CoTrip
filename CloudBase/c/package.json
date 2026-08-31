@@ -6,8 +6,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "typecheck": "node --check index.js && node --check lib/pipeline-contract.js && node --check lib/pipeline-prompt.js && node --check lib/gateway.js && node --check lib/cloudbase-ai.js",
     "test": "node tests/run-tests.js",
-    "smoke": "node tests/smoke.js"
+    "smoke": "node tests/smoke.js",
+    "build": "npm run typecheck"
   },
   "dependencies": {
     "@cloudbase/node-sdk": "^3.16.0"

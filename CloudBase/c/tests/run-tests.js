@@ -19,10 +19,12 @@ module.exports.record = record;
 
 const { runGatewayTests } = require('./gateway.test');
 const { runCoordinateTests } = require('./coordinate.test');
+const { runPipelineTests } = require('./pipeline.test');
 
 async function main() {
   await runGatewayTests();
   await runCoordinateTests();
+  await runPipelineTests();
 
   let failed = 0;
   for (const r of results) {

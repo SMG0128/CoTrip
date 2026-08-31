@@ -5,6 +5,7 @@
 const http = require('http');
 const assert = require('assert');
 const { createServer } = require('../index');
+const { BODIES, ENVELOPES, ROUTES } = require('./pipeline.test');
 
 const SECRET = 'cotrip-smoke-secret';
 const MOCK_ANALYSIS = {
@@ -20,6 +21,9 @@ function mockAIProvider() {
   return {
     async analyze() {
       return { text: JSON.stringify(MOCK_ANALYSIS) };
+    },
+    async tripPipeline(requestType) {
+      return { text: JSON.stringify(ENVELOPES[requestType]) };
     },
   };
 }
@@ -90,6 +94,39 @@ async function main() {
     });
     assert.strictEqual(res.status, 400);
   });
+
+  for (const requestType of Object.keys(ROUTES)) {
+    await check(`POST ${ROUTES[requestType]} 无认证 → 401`, async () => {
+      const res = await request(port, {
+        method: 'POST',
+        path: ROUTES[requestType],
+        headers: { 'Content-Type': 'application/json' },
+        body: BODIES[requestType],
+      });
+      assert.strictEqual(res.status, 401);
+    });
+
+    await check(`POST ${ROUTES[requestType]} 错误 secret → 401`, async () => {
+      const res = await request(port, {
+        method: 'POST',
+        path: ROUTES[requestType],
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrong' },
+        body: BODIES[requestType],
+      });
+      assert.strictEqual(res.status, 401);
+    });
+
+    await check(`POST ${ROUTES[requestType]} 正确认证 → 200 envelope`, async () => {
+      const res = await request(port, {
+        method: 'POST',
+        path: ROUTES[requestType],
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SECRET}` },
+        body: BODIES[requestType],
+      });
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual(res.body.envelope, ENVELOPES[requestType]);
+    });
+  }
 
   await new Promise((resolve) => server.close(resolve));
   console.log(failed === 0 ? '\nSMOKE PASS' : '\nSMOKE FAIL');
