@@ -14,6 +14,7 @@ import { tripService } from '../../services/index';
 import { requireCurrentUser } from '../../utils/current-user';
 import { buildRangeBounds } from '../../utils/area-range';
 import { buildRegionColumns, resolveRegionIndices, regionDisplayText } from '../../utils/china-region';
+import { resolveTripTitle } from '../../utils/trip-title';
 
 type AreaMode = 'none' | 'district' | 'location' | 'range';
 
@@ -29,6 +30,7 @@ const RANGE_RADIUS_KM = 3;
 
 Page({
   data: {
+    title: '',
     areaMode: 'none' as AreaMode,
     areaModeText: AREA_MODE_LABELS.none,
     regionColumns: buildRegionColumns(0, 0),
@@ -158,12 +160,23 @@ Page({
     this.setData({ endTime: e.detail.value });
   },
 
+  onTitleInput(e: WechatMiniprogram.Input) {
+    this.setData({ title: e.detail.value });
+  },
+
   onBriefInput(e: WechatMiniprogram.Input) {
     this.setData({ brief: e.detail.value });
   },
 
   onCreate() {
-    const { startDate, startTime, endDate, endTime, brief, areaConstraint } = this.data;
+    const { title, startDate, startTime, endDate, endTime, brief, areaConstraint } = this.data;
+
+    // 标题为用户必填字段（不再从简述派生），与后端 validation 规则一致
+    const titleResolution = resolveTripTitle(title);
+    if (!titleResolution.ok) {
+      wx.showToast({ title: titleResolution.error || '请填写行程标题', icon: 'none' });
+      return;
+    }
 
     if (!this.isAreaConstraintFilled(areaConstraint)) {
       wx.showToast({ title: '请先完成区域选择', icon: 'none' });
@@ -191,10 +204,10 @@ Page({
 
     // 真实创建：creatorId = currentUser.id，默认 participant = [currentUser.id]
     // 新 Trip 天然属于真实用户，无需任何 Mock 身份或 runtime hydration。
-    const title = brief.trim() ? brief.trim() : '新行程';
+    // title 为用户输入的独立字段；initialBrief 仍为原始行程简述（PREPROCESS AI 输入的一部分）。
     tripService
       .createTrip({
-        title,
+        title: titleResolution.title,
         creatorId: guard.user.id,
         initialBrief: brief.trim(),
         areaConstraint,

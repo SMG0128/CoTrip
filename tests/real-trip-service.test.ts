@@ -207,6 +207,8 @@ export async function runRealTripServiceTests(): Promise<void> {
   assert(!('creatorId' in createBody), 'create body 不得包含 creatorId');
   assert(!('participantIds' in createBody), 'create body 不得包含 participantIds');
   assert(!('status' in createBody), 'create body 不得包含 status');
+  assert(createBody.title === '顺德一日游', 'create body 必须携带用户输入的 title（PREPROCESS AI 输入的一部分）');
+  assert(createBody.initialBrief === '周末去顺德吃东西', 'create body 必须携带 initialBrief');
 
   const listRequests = installWx((option) => succeed(option, { trips: [] }));
   await service.listActiveTrips();

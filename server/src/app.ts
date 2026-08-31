@@ -26,6 +26,11 @@ import {
 } from './services/trip-coordination-ai-service';
 import { CloudBaseGatewayTripCoordinationAIService } from './services/cloudbase-gateway-trip-coordination-ai-service';
 import { TripCoordinationService } from './services/trip-coordination-service';
+import {
+  TripPreprocessAIService,
+  UnavailableTripPreprocessAIService,
+} from './services/trip-preprocess-ai-service';
+import { CloudBaseGatewayTripPreprocessAIService } from './services/cloudbase-gateway-trip-preprocess-ai-service';
 import { coordinationRouter } from './routes/coordination';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
@@ -37,7 +42,8 @@ export function createApp() {
   const tokens = new HmacTokenService(config.authTokenSecret);
   const auth = new RealAuthService(users, wechat, tokens);
   const tripRepository = new JsonTripRepository(config.tripDataFile);
-  const trips = new RealTripService(tripRepository);
+  const aiPreprocess = createTripPreprocessAIService(config);
+  const trips = new RealTripService(tripRepository, Math.random, aiPreprocess);
   const commentRepository = new JsonCommentRepository(config.commentDataFile);
   const aiComments = createAICommentService(config);
   const constraintRepository = new JsonConstraintRepository(config.constraintDataFile);
@@ -79,6 +85,20 @@ export function createApp() {
   app.use(errorHandler);
 
   return app;
+}
+
+function createTripPreprocessAIService(
+  config: ReturnType<typeof loadConfig>,
+): TripPreprocessAIService {
+  if (config.aiGatewayUrl && config.aiGatewaySecret) {
+    return new CloudBaseGatewayTripPreprocessAIService({
+      gatewayUrl: config.aiGatewayUrl,
+      secret: config.aiGatewaySecret,
+      timeoutMs: config.aiTimeoutMs,
+    });
+  }
+  // 未配置 PREPROCESS AI Provider：创建流程确定性进行，不写入 AI Context（不伪造）
+  return new UnavailableTripPreprocessAIService();
 }
 
 function createTripCoordinationAIService(

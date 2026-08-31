@@ -5,6 +5,12 @@ import { TripRepository } from '../repositories/trip-repository';
 import { CreateTripInput, Trip, TripJoinPreview, TripStatus } from '../types/trip';
 import { AppError } from '../types/errors';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../utils/room-code';
+import {
+  TripPreprocessAIService,
+  UnavailableTripPreprocessAIService,
+} from './trip-preprocess-ai-service';
+import { buildTripAIContext, validatePreprocessEnvelope } from './trip-preprocess-ai-validation';
+import { TripPreprocessTripInput } from '../types/ai-preprocess';
 
 export interface TripService {
   createTrip(authenticatedUserId: string, input: CreateTripInput): Promise<Trip>;
@@ -20,6 +26,8 @@ export class RealTripService implements TripService {
   constructor(
     private readonly trips: TripRepository,
     private readonly random: () => number = Math.random,
+    /** AI Trip Pipeline V2：创建行程时的第一次 AI 调用（PREPROCESS）；未配置时不阻塞创建 */
+    private readonly preprocessAI: TripPreprocessAIService = new UnavailableTripPreprocessAIService(),
   ) {}
 
   /** 服务器生成房间号；与已有 roomCode 碰撞时重新生成（上限 50 次）。 */
@@ -44,6 +52,32 @@ export class RealTripService implements TripService {
       throw new AppError(400, 'VALIDATION_ERROR', '行程简述不能超过 2000 个字符');
     }
 
+    // AI Trip Pipeline V2：创建行程时的第一次 AI 调用固定为 PREPROCESS。
+    // 只做意图/约束预处理，绝不生成 itinerary；AI 不可用或响应非法时优雅降级
+    // （行程照常创建、不写入 aiContext），绝不伪造 AI 分析。
+    const tripInput: TripPreprocessTripInput = {
+      title,
+      initialBrief,
+      areaConstraint: input.areaConstraint,
+      timeRange: input.timeRange,
+    };
+    let aiContext: Trip['aiContext'];
+    try {
+      const envelope = await this.preprocessAI.preprocess({ title, tripInput });
+      const validation = validatePreprocessEnvelope(envelope);
+      if (!validation.ok) {
+        console.warn(
+          `PREPROCESS AI 响应验证失败（${validation.failureReasonCode} @ ${validation.failurePath}），本次创建不写入 AI Context`,
+        );
+      } else {
+        aiContext = buildTripAIContext(envelope, tripInput, new Date().toISOString());
+      }
+    } catch (error) {
+      console.warn(
+        `PREPROCESS AI 调用失败（${error instanceof Error ? error.message : 'unknown'}），本次创建不写入 AI Context`,
+      );
+    }
+
     const tripBase: Omit<Trip, 'roomCode'> = {
       id: `trip_${crypto.randomUUID()}`,
       title,
@@ -56,6 +90,7 @@ export class RealTripService implements TripService {
       timeRange: input.timeRange,
       commentIds: [],
       constraintIds: [],
+      ...(aiContext ? { aiContext } : {}),
     };
 
     // 仓库在最终提交点再次保证 roomCode 唯一；并发碰撞时重新生成而不是写入歧义数据。

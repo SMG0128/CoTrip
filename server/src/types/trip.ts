@@ -1,5 +1,7 @@
 // 后端独立 Trip 模型；不依赖微信小程序 runtime 类型。
 
+import { TripAIContext } from './ai-preprocess';
+
 export type TripStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
 export interface Trip {
@@ -18,6 +20,8 @@ export interface Trip {
   currentPlan?: unknown;
   commentIds: string[];
   constraintIds: string[];
+  /** AI Trip Pipeline V2：创建时 PREPROCESS 生成的结构化上下文；AI 不可用或缺席时为 undefined */
+  aiContext?: TripAIContext;
 }
 
 export interface CreateTripInput {

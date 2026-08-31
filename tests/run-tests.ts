@@ -33,6 +33,7 @@ import { runJoinFlowTests } from './join-flow.test';
 import { runDemoTripTests } from './demo-trip.test';
 import { runAuthFlowTests } from './auth-flow.test';
 import { runAvatarTests } from './avatar.test';
+import { runTripTitleTests } from './trip-title.test';
 
 async function main(): Promise<void> {
   await runHomeMultiTripsTests();
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
   await runDemoTripTests();
   await runAuthFlowTests();
   await runAvatarTests();
+  await runTripTitleTests();
   console.log('\n🎉 全部核心逻辑测试通过');
 }
 

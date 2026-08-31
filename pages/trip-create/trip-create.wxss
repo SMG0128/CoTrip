@@ -179,6 +179,16 @@
   display: block;
 }
 
+/* 标题输入：右对齐填充剩余宽度，与 field pill 一体 */
+.title-input {
+  flex: 1;
+  margin-left: 20rpx;
+  color: #17243d;
+  font-size: 27rpx;
+  font-weight: 600;
+  text-align: right;
+}
+
 .field-picker:last-child .field {
   margin-bottom: 0;
 }

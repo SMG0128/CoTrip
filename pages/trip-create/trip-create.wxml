@@ -13,6 +13,28 @@
     </view>
   </view>
 
+  <!-- 行程标题 -->
+  <view class="card">
+    <view class="section-head">
+      <image class="section-icon" src="/assets/icons/trip-create/brief.svg" mode="aspectFit" />
+      <text class="section-title">行程标题</text>
+    </view>
+    <view class="field">
+      <view class="field-label-group">
+        <image class="field-icon" src="/assets/icons/trip-create/pencil.svg" mode="aspectFit" />
+        <text class="field-label">标题</text>
+      </view>
+      <input
+        class="title-input"
+        placeholder="例如：顺德周末美食之旅"
+        placeholder-class="picker-placeholder"
+        value="{{title}}"
+        bind:input="onTitleInput"
+        maxlength="100"
+      />
+    </view>
+  </view>
+
   <!-- 区域限定 -->
   <view class="card">
     <view class="section-head">
