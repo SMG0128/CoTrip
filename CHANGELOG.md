@@ -11,11 +11,14 @@
 - 通用餐饮关键词提取（`extractFoodKeyword`）：越南菜 / 泰国菜 / 粤菜 / 火锅 / 咖啡 / 甜品等统一走腾讯 nearby，无菜系 special-case 分支；「吃饭 / 附近吃饭 / 找个餐厅」→「餐厅」
 - 评论驱动先后关系解析：「参观省博后吃越南菜」「之后附近吃越南菜」→ 餐饮活动链接到前置活动（`afterActivityId` + `near_previous_activity`），nearby anchor 使用前置活动真实腾讯坐标
 - 行程时间线 / 地点详情展示真实腾讯 POI 地址；标题已含地点名时去重展示避免视觉重复
+- 全局 resolved physical location contract：Tencent Provider 身份、POI id、名称与合法坐标齐全才视为 resolved；活动地点、餐厅和咖啡馆共用同一事实字段规则
+- Tencent 地址补全：POI Search / nearby 未返回 address 但有合法坐标时，复用同一 Provider 的 Reverse Geocoder；腾讯仍无法提供时保持 `undefined`，绝不伪造
 
 ### Changed
 - 移除真实行程 production runtime 中的本地 mock 餐厅注入：`pages/trip-detail` 真实行程分支不再以 `realRestaurants` 排序生成候选，候选只来自服务端计划中的已验证实体；`place-detail` 支持上游直传实体数据跳转，mock 表仅保留 id 回查 fallback（示例行程 fixture）
 - `place-detail` 的「AI 推荐理由」不再注入伪造文案：无真实理由时不显示该卡片
 - 餐厅可选字段 truth-preserving：腾讯未返回 rating / avgPrice 时保持 `undefined`，前端按缺省隐藏，绝不补齐伪造事实
+- 地址持久化与展示保持 truth-preserving：sanitizer 只保留已验证 Tencent location 的非空 address；活动与餐厅统一展示真实 address，缺失时隐藏地址节点且不以 district 或占位文案替代
 
 ### Fixed
 - 修复「广州图书馆看书」等非「去X」句型活动无法解析 POI 的问题（原提取器仅匹配「去」前缀）

@@ -60,7 +60,7 @@
 .time,
 .title,
 .loc,
-.district,
+.address,
 .selected-label,
 .candidate-name {
   display: block;
@@ -95,11 +95,27 @@
   white-space: nowrap;
 }
 
-.district,
+.address-line,
 .entity-meta {
   margin-top: 5rpx;
   color: #9aa6bb;
   font-size: 20rpx;
+}
+
+.address-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 4rpx;
+  line-height: 1.45;
+}
+
+.address-pin {
+  flex-shrink: 0;
+}
+
+.address {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .entity-meta {

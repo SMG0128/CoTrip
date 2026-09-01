@@ -12,14 +12,13 @@
 //
 // 腾讯 nearby 坐标顺序：latitude, longitude（不要写反）。
 
+import {
+  enrichTencentLocationAddress,
+  ResolvedPhysicalLocation,
+} from './resolved-physical-location';
+
 /** 统一 PlaceCandidate：truth-preserving，腾讯未返回的字段保持 undefined */
-export interface PlaceCandidate {
-  provider: 'tencent';
-  providerPoiId: string;
-  name: string;
-  address?: string;
-  latitude: number;
-  longitude: number;
+export interface PlaceCandidate extends ResolvedPhysicalLocation {
   /** 距锚点距离（米）；腾讯 API 未返回时为 undefined */
   distanceMeters?: number;
   /** 分类；腾讯 API 未返回时为 undefined */
@@ -57,9 +56,21 @@ interface TencentPlaceResponse {
   data?: TencentPlaceItem[];
 }
 
+interface TencentReverseGeocodeResponse {
+  status: number;
+  result?: {
+    address?: string;
+    formatted_addresses?: {
+      recommend?: string;
+      rough?: string;
+    };
+  };
+}
+
 export interface TencentLBSOptions {
   key: string;
   baseUrl?: string;
+  reverseGeocodeBaseUrl?: string;
   timeoutMs?: number;
   fetchImpl?: (url: string, init: { signal: AbortSignal }) => Promise<{
     ok: boolean;
@@ -71,11 +82,14 @@ export class TencentLBSService {
   private readonly key: string;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly reverseGeocodeBaseUrl: string;
   private readonly fetchImpl: TencentLBSOptions['fetchImpl'];
 
   constructor(options: TencentLBSOptions) {
     this.key = options.key;
     this.baseUrl = options.baseUrl ?? 'https://apis.map.qq.com/ws/place/v1/search';
+    this.reverseGeocodeBaseUrl = options.reverseGeocodeBaseUrl
+      ?? 'https://apis.map.qq.com/ws/geocoder/v1/';
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init));
   }
@@ -95,7 +109,7 @@ export class TencentLBSService {
     try {
       const items = await this.request({ keyword, boundary, page_size: 5 });
       if (items.length === 0) return { status: 'POI_NOT_FOUND', candidates: [] };
-      return { status: 'FOUND', candidates: items.map((item) => this.toCandidate(item)) };
+      return { status: 'FOUND', candidates: await this.toAddressCompleteCandidates(items) };
     } catch {
       return { status: 'POI_SEARCH_UNAVAILABLE', candidates: [] };
     }
@@ -116,7 +130,7 @@ export class TencentLBSService {
     try {
       const items = await this.request({ keyword, boundary, page_size: 10 });
       if (items.length === 0) return { status: 'POI_NOT_FOUND', candidates: [] };
-      return { status: 'FOUND', candidates: items.map((item) => this.toCandidate(item)) };
+      return { status: 'FOUND', candidates: await this.toAddressCompleteCandidates(items) };
     } catch {
       return { status: 'POI_SEARCH_UNAVAILABLE', candidates: [] };
     }
@@ -138,6 +152,51 @@ export class TencentLBSService {
     // 腾讯 place/v1/search 不返回 rating / avgPrice / openingHours / photo，
     // 因此这些字段保持 undefined —— 绝不伪造。
     return candidate;
+  }
+
+  /** POI search 与 nearby search 共用同一地址补全管线。 */
+  private async toAddressCompleteCandidates(items: TencentPlaceItem[]): Promise<PlaceCandidate[]> {
+    return Promise.all(
+      items.map((item) =>
+        enrichTencentLocationAddress(
+          this.toCandidate(item),
+          (latitude, longitude) => this.reverseGeocodeAddress(latitude, longitude),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * 同一 Tencent Provider 的逆地理编码。只返回腾讯响应中的真实地址；
+   * 不记录 URL、不暴露 key，失败由调用方降级为 address undefined。
+   */
+  private async reverseGeocodeAddress(
+    latitude: number,
+    longitude: number,
+  ): Promise<string | undefined> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const query = new URLSearchParams();
+      query.set('key', this.key);
+      query.set('location', `${latitude},${longitude}`);
+      const response = await this.fetchImpl!(`${this.reverseGeocodeBaseUrl}?${query.toString()}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) return undefined;
+      const body = (await response.json()) as TencentReverseGeocodeResponse;
+      if (body.status !== 0 || !body.result) return undefined;
+      const address = [
+        body.result.address,
+        body.result.formatted_addresses?.recommend,
+        body.result.formatted_addresses?.rough,
+      ].find((value) => typeof value === 'string' && value.trim().length > 0);
+      return typeof address === 'string' ? address.trim() : undefined;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async request(params: Record<string, string | number>): Promise<TencentPlaceItem[]> {

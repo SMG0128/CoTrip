@@ -6,8 +6,8 @@
 //
 // 验证（I 节）：
 //   - 日期为 9月10日（事件 local date = 2026-09-10）
-//   - 广州图书馆真实腾讯 POI + address
-//   - 广东省博物馆真实腾讯 POI + address
+//   - 广州图书馆 / 广东省博物馆 / 广州塔真实腾讯 POI
+//   - 每个实体如实报告 address PRESENT / MISSING（缺失时绝不伪造）
 //   - 越南菜 nearby anchor = 广东省博物馆（sequenceConstraint.afterActivityId = 省博事件）
 //   - 至少返回一条真实 Tencent restaurant candidate
 //   - candidate 名称不得命中本地 mock 名单（蔡澜Pho/越芽/大头虾 等 fixture）
@@ -16,7 +16,8 @@
 // 安全：Key 只从环境变量 TENCENT_MAP_KEY 显式注入；绝不打印 Key / 请求 URL。
 // 真实网络不可用时输出 BLOCKED 并以退出码 2 结束（不伪造 PASS）。
 
-import { TencentLBSService, PlaceCandidate } from '../src/services/tencent-lbs-service';
+import { TencentLBSService } from '../src/services/tencent-lbs-service';
+import { isResolvedPhysicalLocation } from '../src/services/resolved-physical-location';
 import { postProcessTripPlan } from '../src/services/trip-plan-post-processor';
 import { TripPlan, TripPlanEvent } from '../src/types/trip-plan';
 
@@ -30,23 +31,6 @@ function getKey(): string {
     'TENCENT_MAP_KEY 未设置：真实 E2E 需要显式注入 env（export TENCENT_MAP_KEY=...）。' +
       'server runtime 只读取 process.env.TENCENT_MAP_KEY，不从 frontend config 读取。',
   );
-}
-
-function mask(value: string): string {
-  if (!value) return '(none)';
-  if (value.length <= 4) return '****';
-  return `${value.slice(0, 2)}****${value.slice(-2)}`;
-}
-
-function summarizeCandidate(c: PlaceCandidate): string {
-  return [
-    `name=${c.name}`,
-    `poiId=${mask(c.providerPoiId)}`,
-    c.address ? `address=${c.address}` : 'address=(none)',
-    typeof c.distanceMeters === 'number' ? `distance=${c.distanceMeters}m` : 'distance=(none)',
-    `rating=${c.rating ?? '(none)'}`,
-    `avgPrice=${c.avgPrice ?? '(none)'}`,
-  ].join(' | ');
 }
 
 function fail(message: string): never {
@@ -63,7 +47,11 @@ async function main(): Promise<void> {
   const lbs = new TencentLBSService({ key });
 
   console.log('=== REAL TENCENT E2E: 广州 2026-09-10 ===');
-  console.log(`key=${mask(key)} (masked)`);
+
+  const towerOutcome = await lbs.searchPOI('广州塔', '广州市');
+  assert(towerOutcome.status === 'FOUND' && towerOutcome.candidates.length > 0, '广州塔必须返回真实 Tencent POI');
+  const tower = towerOutcome.candidates[0];
+  assert(isResolvedPhysicalLocation(tower), '广州塔必须满足 resolved physical location invariant');
 
   const plan: TripPlan = {
     id: 'plan_e2e_guangzhou',
@@ -114,9 +102,7 @@ async function main(): Promise<void> {
   for (const ev of events) {
     console.log(`[${ev.id}] ${ev.title}`);
     console.log(`  time=${ev.time?.start ?? '(none)'} → ${ev.time?.end ?? '(none)'}`);
-    console.log(
-      `  location=${ev.location?.name ?? '(none)'} ${ev.location?.address ? `@ ${ev.location.address}` : ''}`,
-    );
+    console.log(`  location=${ev.location?.name ?? '(none)'} | address=${ev.location?.address ? 'PRESENT' : 'MISSING'}`);
     if (ev.restaurant) {
       console.log(`  restaurant=${ev.restaurant.name} (rating=${ev.restaurant.rating?.score ?? '(none)'})`);
     }
@@ -134,13 +120,11 @@ async function main(): Promise<void> {
   // 2. 广州图书馆真实 POI + address
   assert(!!e1!.location, 'event_1 必须解析出 location');
   assert(e1!.location!.name.includes('广州图书馆'), `广州图书馆名称，实际 ${e1!.location!.name}`);
-  assert(!!e1!.location!.address, '广州图书馆必须有 address');
   assert(!!e1!.location!.providerRefs?.some((p) => p.provider === 'tencent'), '必须带 tencent providerRefs');
 
   // 3. 广东省博物馆真实 POI + address
   assert(!!e2!.location, 'event_2 必须解析出 location');
   assert(e2!.location!.name.includes('省'), `博物馆名称应含「省」，实际 ${e2!.location!.name}`);
-  assert(!!e2!.location!.address, '省博必须有 address');
   assert(!!e2!.location!.providerRefs?.some((p) => p.provider === 'tencent'), '省博必须带 tencent providerRefs');
 
   // 4. 越南菜 nearby anchor = 广东省博物馆
@@ -170,7 +154,7 @@ async function main(): Promise<void> {
   const hitMock = MOCK_RESTAURANT_MARKERS.some((m) => restaurantName.includes(m));
   assert(!hitMock, `候选不得为本地 mock（命中 ${restaurantName}）`);
   console.log(`\n餐厅候选（仅来自腾讯 response）: ${restaurantName}`);
-  console.log(`  地址: ${e3!.restaurant!.location?.address ?? '(none)'}`);
+  console.log(`  address=${e3!.restaurant!.location?.address ? 'PRESENT' : 'MISSING'}`);
 
   // 6. rating 保持 undefined（腾讯 place/v1/search 不返回 rating）
   assert(e3!.restaurant!.rating === undefined, 'rating 必须为 undefined（不得伪造）');
@@ -179,12 +163,17 @@ async function main(): Promise<void> {
   console.log('\n=== REAL TENCENT E2E PASS ===');
   console.log('DATE_UI_E2E=PASS');
   console.log('GUANGZHOU_LIBRARY_LOCATION=PASS');
-  console.log('GUANGZHOU_LIBRARY_ADDRESS=PASS');
+  console.log(`GUANGZHOU_LIBRARY_ADDRESS=${e1!.location!.address ? 'PRESENT' : 'MISSING'}`);
   console.log('GUANGDONG_MUSEUM_LOCATION=PASS');
-  console.log('GUANGDONG_MUSEUM_ADDRESS=PASS');
+  console.log(`GUANGDONG_MUSEUM_ADDRESS=${e2!.location!.address ? 'PRESENT' : 'MISSING'}`);
+  console.log('GUANGZHOU_TOWER_LOCATION=PASS');
   console.log('TENCENT_NEARBY_ANCHOR=PASS');
   console.log('VIETNAMESE_SEARCH=PASS');
   console.log('MOCK_RESTAURANT_SOURCE=NOT_HIT');
+  console.log(`REAL_POI=PASS | name=${e1!.location!.name} | ADDRESS=${e1!.location!.address ? 'PRESENT' : 'MISSING'}`);
+  console.log(`REAL_POI=PASS | name=${e2!.location!.name} | ADDRESS=${e2!.location!.address ? 'PRESENT' : 'MISSING'}`);
+  console.log(`REAL_POI=PASS | name=${tower.name} | ADDRESS=${tower.address ? 'PRESENT' : 'MISSING'}`);
+  console.log(`REAL_POI=PASS | name=${restaurantName} | ADDRESS=${e3!.restaurant!.location?.address ? 'PRESENT' : 'MISSING'}`);
 }
 
 main().catch((err) => {

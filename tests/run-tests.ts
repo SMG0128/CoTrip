@@ -15,6 +15,7 @@ import './comment-author.test';
 import './candidate-ranker.test';
 import './event-date-grouping.test';
 import './event-candidates.test';
+import './location-display.test';
 import './tencent-map-adapter.test';
 import './external-action-resolver.test';
 import './current-user.test';

@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 241/241、前端全量测试模块全绿）：
+当前已实际实现并通过测试的能力（后端 247/247、前端全量测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -27,8 +27,8 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Native WeChat sharing** —— 分享卡片直达 Join 落地页（携带 roomCode）。
 - **Real room joining** —— Join 落地页 / 首页房间入口 / 微信分享均已接通真实加入流程：公开 Preview → Bearer 认证幂等加入；身份只来自服务端校验的 token，失败不回退 Mock。
 - **Navigation-style route recommendations** —— 见下节；示例行程使用已固化、可重复验证的广州路线数据。
-- **Tencent Location Service adapter** —— 已实现并启用 POI Search + Direction（walking / transit）适配器；真实行程在「我的推荐」面板选定出发地点后调用腾讯路线 API。
-- **Real POI trip presentation** —— 行程时间线按活动 local date 分组显示日期头；所有活动（图书馆 / 省博 / 餐厅…）经通用地点短语提取 + 腾讯 POI 解析为真实地点并渲染地址；任意菜系/餐饮关键词（越南菜、泰国菜、粤菜、火锅、咖啡…）统一走腾讯 nearby，anchor 使用前置活动真实坐标。
+- **Tencent Location Service adapter** —— 已实现并启用 POI Search、Reverse Geocoder 与 Direction（walking / transit）适配器；真实行程在「我的推荐」面板选定出发地点后调用腾讯路线 API。
+- **Real POI trip presentation** —— 行程时间线按活动 local date 分组显示日期头；任意活动提取出的物理地点短语统一经腾讯 POI 解析，任意菜系/餐饮关键词统一走腾讯 nearby，anchor 使用前置活动真实坐标。resolved POI 尽最大可能获取真实地址：优先使用 Search 地址，缺失时以同一 Tencent Provider 的 reverse geocode 补全；腾讯仍无法提供时保持 `undefined`、前端隐藏地址行，绝不伪造。
 - **No runtime mock restaurant injection** —— 真实行程候选只来自服务端计划中的已验证实体（腾讯 POI / nearby），生产链路不再引用 `realRestaurants`/`realRestaurantCailan`；`place-detail` 由上游直传实体，mock 表仅保留示例行程 fixture 回查。
 - **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
 - **Immersive Home experience** —— 首页使用广州图片循环横幅、自定义全面屏安全区与底部渐隐；共享玻璃材质覆盖导航、头像、评论和状态组件，主操作保留独立材质控制。
@@ -67,10 +67,11 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 真实行程的路线规划已启用腾讯位置服务 WebService API（Direction）。仓库内始终只提交占位符，真实 Key **不进入 Git**：
 
-1. 在 [腾讯位置服务控制台](https://lbs.qq.com/) 创建应用并申请 Key，勾选所需 **WebService API** 能力（PlaceSearch / Direction），建议配置配额限额与用量告警。
-2. 仅在本地将 `config/tencent-map.ts` 的 `YOUR_TENCENT_MAP_KEY` 替换为受限 Key；不要提交该修改。当前允许的端点为 `/ws/place/v1/search`、`/ws/direction/v1/walking` 与 `/ws/direction/v1/transit`。
-3. 在小程序管理后台「开发设置 → 服务器域名」添加 request 合法域名 `https://apis.map.qq.com`。
-4. 在微信小程序控制台配置位置权限与《用户隐私保护指引》（`permission.scope.userLocation` 与 `requiredPrivateInfos` 已在 `app.json` 声明）。
+1. 在 [腾讯位置服务控制台](https://lbs.qq.com/) 创建应用并申请 Key，勾选所需 **WebService API** 能力（PlaceSearch / Geocoder / Direction），建议配置配额限额与用量告警。
+2. 仅在本地将 `config/tencent-map.ts` 的 `YOUR_TENCENT_MAP_KEY` 替换为受限 Key；不要提交该修改。当前客户端允许的端点为 `/ws/place/v1/search`、`/ws/direction/v1/walking` 与 `/ws/direction/v1/transit`。
+3. 服务端 POI Search / Reverse Geocoder 仅从运行环境的 `process.env.TENCENT_MAP_KEY` 读取 Key（本地通过 `server/.env` 注入）；E2E 同样只使用该环境变量。`server/.env` 不得提交。
+4. 在小程序管理后台「开发设置 → 服务器域名」添加 request 合法域名 `https://apis.map.qq.com`。
+5. 在微信小程序控制台配置位置权限与《用户隐私保护指引》（`permission.scope.userLocation` 与 `requiredPrivateInfos` 已在 `app.json` 声明）。
 
 **Never commit production/private keys.** 未配置腾讯 Key 时 Provider 抛 `NOT_CONFIGURED`，UI 显示「暂未配置地图服务」；绝不伪造路线，也不把示例 fixture 回退给真实行程。
 

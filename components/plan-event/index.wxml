@@ -12,7 +12,10 @@
         <block wx:if="{{selectedCandidate}}">
           <text class="selected-label">当前首选</text>
           <text wx:if="{{candDisplayName}}" class="loc">{{candDisplayName}}</text>
-          <text wx:if="{{candAddress}}" class="district">{{candAddress}}</text>
+          <view wx:if="{{candAddress}}" class="address-line">
+            <text class="address-pin">📍</text>
+            <text class="address">{{candAddress}}</text>
+          </view>
           <view class="entity-meta">
             <price-display wx:if="{{selectedCandidate.price}}" price="{{selectedCandidate.price}}" />
             <view wx:if="{{selectedCandidate.rating}}" class="event-rating">
@@ -24,7 +27,10 @@
         </block>
         <block wx:else>
           <text wx:if="{{locDisplayName}}" class="loc">{{locDisplayName}}</text>
-          <text wx:if="{{locAddress}}" class="district">{{locAddress}}</text>
+          <view wx:if="{{locAddress}}" class="address-line">
+            <text class="address-pin">📍</text>
+            <text class="address">{{locAddress}}</text>
+          </view>
           <price-display wx:if="{{event.price}}" price="{{event.price}}" />
         </block>
       </view>
@@ -48,7 +54,7 @@
             <text class="candidate-name">{{item.name}}</text>
             <view class="candidate-meta">
               <text wx:if="{{item.confidence}}">匹配度 {{item.confidence}}%</text>
-              <text wx:if="{{item.location.district}}">{{item.location.district}}</text>
+              <text wx:if="{{item.location.address}}">📍 {{item.location.address}}</text>
             </view>
           </view>
           <text wx:if="{{item.overBudget}}" class="over-budget">超预算偏好</text>

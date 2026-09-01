@@ -27,6 +27,27 @@ function isVerifiedLocation(location: TripPlanEvent['location']): boolean {
   );
 }
 
+/** 只复制 Provider 验证后的白名单 factual fields；空白 address 视为缺失。 */
+function sanitizeVerifiedLocation(
+  location: TripPlanEvent['location'],
+): NonNullable<TripPlanEvent['location']> | undefined {
+  if (!location || !isVerifiedLocation(location)) return undefined;
+  const providerRefs = location.providerRefs!.filter(
+    (ref) => ref.provider === 'tencent'
+      && typeof ref.externalId === 'string'
+      && ref.externalId.length > 0,
+  );
+  const address = typeof location.address === 'string' ? location.address.trim() : '';
+  return {
+    id: location.id,
+    name: location.name,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    ...(address ? { address } : {}),
+    providerRefs,
+  };
+}
+
 /** 判定 restaurant 是否来自已验证 Provider（腾讯） */
 function isVerifiedRestaurant(restaurant: TripPlanEvent['restaurant']): boolean {
   if (!restaurant) return false;
@@ -71,17 +92,20 @@ function sanitizeEvent(
   };
 
   // location：仅保留已验证 Provider 的真实地点
-  if (isVerifiedLocation(event.location)) {
-    sanitized.location = event.location;
+  const verifiedLocation = sanitizeVerifiedLocation(event.location);
+  if (verifiedLocation) {
+    sanitized.location = verifiedLocation;
   }
 
   // restaurant：仅保留已验证 Provider 的真实餐厅；其 rating/avgPrice 仅当 Provider 返回
   const restaurant = event.restaurant;
   if (restaurant && isVerifiedRestaurant(restaurant)) {
+    const restaurantLocation = sanitizeVerifiedLocation(restaurant.location);
+    if (!restaurantLocation) return sanitized;
     sanitized.restaurant = {
       id: restaurant.id,
       name: restaurant.name,
-      location: restaurant.location,
+      location: restaurantLocation,
       ...(typeof restaurant.distanceMeters === 'number'
         ? { distanceMeters: restaurant.distanceMeters }
         : {}),

@@ -3,6 +3,7 @@
 
 import { PlanEvent } from '../../types/event';
 import { EventCandidate } from '../../types/event-candidate';
+import { buildPhysicalLocationDisplay } from '../../utils/location-display';
 
 const TYPE_ASSET: Record<string, string> = {
   SPORT: '/assets/icons/trip/badminton.svg',
@@ -35,11 +36,11 @@ Component({
     expanded: false,
     /** 地点展示名：标题已含地点名时为空串（避免视觉重复） */
     locDisplayName: '',
-    /** 地点地址（缺省回退 district） */
+    /** 地点真实地址；缺失时为空，不显示地址行 */
     locAddress: '',
     /** 候选展示名：标题已含候选名时为空串 */
     candDisplayName: '',
-    /** 候选地址（缺省回退 district） */
+    /** 候选真实地址；缺失时为空，不显示地址行 */
     candAddress: '',
   },
   observers: {
@@ -58,14 +59,8 @@ Component({
       // 真实地点展示：title 已包含地点名时避免视觉重复，只显示地址。
       // 例：「广州图书馆看书」+ 地点「广州图书馆」→ 只显示「广东省广州市天河区珠江东路4号」。
       const title = event.title ?? '';
-      const locName = event.location?.name ?? '';
-      const locDisplayName = locName && title.includes(locName) ? '' : locName;
-      const locAddress = event.location?.address || event.location?.district || '';
-
-      const candName = selectedCandidate?.name ?? '';
-      const candDisplayName = candName && title.includes(candName) ? '' : candName;
-      const candAddress =
-        selectedCandidate?.location?.address || selectedCandidate?.location?.district || '';
+      const locationDisplay = buildPhysicalLocationDisplay(title, event.location);
+      const candidateDisplay = buildPhysicalLocationDisplay(title, selectedCandidate?.location);
 
       this.setData({
         icon,
@@ -73,10 +68,10 @@ Component({
         selectedCandidate,
         alternatives,
         expanded: false,
-        locDisplayName,
-        locAddress,
-        candDisplayName,
-        candAddress,
+        locDisplayName: locationDisplay.displayName,
+        locAddress: locationDisplay.address,
+        candDisplayName: candidateDisplay.displayName,
+        candAddress: candidateDisplay.address,
       });
     },
   },

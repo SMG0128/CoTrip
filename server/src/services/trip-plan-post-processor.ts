@@ -22,6 +22,7 @@ import {
 } from './trip-sequence-resolution';
 import { PlaceCandidate, TencentLBSService } from './tencent-lbs-service';
 import { rankPlaceCandidates, RankedPlaceCandidate } from './place-candidate-ranker';
+import { isResolvedPhysicalLocation } from './resolved-physical-location';
 
 /** 解析后的活动：在既有 TripPlanEvent 基础上附加可选字段（全部向后兼容） */
 export interface ResolvedTripEvent extends SequencedTripPlanEvent {
@@ -259,18 +260,22 @@ async function resolveEventPOI(
   } else if (locationQuery) {
     const poiOutcome = await lbs.searchPOI(locationQuery, city);
     if (poiOutcome.status === 'FOUND' && poiOutcome.candidates.length > 0) {
-      const top = poiOutcome.candidates[0];
-      resolvedLat = top.latitude;
-      resolvedLng = top.longitude;
-      resolvedLocation = {
-        id: top.providerPoiId,
-        name: top.name,
-        latitude: top.latitude,
-        longitude: top.longitude,
-        ...(top.address ? { address: top.address } : {}),
-        providerRefs: [{ provider: 'tencent', externalId: top.providerPoiId }],
-      };
-      locationStatus = 'resolved';
+      const top = poiOutcome.candidates.find(isResolvedPhysicalLocation);
+      if (!top) {
+        locationStatus = 'unresolved';
+      } else {
+        resolvedLat = top.latitude;
+        resolvedLng = top.longitude;
+        resolvedLocation = {
+          id: top.providerPoiId,
+          name: top.name,
+          latitude: top.latitude,
+          longitude: top.longitude,
+          ...(top.address ? { address: top.address } : {}),
+          providerRefs: [{ provider: 'tencent', externalId: top.providerPoiId }],
+        };
+        locationStatus = 'resolved';
+      }
     } else {
       locationStatus =
         poiOutcome.status === 'POI_SEARCH_UNAVAILABLE' ? 'search_unavailable' : 'unresolved';
@@ -290,7 +295,7 @@ async function resolveEventPOI(
       const nearby = await lbs.searchNearby(keyword, resolvedLat, resolvedLng);
       if (nearby.status === 'FOUND') {
         resolvedEvent.restaurantCandidates = rankPlaceCandidates(
-          nearby.candidates,
+          nearby.candidates.filter(isResolvedPhysicalLocation),
           keyword,
           {
             budgetMaxPerPerson: input.budgetMaxPerPerson,
@@ -363,6 +368,8 @@ function isTransportTitle(title: string): boolean {
  *   「参观省博物馆」→「省博物馆」
  *   「去广州塔」→「广州塔」
  *   「在天河体育中心打羽毛球」→「天河体育中心」
+ *   「逛K11」→「K11」
+ *   「去酒店休息」→「酒店」
  *   「去完广图吃泰国菜」→「广图」（餐饮标题自带地点 anchor，供 nearby 搜索）
  *
  * 规则：
@@ -384,7 +391,9 @@ export function extractPlaceQuery(title: string): string | undefined {
   // 剥离前缀动词（含复合前缀）
   t = t.replace(/^(?:去参观|去游览|去游玩|去完|前往|参观|游览|游玩|体验|逛|看|到|在|去|直接去)/, '');
   // 在第一个动作动词处截断（「广州图书馆看书」→「广州图书馆」；「广州塔看夜景」→「广州塔」）
-  const verbIndex = t.search(/(?:看|读|玩|打|吃|喝|买|参观|游览|体验|听|唱|跳|拍|运动|游泳|跑步|骑行|散步|爬山|放风筝)/);
+  const verbIndex = t.search(
+    /(?:办理入住|入住|住宿|休息|看|读|玩|打|吃|喝|买|购物|逛街|参观|游览|体验|听|唱|跳|拍|打卡|运动|游泳|跑步|骑行|散步|爬山|放风筝|候车|乘车|换乘)/,
+  );
   if (verbIndex > 0) t = t.slice(0, verbIndex);
 
   t = t.trim();
