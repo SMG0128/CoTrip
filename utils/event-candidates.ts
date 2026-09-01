@@ -4,6 +4,7 @@
 import { RankedCandidate } from '../core/candidate-ranker';
 import { EventCandidate, EventCandidateGroup } from '../types/event-candidate';
 import { Plan } from '../types/plan';
+import { Restaurant } from '../types/restaurant';
 
 function toConfidence(score: number): number {
   return Math.max(50, Math.min(99, Math.round(50 + score * 4)));
@@ -38,6 +39,26 @@ export function buildEventCandidateGroups(
           selected: item.restaurant.id === preferredId,
           overBudget: item.overBudget,
           reasons: item.reasons,
+        }));
+        return { eventId: event.id, candidates };
+      }
+
+      // 真实餐厅候选（服务端 Provider 验证，top 已写入 event.restaurant）：
+      // 全部展示为备选，选中项与 event.restaurant 一致 →「当前首选」+「查看 N 个备选」
+      if (event.restaurantCandidates && event.restaurantCandidates.length > 0) {
+        const preferredId = event.restaurant?.id ?? event.restaurantCandidates[0].id;
+        const candidates: EventCandidate[] = event.restaurantCandidates.map((item, index) => ({
+          id: item.id,
+          eventId: event.id,
+          kind: 'RESTAURANT',
+          name: item.name,
+          location: item.location,
+          restaurant: item as Restaurant,
+          price: item.averagePrice,
+          rating: item.rating?.score,
+          confidence: 99,
+          rank: index + 1,
+          selected: item.id === preferredId,
         }));
         return { eventId: event.id, candidates };
       }

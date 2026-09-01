@@ -29,6 +29,14 @@ const STATUS_MAP: Record<AIStatus, StatusVisual> = {
     shadow: '0 0 0 1rpx rgba(174, 195, 255, 0.5), 0 0 16rpx rgba(50, 107, 255, 0.16), 0 8rpx 18rpx rgba(50, 107, 255, 0.12)',
     icon: '/assets/icons/status/processing.svg',
   },
+  partially_incorporated: {
+    label: '部分纳入',
+    color: '#326bff',
+    bg: '#eaf0ff',
+    border: '#aec3ff',
+    shadow: '0 0 0 1rpx rgba(174, 195, 255, 0.5), 0 0 16rpx rgba(50, 107, 255, 0.16), 0 8rpx 18rpx rgba(50, 107, 255, 0.12)',
+    icon: '/assets/icons/status/clock.svg',
+  },
   conflict: {
     label: '存在冲突',
     color: '#d95665',

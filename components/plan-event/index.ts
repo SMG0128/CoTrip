@@ -13,6 +13,13 @@ const TYPE_ASSET: Record<string, string> = {
   OTHER: '/assets/icons/utility/location.svg',
 };
 
+/** 路线 mode → 中文文案（与产品「步行/地铁/公交/打车」一致） */
+function formatRouteMode(mode: 'transit' | 'walking' | 'driving'): string {
+  if (mode === 'walking') return '步行';
+  if (mode === 'driving') return '打车';
+  return '地铁';
+}
+
 Component({
   properties: {
     event: {
@@ -42,6 +49,10 @@ Component({
     candDisplayName: '',
     /** 候选真实地址；缺失时为空，不显示地址行 */
     candAddress: '',
+    /** 候选与锚点的真实距离（米）；仅腾讯真实返回时显示 */
+    candDistanceMeters: '',
+    /** 真实路线文案（如「地铁 24 分钟」）；无真实路线为空 */
+    routeText: '',
   },
   observers: {
     'event, candidates'(event: PlanEvent | null, candidates: EventCandidate[]) {
@@ -62,6 +73,16 @@ Component({
       const locationDisplay = buildPhysicalLocationDisplay(title, event.location);
       const candidateDisplay = buildPhysicalLocationDisplay(title, selectedCandidate?.location);
 
+      // 真实路线文案（仅腾讯 direction 真实返回时显示，绝不用假数据兜底）
+      const route = event.route;
+      const routeText = route ? `${formatRouteMode(route.mode)} ${route.durationMinutes} 分钟` : '';
+
+      // 候选距离（米）：仅腾讯真实返回时显示
+      const distanceMeters = selectedCandidate?.restaurant?.distanceMeters;
+      const candDistanceMeters = typeof distanceMeters === 'number' && distanceMeters > 0
+        ? String(Math.round(distanceMeters))
+        : '';
+
       this.setData({
         icon,
         timeText,
@@ -72,6 +93,8 @@ Component({
         locAddress: locationDisplay.address,
         candDisplayName: candidateDisplay.displayName,
         candAddress: candidateDisplay.address,
+        candDistanceMeters,
+        routeText,
       });
     },
   },

@@ -13,6 +13,7 @@ import { AICommentAnalysis } from '../types/ai-comment';
 import { AICommentService, AICommentServiceError } from './ai-comment-service';
 import { ConstraintLedgerService } from './constraint-ledger-service';
 import { TripPlanGenerationService } from './trip-plan-generation-service';
+import { projectCommentCoverage } from './comment-intent-coverage';
 import { AppError } from '../types/errors';
 
 function generateCommentId(now: Date): string {
@@ -65,9 +66,14 @@ export class CommentService {
 
   /** 读取共享行程全部评论：同一行程的所有成员看到同一条评论流 */
   async listComments(userId: string, tripId: string): Promise<CommentDTO[]> {
-    await this.requireMember(userId, tripId);
+    const trip = await this.requireMember(userId, tripId);
     const comments = await this.comments.listByTrip(tripId);
-    return Promise.all(comments.map((comment) => this.toDTO(comment)));
+    return Promise.all(
+      comments.map((comment) =>
+        // 原子意图覆盖：按当前计划投影 aiStatus + intentCoverage（始终与最新计划一致）
+        this.toDTO(projectCommentCoverage(comment, trip.currentPlan)),
+      ),
+    );
   }
 
   /** 追加评论：独立落库（绝不覆盖已有评论）；作者身份由认证注入 */
@@ -102,7 +108,9 @@ export class CommentService {
     // Stage 2：评论已权威落库之后才进入 COMMENT_EVALUATION → 条件触发 INITIAL_GENERATION。
     // 该阶段任何失败都不得影响评论本身（评论此刻已保存成功）。
     const evaluated = await this.runPlanPipeline(analyzed, trip);
-    return this.toDTO(evaluated);
+    // 评论返回时按最新计划投影原子意图覆盖（首版计划可能刚生成）
+    const latest = await this.trips.findById(tripId);
+    return this.toDTO(latest ? projectCommentCoverage(evaluated, latest.currentPlan) : evaluated);
   }
 
   /**

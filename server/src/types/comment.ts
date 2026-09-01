@@ -3,10 +3,12 @@
 
 import { AICommentAnalysis, AICommentSource } from './ai-comment';
 import { CommentEvaluationRecord } from './ai-comment-evaluation';
+import { CommentIntentCoverage } from '../services/comment-intent-coverage';
 
 export type CommentAIStatus =
   | 'processing'
   | 'accepted'
+  | 'partially_incorporated'
   | 'conflict'
   | 'unresolved'
   | 'waiting_confirm';
@@ -32,6 +34,12 @@ export interface Comment {
    * 评估失败时记录 status='unavailable' + 具名 reasonCode，绝不伪造判定结论。
    */
   evaluation?: CommentEvaluationRecord;
+  /**
+   * 原子意图覆盖（读取时投影，与当前计划一致）：
+   * 拆分评论的 atomic intents 并逐条判断计划覆盖情况；
+   * 全部 PLANNED → aiStatus=accepted；部分 → partially_incorporated；0 个 → unresolved。
+   */
+  intentCoverage?: CommentIntentCoverage;
 }
 
 /** 评论 API 的公开作者投影；不包含 openid、session_key 或其它认证字段。 */

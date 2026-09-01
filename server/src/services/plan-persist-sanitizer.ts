@@ -67,10 +67,55 @@ function isAnchoredToTripStart(time: TripPlanEvent['time'], startDate: string): 
   return startDay === startDate;
 }
 
+/** 清洗单个真实餐厅候选（与 restaurant 同一验证规则，供 restaurantCandidates 使用） */
+function sanitizeRestaurantCandidate(
+  candidate: NonNullable<TripPlanEvent['restaurantCandidates']>[number],
+): NonNullable<TripPlanEvent['restaurantCandidates']>[number] | undefined {
+  if (!isVerifiedRestaurant(candidate)) return undefined;
+  const candidateLocation = sanitizeVerifiedLocation(candidate.location);
+  if (!candidateLocation) return undefined;
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    location: candidateLocation,
+    ...(typeof candidate.distanceMeters === 'number'
+      ? { distanceMeters: candidate.distanceMeters }
+      : {}),
+    ...(candidate.rating && typeof candidate.rating.score === 'number'
+      ? { rating: { score: candidate.rating.score } }
+      : {}),
+    ...(candidate.averagePrice && typeof candidate.averagePrice.amount === 'number'
+      ? { averagePrice: candidate.averagePrice }
+      : {}),
+    providerRefs: candidate.providerRefs,
+  };
+}
+
+/** 判定 route 是否来自已验证 Provider 且带有限正数 duration（fail-closed，绝不允许伪造 travel） */
+function sanitizeRoute(
+  route: TripPlanEvent['route'],
+): NonNullable<TripPlanEvent['route']> | undefined {
+  if (!route) return undefined;
+  if (route.provider !== 'tencent') return undefined;
+  if (typeof route.durationMinutes !== 'number' || !Number.isFinite(route.durationMinutes) || route.durationMinutes <= 0) {
+    return undefined;
+  }
+  if (typeof route.fromEventId !== 'string' || route.fromEventId.length === 0) return undefined;
+  return {
+    fromEventId: route.fromEventId,
+    durationMinutes: route.durationMinutes,
+    ...(typeof route.distanceMeters === 'number' && Number.isFinite(route.distanceMeters)
+      ? { distanceMeters: route.distanceMeters }
+      : {}),
+    mode: route.mode,
+    provider: 'tencent',
+  };
+}
+
 /**
  * 对单个事件做 fail-closed 清洗：
  *   - 保留意图文本（title / locationRequirement / alternatives / sequenceConstraint）
- *   - 剥离未验证的 location / restaurant 及其中任何 AI 事实字段
+ *   - 剥离未验证的 location / restaurant / restaurantCandidates / route 及其中任何 AI 事实字段
  *   - 时间未锚定到行程日期时，剥离时间（保留意图，不落库未验证时间）
  */
 function sanitizeEvent(
@@ -118,6 +163,22 @@ function sanitizeEvent(
         : {}),
       providerRefs: restaurant.providerRefs,
     };
+  }
+
+  // restaurantCandidates：仅保留已验证 Provider 的真实候选
+  if (Array.isArray(event.restaurantCandidates) && event.restaurantCandidates.length > 0) {
+    const verifiedCandidates = event.restaurantCandidates
+      .map(sanitizeRestaurantCandidate)
+      .filter((candidate): candidate is NonNullable<TripPlanEvent['restaurantCandidates']>[number] => candidate !== undefined);
+    if (verifiedCandidates.length > 0) {
+      sanitized.restaurantCandidates = verifiedCandidates;
+    }
+  }
+
+  // route：仅保留腾讯 direction 真实返回的路线段
+  const verifiedRoute = sanitizeRoute(event.route);
+  if (verifiedRoute) {
+    sanitized.route = verifiedRoute;
   }
 
   return sanitized;

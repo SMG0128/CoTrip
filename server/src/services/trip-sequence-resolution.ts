@@ -37,7 +37,51 @@ const LOCATION_ALIASES: Record<string, string> = {
   省图: '广东省立中山图书馆',
   省博: '广东省博物馆',
   省博物馆: '广东省博物馆',
+  粤博: '广东省博物馆',
 };
+
+/** 把地点短语归一化为全称（存在别名时），用于意图/先后关系匹配。 */
+export function normalizePlaceKeyword(keyword: string): string {
+  return LOCATION_ALIASES[keyword] ?? keyword;
+}
+
+/** 常见地点后缀：剥离后可匹配评论里的简称（「越秀公园」→「越秀」）。通用规则，非城市特例。 */
+const PLACE_SUFFIXES = [
+  '公园', '图书馆', '博物馆', '科技馆', '美术馆', '体育馆', '纪念馆',
+  '展览馆', '广场', '中心', '大学', '学院', '医院', '机场', '车站',
+  '码头', '商场', '大厦', '酒店', '剧院', '影城', '景区', '山庄',
+];
+
+/** 生成地点短语的可能书写形式：全称、别名、剥离通用后缀后的简称。
+ * 通用规则：若某个别名对应的全称包含 keyword（如 keyword=省博物馆，全称=广东省博物馆），
+ * 该别名（省博/粤博）也可能出现在评论里，一并纳入候选。 */
+export function placeMentionCandidates(keyword: string): string[] {
+  const candidates = [keyword];
+  for (const [alias, full] of Object.entries(LOCATION_ALIASES)) {
+    if (full === keyword) candidates.push(alias);
+    if (alias === keyword) candidates.push(full);
+    // 简称兜底：全称包含 keyword 时，指向同一地点的别名（更短写法）也纳入候选
+    if (full.includes(keyword) && alias !== keyword) candidates.push(alias);
+  }
+  for (const suffix of PLACE_SUFFIXES) {
+    if (keyword.endsWith(suffix) && keyword.length - suffix.length >= 2) {
+      candidates.push(keyword.slice(0, -suffix.length));
+    }
+  }
+  return candidates;
+}
+
+/** 在评论原文中查找地点短语的首次出现位置（含别名/后缀简称）。找不到返回 -1。 */
+export function findPlaceMentionIndex(commentText: string, keyword: string): number {
+  if (!commentText) return -1;
+  let best = -1;
+  for (const candidate of placeMentionCandidates(keyword)) {
+    if (candidate.length < 2) continue;
+    const index = commentText.indexOf(candidate);
+    if (index >= 0 && (best < 0 || index < best)) best = index;
+  }
+  return best;
+}
 
 /** 从活动标题中提取「去完X / 去X之后」的地点关键词。
  * 地点名在「去完」之后、动作动词（吃/看/打/玩/逛/喝/买…）之前。 */
@@ -116,7 +160,7 @@ function resolveSequenceFromComment(
 
   // 模式 B：省略地点 + 序列标记 + 吃 → 链接到紧邻的前一个非餐饮、非交通活动
   const implicitMatch = commentText.match(
-    /(?:之后|然后|随后|接着|结束后|参观完|逛完|看完|打完)(?:再|就|去|附近|直接)?(?:吃|吃饭|用餐|去吃饭)/,
+    /(?:(?:之后|然后|随后|接着|结束后|参观完|逛完|看完|打完)(?:再|就|去|附近|直接)?|(?:晚上|中午|下午|早上|上午)?(?:附近|就近))(?:吃|吃饭|用餐|去吃饭)/,
   );
   if (!implicitMatch) return;
 
@@ -175,5 +219,69 @@ export function resolveSequenceConstraints(
     resolveSequenceFromComment(result, commentText);
   }
 
+  // 3. 通用顺序地点链接（compound sequence：A → B → C）
+  //    从评论中按出现顺序提取每个活动的地点提及，若提及顺序与活动顺序一致
+  //    （用户在评论里就是按 1→2→3 的顺序表达的），则把相邻活动链接成先后关系。
+  //    只处理尚无 sequenceConstraint 的活动，绝不覆盖标题法/评论法结果。
+  //    例如「看一个小时书我想去粤博参观一下再去越秀」→ 图书馆 → 粤博 → 越秀。
+  if (commentText) {
+    resolveSequentialPlacesFromComment(result, commentText);
+  }
+
   return result;
+}
+
+/**
+ * 从活动标题提取用于匹配评论的地点关键词。
+ * 与 post-processor 的 extractPlaceQuery 规则保持一致：餐饮/交通标题不产生地点提及。
+ */
+function eventPlaceKeyword(event: SequencedTripPlanEvent): string | undefined {
+  const title = event.title;
+  if (!title) return undefined;
+  if (isMealTitle(title)) return undefined;
+  if (isTransportTitle(title)) return undefined;
+  // 剥离动作词后取地点短语（「广州图书馆看书」→「广州图书馆」）
+  let t = title.trim().replace(/^(?:去参观|去游览|去游玩|去完|前往|参观|游览|游玩|体验|逛|看|到|在|去|直接去)/, '');
+  const verbIndex = t.search(
+    /(?:办理入住|入住|住宿|休息|看|读|玩|打|吃|喝|买|购物|逛街|参观|游览|体验|听|唱|跳|拍|打卡|运动|游泳|跑步|骑行|散步|爬山|放风筝|候车|乘车|换乘)/,
+  );
+  if (verbIndex > 0) t = t.slice(0, verbIndex);
+  t = t.trim();
+  if (!/^[\u4e00-\u9fa5A-Za-z0-9]{2,12}$/.test(t)) return undefined;
+  return t;
+}
+
+/** 通用顺序地点链接：评论中提及顺序与活动顺序一致时，链接相邻活动。 */
+function resolveSequentialPlacesFromComment(
+  result: SequencedTripPlanEvent[],
+  commentText: string,
+): void {
+  if (!commentText || result.length < 2) return;
+
+  // 每个活动 → 其地点关键词在评论中的首次出现位置
+  const mentions: { event: SequencedTripPlanEvent; index: number }[] = [];
+  for (const event of result) {
+    if (event.sequenceConstraint) continue;
+    const keyword = eventPlaceKeyword(event);
+    if (!keyword) continue;
+    const index = findPlaceMentionIndex(commentText, keyword);
+    if (index < 0) continue;
+    mentions.push({ event, index });
+  }
+  if (mentions.length < 2) return;
+
+  // 按评论位置排序；若排序后仍保持活动原始相对顺序，才建立先后关系
+  const sorted = [...mentions].sort((a, b) => a.index - b.index);
+  for (let k = 1; k < sorted.length; k += 1) {
+    const prior = sorted[k - 1];
+    const next = sorted[k];
+    // 原始相对顺序：prior 必须在 next 之前（位置索引递增）
+    const priorOrder = result.indexOf(prior.event);
+    const nextOrder = result.indexOf(next.event);
+    if (priorOrder >= nextOrder) return; // 顺序不一致 → 不强行链接
+    next.event.sequenceConstraint = {
+      afterActivityId: prior.event.id,
+      locationConstraint: 'near_previous_activity',
+    };
+  }
 }

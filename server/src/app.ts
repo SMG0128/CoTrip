@@ -48,6 +48,7 @@ import {
 } from './services/trip-update-ai-service';
 import { CloudBaseGatewayTripUpdateAIService } from './services/cloudbase-gateway-trip-update-ai-service';
 import { TencentLBSService } from './services/tencent-lbs-service';
+import { TencentDirectionService } from './services/tencent-direction-service';
 import { DefaultTripPlanPostProcessor } from './services/trip-plan-generation-service';
 import { coordinationRouter } from './routes/coordination';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
@@ -70,13 +71,17 @@ export function createApp() {
   const tencentLBS = config.tencentMapKey
     ? new TencentLBSService({ key: config.tencentMapKey })
     : null;
+  // 腾讯方向服务：真实路线 duration 参与排程（未配置时 route 不写入、不伪造 travel time）
+  const tencentDirections = config.tencentMapKey
+    ? new TencentDirectionService({ key: config.tencentMapKey })
+    : null;
   // AI Trip Pipeline V2 Stage 2/3：Constraint 评估 + 首轮生成 + 相关评论触发的行程更新
   const planGeneration = new TripPlanGenerationService(
     tripRepository,
     createCommentEvaluationAIService(config),
     createInitialGenerationAIService(config),
     createTripUpdateAIService(config),
-    tencentLBS ? new DefaultTripPlanPostProcessor(tencentLBS) : null,
+    tencentLBS ? new DefaultTripPlanPostProcessor(tencentLBS, tencentDirections) : null,
   );
   const comments = new CommentService(
     commentRepository,

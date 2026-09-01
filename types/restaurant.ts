@@ -10,6 +10,8 @@ export interface Restaurant {
   name: string;
   location: Location;
   categories: string[];
+  /** 与锚点的距离（米）；仅腾讯真实返回时存在 */
+  distanceMeters?: number;
   averagePrice?: Price;
   rating?: {
     score: number;

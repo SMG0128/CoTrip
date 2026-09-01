@@ -4,9 +4,39 @@
 export type AIStatus =
   | 'accepted'
   | 'processing'
+  | 'partially_incorporated'
   | 'conflict'
   | 'unresolved'
   | 'waiting_confirm';
+
+/** 原子意图覆盖：服务端按当前计划投影，前端用于「部分纳入 x / y」等低干扰提示 */
+export interface CommentIntentCoverage {
+  intents: Array<{
+    id: string;
+    kind: 'ACTIVITY' | 'PLACE' | 'MEAL';
+    location?: string;
+    action?: string;
+    durationMinutes?: number;
+    foodKeyword?: string;
+    afterIntentId?: string;
+  }>;
+  entries: Array<{
+    intent: {
+      id: string;
+      kind: 'ACTIVITY' | 'PLACE' | 'MEAL';
+      location?: string;
+      action?: string;
+      durationMinutes?: number;
+      foodKeyword?: string;
+      afterIntentId?: string;
+    };
+    status: 'PLANNED' | 'UNRESOLVED' | 'REJECTED' | 'CONFLICT' | 'PENDING';
+    matchedEventId?: string;
+  }>;
+  incorporation: 'INCORPORATED' | 'PARTIALLY_INCORPORATED' | 'UNRESOLVED';
+  plannedCount: number;
+  totalCount: number;
+}
 
 export type AICommentSource = 'provider' | 'rule_fallback' | 'none';
 
@@ -45,4 +75,6 @@ export interface Comment {
   aiAnalysis?: AICommentAnalysis;
   /** 真实评论必须由服务端动态投影；Demo fixture 可通过隔离的 Mock 参与者解析。 */
   author?: CommentAuthor;
+  /** 原子意图覆盖（服务端按当前计划投影）：全部 PLANNED → accepted；部分 → partially_incorporated */
+  intentCoverage?: CommentIntentCoverage;
 }

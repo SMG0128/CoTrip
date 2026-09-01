@@ -8,5 +8,11 @@
       </view>
     </view>
     <text class="text">{{comment.rawText}}</text>
+    <view
+      wx:if="{{comment.intentCoverage && comment.intentCoverage.incorporation === 'PARTIALLY_INCORPORATED'}}"
+      class="coverage-note"
+    >
+      已加入 {{comment.intentCoverage.plannedCount}} / {{comment.intentCoverage.totalCount}} 项
+    </view>
   </view>
 </view>

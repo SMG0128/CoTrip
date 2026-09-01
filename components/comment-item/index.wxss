@@ -44,3 +44,9 @@
   line-height: 1.55;
   word-break: break-word;
 }
+
+.coverage-note {
+  margin-top: 10rpx;
+  color: #6b7ea8;
+  font-size: 23rpx;
+}

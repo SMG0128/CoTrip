@@ -19,8 +19,10 @@ import { buildTimeAnchor, resolvePlanTimes } from './trip-temporal-resolution';
 import {
   resolveSequenceConstraints,
   SequencedTripPlanEvent,
+  normalizePlaceKeyword,
 } from './trip-sequence-resolution';
 import { PlaceCandidate, TencentLBSService } from './tencent-lbs-service';
+import { DirectionOutcome, TencentDirectionService, resolveDirectionMode } from './tencent-direction-service';
 import { rankPlaceCandidates, RankedPlaceCandidate } from './place-candidate-ranker';
 import { isResolvedPhysicalLocation } from './resolved-physical-location';
 
@@ -35,8 +37,12 @@ export interface ResolvedTripEvent extends SequencedTripPlanEvent {
     address?: string;
     providerRefs?: { provider: 'tencent'; externalId: string }[];
   };
-  /** 附近餐厅候选（全部来自腾讯 API，truth-preserving） */
-  restaurantCandidates?: RankedPlaceCandidate[];
+  /**
+   * 附近餐厅候选（内部：全部来自腾讯 API，确定性排序后 top 写入最终 plan 的
+   * restaurant + restaurantCandidates）。与 TripPlanEvent.restaurantCandidates
+   * （持久化形状）分离，避免两种形状互相干扰。
+   */
+  rankedRestaurantCandidates?: RankedPlaceCandidate[];
   /** 地点解析状态 */
   locationStatus?: 'resolved' | 'unresolved' | 'search_unavailable';
 }
@@ -54,6 +60,8 @@ export interface PostProcessInput {
   budgetMaxPerPerson?: number;
   /** 是否偏好低价 */
   preferLowCost?: boolean;
+  /** 用户明确指定的交通偏好（步行/地铁/公交/打车…）；未指定时使用项目默认推荐逻辑 */
+  routeMode?: string;
 }
 
 export interface PostProcessResult {
@@ -91,7 +99,10 @@ export function applySequenceTimes(
     const priorEnd = new Date(prior.time.end).getTime();
     // 真实路线 duration（分钟）；无真实数据时为 0，即 start = previous.end，不伪造 travel
     const realTravelMs = (realTravelMinutesByEventId?.get(event.id) ?? 0) * 60_000;
-    const nextStart = new Date(priorEnd + realTravelMs);
+    const earliestStart = new Date(priorEnd + realTravelMs);
+    // event[i+1].start = max(已有硬约束 start, event[i].end + 真实路线 duration)
+    const existingStart = new Date(event.time.start).getTime();
+    const nextStart = new Date(Math.max(existingStart, earliestStart.getTime()));
     const startIso = toLocalIso(nextStart);
     const durationMs = event.time.end
       ? new Date(event.time.end).getTime() - new Date(event.time.start).getTime()
@@ -139,6 +150,7 @@ function applyDuration(
 export async function postProcessTripPlan(
   input: PostProcessInput,
   lbs: TencentLBSService | null,
+  directions?: TencentDirectionService | null,
 ): Promise<PostProcessResult> {
   const anchor = buildTimeAnchor(input.timeRange);
   const city = input.city || '广州市';
@@ -157,22 +169,39 @@ export async function postProcessTripPlan(
     events[targetIndex] = applyDuration(events[targetIndex], duration.durationMinutes);
   }
 
-  // 3. 先后关系（D）：标题法 + 评论驱动法（「参观省博后吃越南菜」「之后附近吃越南菜」）
+  // 3. 先后关系（D）：标题法 + 评论驱动法（含 compound sequence A→B→C 通用链接）
   events = resolveSequenceConstraints(events, input.commentText) as ResolvedTripEvent[];
 
-  // 4. 时间不重叠（J）：按先后关系调整后续活动时间。
-  //    无真实路线 duration 时 start = previous.end（不伪造 travel）；真实 route duration 由外部注入。
-  events = applySequenceTimes(events);
-
-  // 5. POI 解析（E/F/G/H/I）
+  // 4. POI 解析（E/F/G/H/I）：真实地点 + 附近餐厅候选
   if (lbs) {
     events = await resolvePOIs(events, city, lbs, input);
   }
 
+  // 5. 真实路线（G/H/I/J/K/M）：对相邻已解析活动调用 Tencent direction，
+  //    真实 duration 参与排程；方向 API 不可用时不产生 route、不伪造 travel。
+  //    餐厅活动以真实餐厅坐标为路线终点（餐厅不是排程例外）。
+  let realTravelMinutesByEventId: ReadonlyMap<string, number> | undefined;
+  if (directions) {
+    events = await applyRealRoutes(events, directions, input.routeMode);
+    realTravelMinutesByEventId = collectRealTravelMinutes(events);
+  }
+
+  // 6. 时间不重叠（J/L）：按先后关系 + 真实路线 duration 调整后续活动时间。
+  //    event[i+1].start = max(已有硬约束 start, event[i].end + realRouteDuration)；
+  //    无真实路线 duration 时 start = previous.end（不伪造 travel）。
+  events = applySequenceTimes(events, realTravelMinutesByEventId);
+
   const plan: TripPlan = {
     ...input.plan,
     events: events.map((event) => {
-      const { sequenceConstraint, resolvedLocation, restaurantCandidates, locationStatus, ...rest } = event;
+      const {
+        sequenceConstraint,
+        resolvedLocation,
+        rankedRestaurantCandidates,
+        locationStatus,
+        route,
+        ...rest
+      } = event;
       const planEvent: TripPlanEvent = {
         ...rest,
         ...(sequenceConstraint ? { sequenceConstraint } : {}),
@@ -181,35 +210,129 @@ export async function postProcessTripPlan(
       if (resolvedLocation) {
         planEvent.location = resolvedLocation;
       }
-      // 附近餐厅 top 候选写入 event.restaurant（前端「当前首选」展示）
-      if (restaurantCandidates && restaurantCandidates.length > 0) {
-        const top = restaurantCandidates[0];
-        const providerRefs = [{ provider: 'tencent' as const, externalId: top.providerPoiId }];
-        planEvent.restaurant = {
-          id: top.providerPoiId,
-          name: top.name,
-          location: {
-            id: top.providerPoiId,
-            name: top.name,
-            latitude: top.latitude,
-            longitude: top.longitude,
-            ...(top.address ? { address: top.address } : {}),
+      // 附近餐厅：top 候选写入 event.restaurant（前端「当前首选」），
+      // 其余真实候选写入 event.restaurantCandidates（前端「查看 N 个备选」）。
+      if (rankedRestaurantCandidates && rankedRestaurantCandidates.length > 0) {
+        const toRestaurant = (candidate: RankedPlaceCandidate): NonNullable<TripPlanEvent['restaurant']> => {
+          const providerRefs = [{ provider: 'tencent' as const, externalId: candidate.providerPoiId }];
+          return {
+            id: candidate.providerPoiId,
+            name: candidate.name,
+            location: {
+              id: candidate.providerPoiId,
+              name: candidate.name,
+              latitude: candidate.latitude,
+              longitude: candidate.longitude,
+              ...(candidate.address ? { address: candidate.address } : {}),
+              providerRefs,
+            },
+            ...(typeof candidate.distanceMeters === 'number'
+              ? { distanceMeters: candidate.distanceMeters }
+              : {}),
+            // truth-preserving：仅当腾讯真实返回 rating / avgPrice 时才写入
+            ...(typeof candidate.rating === 'number' ? { rating: { score: candidate.rating } } : {}),
+            ...(typeof candidate.avgPrice === 'number'
+              ? { averagePrice: { amount: candidate.avgPrice, currency: 'CNY', unit: 'per_person' } }
+              : {}),
             providerRefs,
-          },
-          ...(typeof top.distanceMeters === 'number' ? { distanceMeters: top.distanceMeters } : {}),
-          // truth-preserving：仅当腾讯真实返回 rating / avgPrice 时才写入
-          ...(typeof top.rating === 'number' ? { rating: { score: top.rating } } : {}),
-          ...(typeof top.avgPrice === 'number'
-            ? { averagePrice: { amount: top.avgPrice, currency: 'CNY', unit: 'per_person' } }
-            : {}),
-          providerRefs,
+          };
         };
+        planEvent.restaurant = toRestaurant(rankedRestaurantCandidates[0]);
+        planEvent.restaurantCandidates = rankedRestaurantCandidates.map(toRestaurant);
+      }
+      // 真实路线段写入 event.route（final plan 数据必须保存真实 route segment）
+      if (route) {
+        planEvent.route = route;
       }
       return planEvent;
     }),
   };
 
   return { plan, events };
+}
+
+/** 事件的实际物理坐标：餐厅事件优先用真实餐厅坐标（M 节），其余用解析后的真实地点。 */
+function eventPhysicalLocation(event: ResolvedTripEvent): { latitude: number; longitude: number } | undefined {
+  if (event.rankedRestaurantCandidates && event.rankedRestaurantCandidates.length > 0) {
+    const top = event.rankedRestaurantCandidates[0];
+    if (Number.isFinite(top.latitude) && Number.isFinite(top.longitude)) {
+      return { latitude: top.latitude, longitude: top.longitude };
+    }
+  }
+  const resolved = event.resolvedLocation;
+  if (resolved && Number.isFinite(resolved.latitude) && Number.isFinite(resolved.longitude)) {
+    return { latitude: resolved.latitude, longitude: resolved.longitude };
+  }
+  return undefined;
+}
+
+/**
+ * 对相邻的已解析真实坐标活动调用 Tencent direction，把真实 route 段挂到被到达的活动上。
+ *
+ * mode 规则（I 节）：
+ *   - 用户明确指定（步行/地铁/公交/打车…）→ 尊重并只用该 mode。
+ *   - 未指定 → 复用项目默认推荐逻辑：transit 优先，失败后 walking 兜底（与前端一致）。
+ *
+ * 失败（J 节）：route 不写入、duration 不参与排程、sequence 保留 —— 绝不伪造 travel time。
+ */
+async function applyRealRoutes(
+  events: ResolvedTripEvent[],
+  directions: TencentDirectionService,
+  routeModePreference?: string,
+): Promise<ResolvedTripEvent[]> {
+  const userMode = resolveDirectionMode(routeModePreference);
+  const result: ResolvedTripEvent[] = events.map((e) => ({ ...e }));
+
+  for (let i = 0; i + 1 < result.length; i += 1) {
+    const from = eventPhysicalLocation(result[i]);
+    const to = eventPhysicalLocation(result[i + 1]);
+    if (!from || !to) continue;
+
+    const modes: Array<'transit' | 'walking' | 'driving'> = userMode
+      ? [userMode]
+      : ['transit', 'walking'];
+
+    let route: { durationMinutes: number; distanceMeters?: number; mode: 'transit' | 'walking' | 'driving' } | undefined;
+    for (const mode of modes) {
+      // 失败（R 节）：provider 抛错 / 网络异常 / 无 route 一律视同不可用，
+      // 不写入 route、不伪造 travel duration、不中断整次后处理。
+      let outcome: DirectionOutcome;
+      try {
+        outcome = await directions.getDirection(from, to, mode);
+      } catch {
+        continue;
+      }
+      if (outcome.status === 'FOUND') {
+        route = {
+          durationMinutes: outcome.route.durationMinutes,
+          ...(outcome.route.distanceMeters !== undefined
+            ? { distanceMeters: outcome.route.distanceMeters }
+            : {}),
+          mode,
+        };
+        break;
+      }
+    }
+    if (!route) continue;
+
+    result[i + 1].route = {
+      fromEventId: result[i].id,
+      ...route,
+      provider: 'tencent',
+    };
+  }
+  return result;
+}
+
+/** 汇总各活动真实路线 duration（分钟），供排程使用。 */
+function collectRealTravelMinutes(events: ResolvedTripEvent[]): ReadonlyMap<string, number> {
+  const map = new Map<string, number>();
+  for (const event of events) {
+    if (event.route && Number.isFinite(event.route.durationMinutes) && event.route.durationMinutes > 0) {
+      map.set(event.id, event.route.durationMinutes);
+    }
+  }
+  return map;
 }
 
 /** 为每个活动解析真实 POI 与附近餐厅候选（按顺序，后续活动可复用前置活动坐标） */
@@ -234,8 +357,6 @@ async function resolveEventPOI(
   input: PostProcessInput,
   resolvedSoFar: ResolvedTripEvent[],
 ): Promise<ResolvedTripEvent> {
-  // 若活动有先后关系（near_previous_activity），优先复用前置活动的真实坐标作为锚点，
-  // 而不是对「去完广图吃泰国菜」这类标题做一次新的 POI 解析。
   const seq = event.sequenceConstraint;
   const prior = seq
     ? resolvedSoFar.find((e) => e.id === seq.afterActivityId)
@@ -245,40 +366,69 @@ async function resolveEventPOI(
   // 从标题提取地点关键词（通用：任意需要实体地点的活动都尝试解析）
   const locationQuery = extractPlaceQuery(event.title);
 
-  // 锚点坐标：优先用前置活动真实坐标；否则用本活动 POI 解析结果
+  // 锚点/地点解析优先级（B 节，全局规则）：
+  //   1. 本活动标题里的明确地点（locationQuery）→ POI 解析。
+  //      活动自身的地点优先于任何前置坐标 —— 例如「参观省博物馆」即使排在
+  //      「广州图书馆看书」之后，也绝不把图书馆坐标当作博物馆坐标。
+  //   2. 无明确地点且 sequenceConstraint 前置活动已解析 → 复用前置真实坐标
+  //      （near_previous_activity，如「去完省博吃越南菜」的 nearby 锚点）。
+  //   3. 无 sequenceConstraint 时 → 回看最近一个已解析真实坐标的前置活动
+  //      （「晚上附近吃粤菜」这类省略地点的餐饮意图）。
+  //   4. 以上都没有 → unresolved，不伪造地点。
   let resolvedLat: number | undefined;
   let resolvedLng: number | undefined;
   let resolvedLocation: ResolvedTripEvent['resolvedLocation'];
   let locationStatus: ResolvedTripEvent['locationStatus'] = 'unresolved';
 
-  if (prior && priorLocation) {
+  if (locationQuery) {
+    // 「去完广图吃泰国菜」：anchor 与前置活动地点一致时复用前置真实坐标，
+    // 避免对「广图」这类简称再做一次有风险的 POI 搜索。
+    if (prior && priorLocation && priorMatchesLocationQuery(prior, locationQuery)) {
+      resolvedLat = priorLocation.latitude;
+      resolvedLng = priorLocation.longitude;
+      resolvedLocation = priorLocation;
+      locationStatus = 'resolved';
+    } else {
+      const poiOutcome = await lbs.searchPOI(locationQuery, city);
+      if (poiOutcome.status === 'FOUND' && poiOutcome.candidates.length > 0) {
+        const top = poiOutcome.candidates.find(isResolvedPhysicalLocation);
+        if (!top) {
+          locationStatus = 'unresolved';
+        } else {
+          resolvedLat = top.latitude;
+          resolvedLng = top.longitude;
+          resolvedLocation = {
+            id: top.providerPoiId,
+            name: top.name,
+            latitude: top.latitude,
+            longitude: top.longitude,
+            ...(top.address ? { address: top.address } : {}),
+            providerRefs: [{ provider: 'tencent', externalId: top.providerPoiId }],
+          };
+          locationStatus = 'resolved';
+        }
+      } else {
+        locationStatus =
+          poiOutcome.status === 'POI_SEARCH_UNAVAILABLE' ? 'search_unavailable' : 'unresolved';
+      }
+    }
+  } else if (prior && priorLocation) {
     // 复用前置活动真实坐标（near_previous_activity）
     resolvedLat = priorLocation.latitude;
     resolvedLng = priorLocation.longitude;
     resolvedLocation = priorLocation;
     locationStatus = 'resolved';
-  } else if (locationQuery) {
-    const poiOutcome = await lbs.searchPOI(locationQuery, city);
-    if (poiOutcome.status === 'FOUND' && poiOutcome.candidates.length > 0) {
-      const top = poiOutcome.candidates.find(isResolvedPhysicalLocation);
-      if (!top) {
-        locationStatus = 'unresolved';
-      } else {
-        resolvedLat = top.latitude;
-        resolvedLng = top.longitude;
-        resolvedLocation = {
-          id: top.providerPoiId,
-          name: top.name,
-          latitude: top.latitude,
-          longitude: top.longitude,
-          ...(top.address ? { address: top.address } : {}),
-          providerRefs: [{ provider: 'tencent', externalId: top.providerPoiId }],
-        };
+  } else {
+    // 回看最近一个已解析真实坐标的前置活动（省略地点的餐饮意图通用锚点）
+    for (let i = resolvedSoFar.length - 1; i >= 0; i -= 1) {
+      const anchor = resolvedSoFar[i].resolvedLocation;
+      if (anchor) {
+        resolvedLat = anchor.latitude;
+        resolvedLng = anchor.longitude;
+        resolvedLocation = anchor;
         locationStatus = 'resolved';
+        break;
       }
-    } else {
-      locationStatus =
-        poiOutcome.status === 'POI_SEARCH_UNAVAILABLE' ? 'search_unavailable' : 'unresolved';
     }
   }
 
@@ -289,12 +439,13 @@ async function resolveEventPOI(
   };
 
   // 若活动是餐饮（DINING）或标题含「吃/菜/餐」，则搜索附近餐厅
+  // 全局规则（A/B/P 节）：meal intent + foodKeyword + 可解析 anchor → 腾讯 nearby
   if (event.type === 'DINING' || isMealTitle(event.title)) {
     const keyword = extractFoodKeyword(event.title) || '餐厅';
     if (resolvedLat !== undefined && resolvedLng !== undefined) {
       const nearby = await lbs.searchNearby(keyword, resolvedLat, resolvedLng);
       if (nearby.status === 'FOUND') {
-        resolvedEvent.restaurantCandidates = rankPlaceCandidates(
+        resolvedEvent.rankedRestaurantCandidates = rankPlaceCandidates(
           nearby.candidates.filter(isResolvedPhysicalLocation),
           keyword,
           {
@@ -307,6 +458,21 @@ async function resolveEventPOI(
   }
 
   return resolvedEvent;
+}
+
+/** 前置活动的地点是否与标题提取的地点关键词一致（含别名归一化） */
+function priorMatchesLocationQuery(
+  prior: ResolvedTripEvent,
+  locationQuery: string,
+): boolean {
+  const priorPlace = extractPlaceQuery(prior.title);
+  if (!priorPlace) return false;
+  const a = normalizePlaceKeyword(locationQuery);
+  const b = normalizePlaceKeyword(priorPlace);
+  if (a === b) return true;
+  const priorName = prior.resolvedLocation?.name;
+  if (priorName && (priorName.includes(a) || a.includes(priorName))) return true;
+  return false;
 }
 
 /**

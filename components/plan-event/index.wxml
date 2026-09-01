@@ -22,6 +22,7 @@
               <image src="/assets/icons/utility/star.svg" mode="aspectFit" />
               <text>{{selectedCandidate.rating}}</text>
             </view>
+            <text wx:if="{{candDistanceMeters}}" class="event-distance">距离 {{candDistanceMeters}} m</text>
             <text wx:if="{{selectedCandidate.overBudget}}" class="selected-over-budget">超预算偏好</text>
           </view>
         </block>
@@ -34,6 +35,10 @@
           <price-display wx:if="{{event.price}}" price="{{event.price}}" />
         </block>
       </view>
+    </view>
+
+    <view wx:if="{{routeText}}" class="route-line">
+      <text class="route-label">{{routeText}}</text>
     </view>
 
     <view wx:if="{{alternatives.length}}" class="candidate-tray">

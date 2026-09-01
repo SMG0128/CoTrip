@@ -20,6 +20,9 @@ import { runProductionReadinessTests } from './production-readiness.test';
 import { runTemporalResolutionTests } from './trip-temporal-resolution.test';
 import { runGenericPoiFoodTests } from './trip-generic-poi-food.test';
 import { runTencentLocationAddressTests } from './tencent-location-address.test';
+import { runMealResolutionTests } from './trip-meal-resolution.test';
+import { runRouteDurationTests } from './trip-route-duration.test';
+import { runIntentCoverageTests } from './trip-intent-coverage.test';
 
 interface TestResult {
   name: string;
@@ -60,6 +63,9 @@ async function main(): Promise<void> {
   await runTemporalResolutionTests();
   await runGenericPoiFoodTests();
   await runTencentLocationAddressTests();
+  await runMealResolutionTests();
+  await runRouteDurationTests();
+  await runIntentCoverageTests();
 
   let failed = 0;
   for (const r of results) {

@@ -59,6 +59,7 @@ import {
   postProcessTripPlan,
 } from './trip-plan-post-processor';
 import { TencentLBSService } from './tencent-lbs-service';
+import { TencentDirectionService } from './tencent-direction-service';
 import { sanitizePlanForPersist } from './plan-persist-sanitizer';
 import { buildTimeAnchor } from './trip-temporal-resolution';
 
@@ -69,12 +70,15 @@ export interface TripPlanPostProcessor {
   postProcess(input: PostProcessInput): Promise<{ plan: TripPlan }>;
 }
 
-/** 默认后处理器：使用注入的 LBS 服务 */
+/** 默认后处理器：使用注入的 LBS 服务 + Tencent direction（真实路线参与排程） */
 export class DefaultTripPlanPostProcessor implements TripPlanPostProcessor {
-  constructor(private readonly lbs: TencentLBSService | null) {}
+  constructor(
+    private readonly lbs: TencentLBSService | null,
+    private readonly directions: TencentDirectionService | null = null,
+  ) {}
 
   async postProcess(input: PostProcessInput): Promise<{ plan: TripPlan }> {
-    const result = await postProcessTripPlan(input, this.lbs);
+    const result = await postProcessTripPlan(input, this.lbs, this.directions);
     return { plan: result.plan };
   }
 }
@@ -255,6 +259,7 @@ export class TripPlanGenerationService {
             timeRange: latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
             commentText: comment.rawText,
             city: extractCity(latest.areaConstraint),
+            routeMode: comment.rawText,
           });
           plan = processed.plan;
         } catch {
@@ -362,6 +367,7 @@ export class TripPlanGenerationService {
             timeRange: latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
             commentText: comment.rawText,
             city: extractCity(latest.areaConstraint),
+            routeMode: comment.rawText,
           });
           plan = processed.plan;
         } catch {

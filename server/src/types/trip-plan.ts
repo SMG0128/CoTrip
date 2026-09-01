@@ -75,6 +75,38 @@ export interface TripPlanEvent {
     afterActivityId: string;
     locationConstraint: 'near_previous_activity';
   };
+  /**
+   * 附近搜索返回的全部真实餐厅候选（确定性排序后，top 为 event.restaurant）。
+   * 仅由 Provider 层写入真实腾讯候选，绝不包含 mock / AI 生成的店名。
+   */
+  restaurantCandidates?: Array<{
+    id: string;
+    name: string;
+    location: {
+      id: string;
+      name: string;
+      latitude: number;
+      longitude: number;
+      address?: string;
+      providerRefs?: { provider: 'tencent'; externalId: string }[];
+    };
+    distanceMeters?: number;
+    rating?: { score: number };
+    averagePrice?: { amount: number; currency: string; unit: string };
+    providerRefs?: { provider: 'tencent'; externalId: string }[];
+  }>;
+  /**
+   * 相邻活动之间的真实路线段（Tencent direction 结果）。
+   * 挂在被到达的活动上：本活动从 route.fromEventId 出发，真实耗时为 durationMinutes。
+   * 仅当腾讯方向 API 真实返回时存在；失败/未配置时缺省，绝不伪造 travel time。
+   */
+  route?: {
+    fromEventId: string;
+    durationMinutes: number;
+    distanceMeters?: number;
+    mode: 'transit' | 'walking' | 'driving';
+    provider: 'tencent';
+  };
 }
 
 export interface TripPlan {
