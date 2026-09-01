@@ -109,7 +109,9 @@ const GUANGZHOU_LIBRARY = tencentCandidate('广州图书馆', { address: '广东
 const GUANGDONG_MUSEUM = tencentCandidate('广东省博物馆', { lat: 23.1141, lng: 113.3215, address: '广东省广州市天河区珠江东路2号' });
 const YUEXIU_PARK = tencentCandidate('越秀公园', { address: '广东省广州市越秀区解放北路988号' });
 
-const LIBRARY_POIS = {
+const LIBRARY_POIS: {
+  poiByQuery: Record<string, POISearchOutcome>;
+} = {
   poiByQuery: {
     广州图书馆: { status: 'FOUND', candidates: [GUANGZHOU_LIBRARY] },
     省博物馆: { status: 'FOUND', candidates: [GUANGDONG_MUSEUM] },
