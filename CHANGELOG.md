@@ -6,6 +6,22 @@
 ## [Unreleased]
 
 ### Added
+- 行程时间线日期分组展示：按活动 local date（+08:00）生成日期头（如「9月10日 · 周四」），同一天仅首次显示、跨天生成新日期头，日期由活动 ISO 时间推导而非系统当前日期
+- 通用地点短语提取（`extractPlaceQuery`）：「广州图书馆看书 / 参观省博物馆 / 去广州塔 / 在天河体育中心打羽毛球」等统一剥离动作词得到地点短语，结合 trip city 走腾讯 POI 解析为真实地点并渲染地址
+- 通用餐饮关键词提取（`extractFoodKeyword`）：越南菜 / 泰国菜 / 粤菜 / 火锅 / 咖啡 / 甜品等统一走腾讯 nearby，无菜系 special-case 分支；「吃饭 / 附近吃饭 / 找个餐厅」→「餐厅」
+- 评论驱动先后关系解析：「参观省博后吃越南菜」「之后附近吃越南菜」→ 餐饮活动链接到前置活动（`afterActivityId` + `near_previous_activity`），nearby anchor 使用前置活动真实腾讯坐标
+- 行程时间线 / 地点详情展示真实腾讯 POI 地址；标题已含地点名时去重展示避免视觉重复
+
+### Changed
+- 移除真实行程 production runtime 中的本地 mock 餐厅注入：`pages/trip-detail` 真实行程分支不再以 `realRestaurants` 排序生成候选，候选只来自服务端计划中的已验证实体；`place-detail` 支持上游直传实体数据跳转，mock 表仅保留 id 回查 fallback（示例行程 fixture）
+- `place-detail` 的「AI 推荐理由」不再注入伪造文案：无真实理由时不显示该卡片
+- 餐厅可选字段 truth-preserving：腾讯未返回 rating / avgPrice 时保持 `undefined`，前端按缺省隐藏，绝不补齐伪造事实
+
+### Fixed
+- 修复「广州图书馆看书」等非「去X」句型活动无法解析 POI 的问题（原提取器仅匹配「去」前缀）
+- 修复 `isMealTitle` 漏判「咖啡 / 火锅 / 甜品」等纯菜系标题导致误当地点解析的问题
+
+### Added
 - AI 行程时间确定性解析：行程日期与活动时间锚定到行程日期（+08:00 时区），活动时间不再依赖 AI 自由发挥
 - 评论时长解析：从评论提取时长（如「看三个小时」→ 180 分钟）并绑定到语义相关的活动
 - 先后关系约束：解析「去完 X 后去 Y」为 `afterActivityId` + `near_previous_activity`，保证活动不重叠

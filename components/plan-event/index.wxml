@@ -11,9 +11,9 @@
         <text class="title">{{event.title}}</text>
         <block wx:if="{{selectedCandidate}}">
           <text class="selected-label">当前首选</text>
-          <text class="loc">{{selectedCandidate.name}}</text>
+          <text wx:if="{{candDisplayName}}" class="loc">{{candDisplayName}}</text>
+          <text wx:if="{{candAddress}}" class="district">{{candAddress}}</text>
           <view class="entity-meta">
-            <text wx:if="{{selectedCandidate.location.district}}">{{selectedCandidate.location.district}}</text>
             <price-display wx:if="{{selectedCandidate.price}}" price="{{selectedCandidate.price}}" />
             <view wx:if="{{selectedCandidate.rating}}" class="event-rating">
               <image src="/assets/icons/utility/star.svg" mode="aspectFit" />
@@ -23,8 +23,8 @@
           </view>
         </block>
         <block wx:else>
-          <text wx:if="{{event.location}}" class="loc">{{event.location.name}}</text>
-          <text wx:if="{{event.location.district}}" class="district">{{event.location.district}}</text>
+          <text wx:if="{{locDisplayName}}" class="loc">{{locDisplayName}}</text>
+          <text wx:if="{{locAddress}}" class="district">{{locAddress}}</text>
           <price-display wx:if="{{event.price}}" price="{{event.price}}" />
         </block>
       </view>

@@ -55,6 +55,14 @@
   border-radius: 28rpx;
 }
 
+.date-header {
+  padding: 22rpx 0 2rpx;
+  color: #a8b3c7;
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+
 .budget-summary {
   display: flex;
   align-items: center;

@@ -18,6 +18,7 @@ import { runAIEnvelopeTests } from './ai-envelope.test';
 import { runTripUpdateTests } from './trip-update.test';
 import { runProductionReadinessTests } from './production-readiness.test';
 import { runTemporalResolutionTests } from './trip-temporal-resolution.test';
+import { runGenericPoiFoodTests } from './trip-generic-poi-food.test';
 
 interface TestResult {
   name: string;
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   await runTripUpdateTests();
   await runProductionReadinessTests();
   await runTemporalResolutionTests();
+  await runGenericPoiFoodTests();
 
   let failed = 0;
   for (const r of results) {

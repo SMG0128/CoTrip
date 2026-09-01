@@ -29,8 +29,21 @@ Page({
   },
 
   onLoad(options: Record<string, string>) {
-    const { locationId, restaurantId } = options;
+    const { locationId, restaurantId, kind, entity } = options;
 
+    // 真实链路：上游直接携带实体数据跳转，避免依赖本地 mock 表回查
+    if (entity) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(entity)) as Record<string, unknown>;
+        if (kind === 'restaurant') this.renderRestaurant(parsed as unknown as Restaurant);
+        else if (kind === 'location') this.renderLocation(parsed as unknown as Location);
+        return;
+      } catch {
+        // 解析失败回退到下方 id 查询
+      }
+    }
+
+    // 旧链路 / 示例行程 fixture：按 id 回查本地 fixture
     if (restaurantId) {
       const r = realRestaurants.find((x) => x.id === restaurantId);
       if (r) this.renderRestaurant(r);
@@ -47,11 +60,11 @@ Page({
     const buttons = this.buildRestaurantButtons(r);
     this.setData({
       name: r.name,
-      rating: r.rating ? String(r.rating.score) : '',
+      rating: r.rating?.score ? String(r.rating.score) : '',
       price: r.averagePrice ?? null,
       district: r.location.district ?? '',
       address: r.location.address ?? '',
-      reason: '符合当前低预算要求，同时满足在越秀区吃饭的需求。',
+      reason: '',
       actionButtons: buttons,
     });
   },
@@ -104,8 +117,8 @@ Page({
       });
     }
 
-    // 大众点评：仅当 externalActions 存在 dianping URL 时显示
-    const dianping = r.externalActions.find(
+    // 大众点评：仅当 externalActions 存在 dianping URL 时显示（服务端腾讯结果无此字段时自然隐藏）
+    const dianping = (r.externalActions ?? []).find(
       (a) => a.provider === 'dianping' && a.mode === 'URL'
     ) as UrlExternalAction | undefined;
     if (dianping) {

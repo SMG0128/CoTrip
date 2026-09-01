@@ -9,6 +9,7 @@
 
   <view class="events">
     <block wx:for="{{eventRows}}" wx:key="id">
+      <view wx:if="{{item.dateHeader}}" class="date-header">{{item.dateHeader}}</view>
       <plan-event
         event="{{item.event}}"
         candidates="{{item.candidates}}"

@@ -156,8 +156,8 @@ export async function postProcessTripPlan(
     events[targetIndex] = applyDuration(events[targetIndex], duration.durationMinutes);
   }
 
-  // 3. 先后关系（D）
-  events = resolveSequenceConstraints(events) as ResolvedTripEvent[];
+  // 3. 先后关系（D）：标题法 + 评论驱动法（「参观省博后吃越南菜」「之后附近吃越南菜」）
+  events = resolveSequenceConstraints(events, input.commentText) as ResolvedTripEvent[];
 
   // 4. 时间不重叠（J）：按先后关系调整后续活动时间。
   //    无真实路线 duration 时 start = previous.end（不伪造 travel）；真实 route duration 由外部注入。
@@ -241,8 +241,8 @@ async function resolveEventPOI(
     : undefined;
   const priorLocation = prior?.resolvedLocation;
 
-  // 从标题提取地点关键词（如「去广州图书馆看书」→「广州图书馆」）
-  const locationQuery = extractLocationQuery(event.title);
+  // 从标题提取地点关键词（通用：任意需要实体地点的活动都尝试解析）
+  const locationQuery = extractPlaceQuery(event.title);
 
   // 锚点坐标：优先用前置活动真实坐标；否则用本活动 POI 解析结果
   let resolvedLat: number | undefined;
@@ -284,8 +284,8 @@ async function resolveEventPOI(
   };
 
   // 若活动是餐饮（DINING）或标题含「吃/菜/餐」，则搜索附近餐厅
-  if (event.type === 'DINING' || /吃|菜|餐|饭/.test(event.title)) {
-    const keyword = extractDiningKeyword(event.title) || '餐厅';
+  if (event.type === 'DINING' || isMealTitle(event.title)) {
+    const keyword = extractFoodKeyword(event.title) || '餐厅';
     if (resolvedLat !== undefined && resolvedLng !== undefined) {
       const nearby = await lbs.searchNearby(keyword, resolvedLat, resolvedLng);
       if (nearby.status === 'FOUND') {
@@ -332,14 +332,93 @@ function findDurationTargetIndex(events: ResolvedTripEvent[], commentText: strin
   return lastIndex;
 }
 
-/** 从活动标题提取地点关键词（如「去广州图书馆看书」→「广州图书馆」） */
-function extractLocationQuery(title: string): string | undefined {
-  const m = title.match(/去\s*([\u4e00-\u9fa5A-Za-z0-9]{2,})/);
-  return m ? m[1] : undefined;
+/** 常见菜系/餐饮关键词表（通用意图表，禁止对单一菜系做 special-case 分支） */
+const CUISINE_KEYWORDS = [
+  '越南菜', '泰国菜', '粤菜', '广式', '川菜', '湘菜', '赣菜', '江浙菜',
+  '日料', '日本料理', '韩料', '寿司', '刺身', '火锅', '打边炉', '烧烤',
+  '烤肉', '咖啡', '甜品', '甜点', '素食', '素菜', '西餐', '披萨', '比萨',
+  '汉堡', '炸鸡', '米粉', '河粉', '肠粉', '牛肉面', '拉面', '面馆', '早茶',
+  '点心', '海鲜', '自助餐', '大排档', '夜宵', '下午茶',
+];
+
+/** 是否为餐饮类标题：
+ *   - 含 吃/喝/餐/饭/菜（吃越南菜、晚餐、下午喝咖啡）
+ *   - 或标题本身就是菜系/餐饮词（咖啡、火锅、甜品）
+ */
+export function isMealTitle(title: string): boolean {
+  if (/吃|喝|餐|饭|菜/.test(title)) return true;
+  return CUISINE_KEYWORDS.includes(title);
 }
 
-/** 从活动标题提取餐饮关键词（如「吃泰国菜」→「泰国菜」） */
-function extractDiningKeyword(title: string): string | undefined {
-  const m = title.match(/吃\s*([\u4e00-\u9fa5A-Za-z0-9]+)/);
-  return m ? m[1] : undefined;
+/** 是否为移动/交通类标题（「前往X」「坐地铁X」等，不做 POI 解析） */
+function isTransportTitle(title: string): boolean {
+  return /^(前往|去往|坐|乘|搭|打车|地铁|公交|高铁|火车|飞机|导航|从)/.test(title);
+}
+
+/**
+ * 通用地点短语提取：从活动标题中剥离动作词后取出地点短语。
+ *
+ * 例：
+ *   「广州图书馆看书」→「广州图书馆」
+ *   「参观省博物馆」→「省博物馆」
+ *   「去广州塔」→「广州塔」
+ *   「在天河体育中心打羽毛球」→「天河体育中心」
+ *   「去完广图吃泰国菜」→「广图」（餐饮标题自带地点 anchor，供 nearby 搜索）
+ *
+ * 规则：
+ *   - 餐饮标题只提取「去完X吃…」模式中的 X 作为 anchor，其余不解析地点
+ *   - 交通类标题不解析地点（移动不是实体地点）
+ *   - 剥离前缀动词（去/参观/在/到…）与后缀活动词（看书/打羽毛球…）
+ *   - 只接受 2-12 位中文/字母数字短语，其余返回 undefined
+ */
+export function extractPlaceQuery(title: string): string | undefined {
+  if (!title) return undefined;
+  if (isTransportTitle(title)) return undefined;
+  if (isMealTitle(title)) {
+    // 餐饮标题自身携带地点 anchor：「去完广图吃泰国菜」→「广图」
+    const anchor = title.match(/去完\s*([\u4e00-\u9fa5A-Za-z0-9]{2,8}?)(?:后|之后|再|就|直接)?(?:吃|喝|来杯|点)/);
+    return anchor ? anchor[1] : undefined;
+  }
+
+  let t = title.trim();
+  // 剥离前缀动词（含复合前缀）
+  t = t.replace(/^(?:去参观|去游览|去游玩|去完|前往|参观|游览|游玩|体验|逛|看|到|在|去|直接去)/, '');
+  // 在第一个动作动词处截断（「广州图书馆看书」→「广州图书馆」；「广州塔看夜景」→「广州塔」）
+  const verbIndex = t.search(/(?:看|读|玩|打|吃|喝|买|参观|游览|体验|听|唱|跳|拍|运动|游泳|跑步|骑行|散步|爬山|放风筝)/);
+  if (verbIndex > 0) t = t.slice(0, verbIndex);
+
+  t = t.trim();
+  // 只接受 2-12 位中文/字母数字短语（「书」「塔」等单字太弱，交给 POI 搜索反而引入噪声）
+  if (!/^[\u4e00-\u9fa5A-Za-z0-9]{2,12}$/.test(t)) return undefined;
+  return t;
+}
+
+/**
+ * 通用餐饮关键词提取：把「吃越南菜」「吃个火锅」「附近吃饭」「找个餐厅」等
+ * 统一抽取为单个 foodKeyword 交给腾讯 nearby 搜索。
+ *
+ * 例：
+ *   「吃越南菜」→「越南菜」
+ *   「吃泰国菜」→「泰国菜」（与越南菜同一通用路径，无 special-case）
+ *   「吃个火锅」→「火锅」
+ *   「吃粤菜」→「粤菜」
+ *   「去完省博吃越南菜」→「越南菜」
+ *   「吃饭」/「附近吃饭」/「找个餐厅」→「餐厅」
+ */
+export function extractFoodKeyword(title: string): string | undefined {
+  if (!title) return undefined;
+  // 1. 「吃X」直接捕获（吃个/吃点/吃顿/吃一）
+  const m = title.match(/吃(?:个|点|顿|一)?([\u4e00-\u9fa5A-Za-z0-9]{1,8})/);
+  if (m) {
+    const kw = m[1].trim();
+    if (kw === '饭' || kw === '餐' || kw === '东西' || kw === '的') return '餐厅';
+    if (/^[\u4e00-\u9fa5A-Za-z0-9]+$/.test(kw)) return kw;
+  }
+  // 2. 标题包含已知菜系词 → 返回该菜系词
+  for (const kw of CUISINE_KEYWORDS) {
+    if (title.includes(kw)) return kw;
+  }
+  // 3. 含 吃/餐/饭 的通用意图 → 通用「餐厅」
+  if (/吃|餐|饭/.test(title)) return '餐厅';
+  return undefined;
 }

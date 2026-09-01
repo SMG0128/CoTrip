@@ -12,7 +12,7 @@
     <image class="place-art" src="/assets/3d/location.png" mode="aspectFit" />
   </view>
 
-  <view class="reason-card">
+  <view class="reason-card" wx:if="{{reason}}">
     <view class="section-title-row">
       <text>AI 推荐理由</text>
       <image src="/assets/icons/utility/sparkle.svg" mode="aspectFit" />

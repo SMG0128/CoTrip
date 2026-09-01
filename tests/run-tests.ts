@@ -13,6 +13,7 @@ import './trip-detail-on-show.test';
 import './comment-composer.test';
 import './comment-author.test';
 import './candidate-ranker.test';
+import './event-date-grouping.test';
 import './event-candidates.test';
 import './tencent-map-adapter.test';
 import './external-action-resolver.test';

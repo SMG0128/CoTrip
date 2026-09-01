@@ -33,6 +33,14 @@ Component({
     selectedCandidate: null as EventCandidate | null,
     alternatives: [] as EventCandidate[],
     expanded: false,
+    /** 地点展示名：标题已含地点名时为空串（避免视觉重复） */
+    locDisplayName: '',
+    /** 地点地址（缺省回退 district） */
+    locAddress: '',
+    /** 候选展示名：标题已含候选名时为空串 */
+    candDisplayName: '',
+    /** 候选地址（缺省回退 district） */
+    candAddress: '',
   },
   observers: {
     'event, candidates'(event: PlanEvent | null, candidates: EventCandidate[]) {
@@ -46,7 +54,30 @@ Component({
       const alternatives = selectedCandidate
         ? ranked.filter((candidate) => candidate.id !== selectedCandidate.id)
         : [];
-      this.setData({ icon, timeText, selectedCandidate, alternatives, expanded: false });
+
+      // 真实地点展示：title 已包含地点名时避免视觉重复，只显示地址。
+      // 例：「广州图书馆看书」+ 地点「广州图书馆」→ 只显示「广东省广州市天河区珠江东路4号」。
+      const title = event.title ?? '';
+      const locName = event.location?.name ?? '';
+      const locDisplayName = locName && title.includes(locName) ? '' : locName;
+      const locAddress = event.location?.address || event.location?.district || '';
+
+      const candName = selectedCandidate?.name ?? '';
+      const candDisplayName = candName && title.includes(candName) ? '' : candName;
+      const candAddress =
+        selectedCandidate?.location?.address || selectedCandidate?.location?.district || '';
+
+      this.setData({
+        icon,
+        timeText,
+        selectedCandidate,
+        alternatives,
+        expanded: false,
+        locDisplayName,
+        locAddress,
+        candDisplayName,
+        candAddress,
+      });
     },
   },
   methods: {

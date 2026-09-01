@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 59/59、前端 27 个测试模块全绿）：
+当前已实际实现并通过测试的能力（后端 241/241、前端全量测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -28,6 +28,8 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Real room joining** —— Join 落地页 / 首页房间入口 / 微信分享均已接通真实加入流程：公开 Preview → Bearer 认证幂等加入；身份只来自服务端校验的 token，失败不回退 Mock。
 - **Navigation-style route recommendations** —— 见下节；示例行程使用已固化、可重复验证的广州路线数据。
 - **Tencent Location Service adapter** —— 已实现并启用 POI Search + Direction（walking / transit）适配器；真实行程在「我的推荐」面板选定出发地点后调用腾讯路线 API。
+- **Real POI trip presentation** —— 行程时间线按活动 local date 分组显示日期头；所有活动（图书馆 / 省博 / 餐厅…）经通用地点短语提取 + 腾讯 POI 解析为真实地点并渲染地址；任意菜系/餐饮关键词（越南菜、泰国菜、粤菜、火锅、咖啡…）统一走腾讯 nearby，anchor 使用前置活动真实坐标。
+- **No runtime mock restaurant injection** —— 真实行程候选只来自服务端计划中的已验证实体（腾讯 POI / nearby），生产链路不再引用 `realRestaurants`/`realRestaurantCailan`；`place-detail` 由上游直传实体，mock 表仅保留示例行程 fixture 回查。
 - **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
 - **Immersive Home experience** —— 首页使用广州图片循环横幅、自定义全面屏安全区与底部渐隐；共享玻璃材质覆盖导航、头像、评论和状态组件，主操作保留独立材质控制。
 - **Clipboard-assisted room join** —— 首页聚焦房间号输入时可从剪贴板识别并归一化房间号，仍由用户明确确认加入。

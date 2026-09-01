@@ -4,11 +4,14 @@
 
 import { Plan } from '../../types/plan';
 import { EventCandidate, EventCandidateGroup } from '../../types/event-candidate';
+import { buildEventDateHeaders } from '../../utils/event-date-grouping';
 
 interface EventRow {
   id: string;
   event: Plan['events'][number];
   candidates: EventCandidate[];
+  /** 日期头文案（同一天后续事件为空串）；来自活动 local date，低干扰层级 */
+  dateHeader: string;
 }
 
 Component({
@@ -38,10 +41,12 @@ Component({
         return;
       }
       const groups = candidateGroups ?? [];
-      const eventRows = plan.events.map((event) => ({
+      const dateHeaders = buildEventDateHeaders(plan.events);
+      const eventRows = plan.events.map((event, index) => ({
         id: event.id,
         event,
         candidates: groups.find((group) => group.eventId === event.id)?.candidates ?? [],
+        dateHeader: dateHeaders[index] ?? '',
       }));
       this.setData({ eventRows });
     },

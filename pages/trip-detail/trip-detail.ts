@@ -129,7 +129,7 @@ Page({
     // 页面壳默认值：onLoad 的所有分支都会立即以真实数据或示例行程覆盖
     trip: buildDemoTrip(),
     comments: [] as Comment[],
-    restaurants: realRestaurants as Restaurant[],
+    restaurants: [] as Restaurant[],
     rankedRestaurants: [] as ReturnType<typeof rankCandidates>,
     candidateGroups: [] as EventCandidateGroup[],
     showRoute: false,
@@ -478,25 +478,28 @@ Page({
     if (!isDemoTripId(this.data.trip.id)) {
       const currentPlan = this.data.trip.currentPlan ?? buildEmptyPlan(this.data.trip.id);
       const result = evaluateRealCommentPlan(currentPlan, comments);
-      const ranked = rankCandidates({
-        restaurants: realRestaurants,
-        constraints: result.constraints,
-      });
-      const rankedRestaurants = ranked.map((entry) => entry.restaurant);
+      // 真实行程：候选只来自服务端计划中的已验证实体（腾讯 POI / nearby 结果），
+      // 绝不使用任何本地 mock 餐厅（蔡澜Pho 等 seed fixture）。
+      const candidateGroups = buildEventCandidateGroups(result.plan, []);
+      const planRestaurants = candidateGroups
+        .flatMap((group) => group.candidates)
+        .map((candidate) => candidate.restaurant)
+        .filter((restaurant): restaurant is Restaurant => !!restaurant);
+      const firstRestaurant = planRestaurants[0];
       this.setData({
         trip: { ...this.data.trip, currentPlan: result.plan },
-        restaurants: rankedRestaurants,
-        rankedRestaurants: ranked,
-        candidateGroups: buildEventCandidateGroups(result.plan, ranked),
+        restaurants: planRestaurants,
+        rankedRestaurants: [],
+        candidateGroups,
         debugConstraints: result.constraints,
         debugPlanVersion: result.plan.version,
         debugConflictCount: result.plan.conflicts.length,
         debugUnresolved: result.unresolvedCommentIds,
         'debugProvider.searchQuery': this.buildSearchQuery(result.constraints),
-        'debugProvider.rawResultCount': realRestaurants.length,
-        'debugProvider.selectedEntity': rankedRestaurants[0]?.name ?? '',
-        'debugProvider.providerRefs': rankedRestaurants[0]?.providerRefs?.map((p) => `${p.provider}:${p.externalId}`) ?? [],
-        'debugProvider.externalActions': rankedRestaurants[0]?.externalActions.length ?? 0,
+        'debugProvider.rawResultCount': planRestaurants.length,
+        'debugProvider.selectedEntity': firstRestaurant?.name ?? '',
+        'debugProvider.providerRefs': firstRestaurant?.providerRefs?.map((p) => `${p.provider}:${p.externalId}`) ?? [],
+        'debugProvider.externalActions': firstRestaurant?.externalActions?.length ?? 0,
       });
       return;
     }
@@ -551,11 +554,20 @@ Page({
     }
   },
 
+  /** 从 DINING 约束值提取餐饮关键词（Debug 展示用；缺省「餐厅」） */
+  extractDiningKeywordFromConstraint(constraint: Constraint | undefined): string {
+    if (!constraint) return '餐厅';
+    const value = constraint.value as Record<string, unknown>;
+    const candidate = value.keyword ?? value.category ?? value.note;
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    return '餐厅';
+  },
+
   /** 从约束构建 Provider 搜索查询（Debug 展示用） */
   buildSearchQuery(constraints: Constraint[]): string {
     const dining = constraints.find((c) => c.scope === 'DINING');
     const district = constraints.find((c) => c.type === 'LOCATION')?.value.district as string | undefined;
-    const keyword = dining ? '越南菜' : '餐厅';
+    const keyword = this.extractDiningKeywordFromConstraint(dining);
     return `keyword=${keyword}, boundary=region(广州市, 0)${district ? `, district=${district}` : ''}`;
   },
 
@@ -982,16 +994,22 @@ Page({
   onPlaceTap(e: WechatMiniprogram.CustomEvent) {
     const location = e.detail.location;
     if (!location) return;
+    // 直接携带实体数据跳转，避免详情页依赖本地 mock 表回查
     wx.navigateTo({
-      url: `/pages/place-detail/place-detail?locationId=${location.id}`,
+      url: `/pages/place-detail/place-detail?kind=location&entity=${encodeURIComponent(
+        JSON.stringify(location),
+      )}`,
     });
   },
 
   onRestaurantTap(e: WechatMiniprogram.CustomEvent) {
     const restaurant = e.detail.restaurant;
     if (!restaurant) return;
+    // 直接携带实体数据跳转，避免详情页依赖本地 mock 表回查
     wx.navigateTo({
-      url: `/pages/place-detail/place-detail?restaurantId=${restaurant.id}`,
+      url: `/pages/place-detail/place-detail?kind=restaurant&entity=${encodeURIComponent(
+        JSON.stringify(restaurant),
+      )}`,
     });
   },
 
@@ -1004,12 +1022,17 @@ Page({
     if (!this.engine || !this.initialSnapshot) return;
     const snapshot = this.initialSnapshot;
     this.engine.reset();
+    const snapshotPlan = snapshot.trip.currentPlan ?? buildEmptyPlan(snapshot.trip.id);
+    const snapshotRestaurants = buildEventCandidateGroups(snapshotPlan, [])
+      .flatMap((group) => group.candidates)
+      .map((candidate) => candidate.restaurant)
+      .filter((restaurant): restaurant is Restaurant => !!restaurant);
     this.setData({
       comments: snapshot.comments,
-      trip: { ...this.data.trip, currentPlan: snapshot.trip.currentPlan },
-      restaurants: realRestaurants,
+      trip: { ...this.data.trip, currentPlan: snapshotPlan },
+      restaurants: snapshotRestaurants,
       rankedRestaurants: [],
-      candidateGroups: buildEventCandidateGroups(snapshot.trip.currentPlan, []),
+      candidateGroups: buildEventCandidateGroups(snapshotPlan, []),
       debugConstraints: [],
       debugPlanVersion: 0,
       debugConflictCount: 0,
