@@ -189,6 +189,13 @@
   text-align: right;
 }
 
+/* 标题 placeholder：与输入内容一致靠右，示例文本灰色不加粗 */
+.title-placeholder {
+  color: #b2bdce;
+  font-weight: 400;
+  text-align: right;
+}
+
 .field-picker:last-child .field {
   margin-bottom: 0;
 }

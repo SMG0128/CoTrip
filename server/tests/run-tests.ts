@@ -17,6 +17,7 @@ import { runTripPlanGenerationTests } from './trip-plan-generation.test';
 import { runAIEnvelopeTests } from './ai-envelope.test';
 import { runTripUpdateTests } from './trip-update.test';
 import { runProductionReadinessTests } from './production-readiness.test';
+import { runTemporalResolutionTests } from './trip-temporal-resolution.test';
 
 interface TestResult {
   name: string;
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
   await runAIEnvelopeTests();
   await runTripUpdateTests();
   await runProductionReadinessTests();
+  await runTemporalResolutionTests();
 
   let failed = 0;
   for (const r of results) {

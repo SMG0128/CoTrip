@@ -54,8 +54,30 @@ import {
 } from './initial-generation-ai-validation';
 import { buildUpdatedTripPlan, validateTripUpdateEnvelope } from './trip-update-ai-validation';
 import { TripPreprocessTripInput } from '../types/ai-preprocess';
+import {
+  PostProcessInput,
+  postProcessTripPlan,
+} from './trip-plan-post-processor';
+import { TencentLBSService } from './tencent-lbs-service';
+import { sanitizePlanForPersist } from './plan-persist-sanitizer';
+import { buildTimeAnchor } from './trip-temporal-resolution';
 
 export type PlanMutation = 'none' | 'initial_generation' | 'trip_update';
+
+/** 确定性后处理依赖：可注入的 Tencent LBS（未配置时为 null，跳过 POI 解析） */
+export interface TripPlanPostProcessor {
+  postProcess(input: PostProcessInput): Promise<{ plan: TripPlan }>;
+}
+
+/** 默认后处理器：使用注入的 LBS 服务 */
+export class DefaultTripPlanPostProcessor implements TripPlanPostProcessor {
+  constructor(private readonly lbs: TencentLBSService | null) {}
+
+  async postProcess(input: PostProcessInput): Promise<{ plan: TripPlan }> {
+    const result = await postProcessTripPlan(input, this.lbs);
+    return { plan: result.plan };
+  }
+}
 
 export interface ProcessCommentResult {
   /** 评估记录；成功评估或明确不可用，绝不伪造 */
@@ -74,6 +96,8 @@ export class TripPlanGenerationService {
     private readonly generationAI: InitialGenerationAIService,
     /** Stage 3：未注入时行为与 Stage 2 完全一致（永不更新计划） */
     private readonly updateAI: TripUpdateAIService = new UnavailableTripUpdateAIService(),
+    /** 确定性后处理：时间锚定 / 时长 / 先后关系 / POI 解析；未注入时跳过 */
+    private readonly postProcessor: TripPlanPostProcessor | null = null,
   ) {}
 
   /**
@@ -221,7 +245,28 @@ export class TripPlanGenerationService {
       }
 
       const updatedAt = new Date().toISOString();
-      const plan = buildTripPlanFromEnvelope(envelope, tripId, updatedAt);
+      let plan = buildTripPlanFromEnvelope(envelope, tripId, updatedAt);
+      // 确定性后处理：时间锚定到行程日期 / 时长 / 先后关系 / POI 解析。
+      // 失败时保留 AI 意图文本，但未验证事实字段会在下方 sanitize 时被剥离（fail-closed）。
+      if (this.postProcessor) {
+        try {
+          const processed = await this.postProcessor.postProcess({
+            plan,
+            timeRange: latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
+            commentText: comment.rawText,
+            city: extractCity(latest.areaConstraint),
+          });
+          plan = processed.plan;
+        } catch {
+          // 后处理失败：保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离
+        }
+      }
+      // 落库前不变量门禁（fail-closed）：剥离未验证 location/restaurant/时间，
+      // 禁止 AI 生成的 POI id/经纬度/餐厅/rating/avgPrice 绕过验证进入最终 plan。
+      const tripStartDate = buildTimeAnchor(
+        latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
+      )?.startDate;
+      plan = sanitizePlanForPersist(plan, tripStartDate);
       // 完整 snapshot 与 UI 提示同一次原子写入
       await this.trips.update({
         ...latest,
@@ -307,7 +352,27 @@ export class TripPlanGenerationService {
       }
 
       const updatedAt = new Date().toISOString();
-      const plan = buildUpdatedTripPlan(envelope, latest.currentPlan, updatedAt);
+      let plan = buildUpdatedTripPlan(envelope, latest.currentPlan, updatedAt);
+      // 确定性后处理：时间锚定 / 时长 / 先后关系 / POI 解析。
+      // 失败时保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离（fail-closed）。
+      if (this.postProcessor) {
+        try {
+          const processed = await this.postProcessor.postProcess({
+            plan,
+            timeRange: latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
+            commentText: comment.rawText,
+            city: extractCity(latest.areaConstraint),
+          });
+          plan = processed.plan;
+        } catch {
+          // 后处理失败：保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离
+        }
+      }
+      // 落库前不变量门禁（fail-closed）：剥离未验证 location/restaurant/时间
+      const tripStartDate = buildTimeAnchor(
+        latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
+      )?.startDate;
+      plan = sanitizePlanForPersist(plan, tripStartDate);
       await this.trips.update({
         ...latest,
         currentPlan: plan,
@@ -319,4 +384,12 @@ export class TripPlanGenerationService {
     console.warn('TRIP_UPDATE 连续版本冲突，放弃本次过期结果（不重试、不覆盖）');
     return false;
   }
+}
+
+/** 从 areaConstraint 提取城市（用于 POI disambiguation）；缺省返回 undefined */
+function extractCity(areaConstraint: unknown): string | undefined {
+  if (!areaConstraint || typeof areaConstraint !== 'object') return undefined;
+  const record = areaConstraint as Record<string, unknown>;
+  if (typeof record.city === 'string' && record.city) return record.city;
+  return undefined;
 }

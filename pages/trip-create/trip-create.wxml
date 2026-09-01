@@ -27,7 +27,7 @@
       <input
         class="title-input"
         placeholder="例如：顺德周末美食之旅"
-        placeholder-class="picker-placeholder"
+        placeholder-class="title-placeholder"
         value="{{title}}"
         bind:input="onTitleInput"
         maxlength="100"

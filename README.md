@@ -80,6 +80,33 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - 地图预览（Map Preview）尚未实现。
 - 本阶段未使用后端代理转发腾讯地图请求（客户端受限 Key 直连）。
 
+## V0.4 AI Trip Temporal & POI Resolution（本轮交付）
+
+本轮加固了 AI 行程生成的时间 / 地点 / 时长确定性，并接入腾讯真实 POI，全部通过验证：
+
+### 时间与时长确定性解析
+
+- **trip date/time deterministic resolution** —— 行程日期与活动时间锚定到行程日期（+08:00 时区），不再依赖 AI 自由发挥。
+- **duration parsing** —— 从评论提取时长（如「看三个小时」→ 180 分钟）并绑定到语义相关的活动。
+- **sequence constraints** —— 「去完 X 后去 Y」解析为 `afterActivityId` + `near_previous_activity`，保证活动不重叠。
+- **no fake travel duration** —— 未获得真实路线时长时，后续活动 `start = previous.end`（最早不重叠时刻），**绝不凭空生成 travel duration**；真实 route duration 由外部注入复用，本模块不新造第二套路由系统。
+
+### 腾讯真实 POI 解析
+
+- **Tencent real POI resolution / nearby search** —— 服务端复用项目已有腾讯位置服务（`ws/place/v1/search`），把「广图 / 广州图书馆」解析为真实腾讯 POI，并做附近餐厅搜索。
+- **no runtime mock restaurant** —— 搜索失败绝不回退 mock / hardcoded / AI 生成的餐厅名。
+- **truth-preserving** —— 腾讯 API 实际未返回的字段（rating / avgPrice / photo 等）一律保持 `undefined`，绝不补齐伪造。
+
+### 安全与失败关闭
+
+- **fail-closed persist sanitizer** —— 落库前剥离所有未经验证的事实字段，失败时保留 AI 意图文本但绝不写入未验证数据。
+- **server Tencent key env-only** —— 服务端只读取 `process.env.TENCENT_MAP_KEY`；未配置时 POI 解析明确返回不可用，**不从 frontend config 自动读取 Key**；真实 E2E 仅通过显式 env 注入。
+
+### 测试覆盖
+
+- 后端：222/222 通过（含无真实 route duration 不出现 hardcoded 30min、有真实 route duration 时 start = previous.end + real duration）。
+- 前端：全部核心逻辑测试通过。
+
 ## V0.3 Room Foundation（上一轮交付）
 
 本轮完成了**基于房间号（roomCode）的行程协作地基**，前后端与测试全部就绪：

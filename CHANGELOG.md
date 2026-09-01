@@ -6,7 +6,23 @@
 ## [Unreleased]
 
 ### Added
-- 房间号真实加入闭环：后端新增 `GET /trips/join-preview`（公开、仅返回安全字段）与 `POST /trips/join`（Bearer 认证、身份仅取服务端校验的 userId、ACTIVE-only、重复加入幂等、creator 不变、participantIds 去重并持久化）
+- AI 行程时间确定性解析：行程日期与活动时间锚定到行程日期（+08:00 时区），活动时间不再依赖 AI 自由发挥
+- 评论时长解析：从评论提取时长（如「看三个小时」→ 180 分钟）并绑定到语义相关的活动
+- 先后关系约束：解析「去完 X 后去 Y」为 `afterActivityId` + `near_previous_activity`，保证活动不重叠
+- 腾讯真实 POI 解析：服务端复用项目已有腾讯位置服务（`ws/place/v1/search`），把「广图 / 广州图书馆」解析为真实腾讯 POI，并做附近餐厅搜索；搜索失败绝不回退 mock / hardcoded / AI 生成的餐厅名
+- fail-closed 落库 sanitizer：落库前剥离所有未经验证的事实字段，失败时保留 AI 意图文本但绝不写入未验证数据
+- 服务端腾讯 Key 仅从 `process.env.TENCENT_MAP_KEY` 读取；未配置时 POI 解析明确返回不可用，不从 frontend config 自动读取 Key
+
+### Changed
+- 无真实路线时长时，后续活动 `start = previous.end`（最早不重叠时刻），**绝不凭空生成 travel duration**；真实 route duration 由外部注入复用，不新造第二套路由系统
+- 腾讯 POI 字段 truth-preserving：腾讯 API 实际未返回的字段（rating / avgPrice / photo 等）一律保持 `undefined`，绝不补齐伪造
+
+### Fixed
+- 移除伪造的 30 分钟 travel duration（原为 hardcoded default，非真实 route provider 数据）
+- 移除服务端对 frontend public Tencent Key 的隐式回退：真实 E2E 仅通过显式 env 注入 Key
+
+### Added
+- 房间号加入链路：`POST /trips/join-preview`（公开、仅返回安全字段）与 `POST /trips/join`（Bearer 认证、身份仅取服务端校验的 userId、ACTIVE-only、重复加入幂等、creator 不变、participantIds 去重并持久化）
 - 前端 Join 流程接通真实 API：Join 落地页加载真实 Preview，`RealTripService` 直连 Join contract 且无 Mock 回退；未登录加入意图持久化（`pendingJoinRoomCode`），登录成功后自动恢复，加入成功后清理 pending state
 - 新建行程页图标统一为蓝紫渐变 SVG 风格（`assets/icons/trip-create/`）
 - 导航式路线方案选择器：「我的推荐」最多展示 3 条方案，首条默认推荐并展开，任意时刻最多展开 1 条

@@ -30,6 +30,8 @@ export interface AppConfig {
   aiGatewayUrl?: string;
   aiGatewaySecret?: string;
   aiTimeoutMs: number;
+  /** 腾讯位置服务 WebService Key（服务端通过 env 注入，绝不硬编码/打印） */
+  tencentMapKey?: string;
 }
 
 function required(name: string): string {
@@ -61,5 +63,6 @@ export function loadConfig(): AppConfig {
     aiGatewayUrl: process.env.AI_GATEWAY_URL?.trim() || undefined,
     aiGatewaySecret: process.env.AI_GATEWAY_SECRET?.trim() || undefined,
     aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS || 15000),
+    tencentMapKey: process.env.TENCENT_MAP_KEY?.trim() || undefined,
   };
 }

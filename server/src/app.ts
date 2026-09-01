@@ -47,6 +47,8 @@ import {
   UnavailableTripUpdateAIService,
 } from './services/trip-update-ai-service';
 import { CloudBaseGatewayTripUpdateAIService } from './services/cloudbase-gateway-trip-update-ai-service';
+import { TencentLBSService } from './services/tencent-lbs-service';
+import { DefaultTripPlanPostProcessor } from './services/trip-plan-generation-service';
 import { coordinationRouter } from './routes/coordination';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
@@ -64,12 +66,17 @@ export function createApp() {
   const aiComments = createAICommentService(config);
   const constraintRepository = new JsonConstraintRepository(config.constraintDataFile);
   const ledger = new ConstraintLedgerService(constraintRepository);
-  // AI Trip Pipeline V2 Stage 2/3：评论评估 + 首版生成 + 相关评论触发的行程更新
+  // 腾讯位置服务：Key 从 env 注入（未配置时 POI 解析返回 POI_SEARCH_UNAVAILABLE，绝不伪造）
+  const tencentLBS = config.tencentMapKey
+    ? new TencentLBSService({ key: config.tencentMapKey })
+    : null;
+  // AI Trip Pipeline V2 Stage 2/3：Constraint 评估 + 首轮生成 + 相关评论触发的行程更新
   const planGeneration = new TripPlanGenerationService(
     tripRepository,
     createCommentEvaluationAIService(config),
     createInitialGenerationAIService(config),
     createTripUpdateAIService(config),
+    tencentLBS ? new DefaultTripPlanPostProcessor(tencentLBS) : null,
   );
   const comments = new CommentService(
     commentRepository,
