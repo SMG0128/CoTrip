@@ -24,6 +24,13 @@ const TOP_LEVEL_KEYS = [
 ];
 const UI_KEYS = ['changedEventIds', 'highlightEventIds', 'removedEventIds', 'message'];
 const UI_ID_FIELDS = ['changedEventIds', 'highlightEventIds', 'removedEventIds'];
+const TRIP_SIGNAL_KEYS = [
+  'places',
+  'timeExpressions',
+  'durationExpressions',
+  'sequenceWords',
+  'actionWords',
+];
 const FORBIDDEN_STYLE_KEYS = [
   'color',
   'background',
@@ -76,6 +83,21 @@ function validateExactKeys(value, allowed, required, path) {
   if (unexpected !== undefined) return invalid(`${path}.${unexpected}`, 'UNEXPECTED_KEY');
   const missing = required.find((key) => !(key in value));
   return missing === undefined ? valid() : invalid(`${path}.${missing}`, 'REQUIRED_FIELD');
+}
+
+function validateTripSignals(value, path) {
+  if (!isRecord(value)) return invalid(path, 'TRIP_SIGNALS_OBJECT_REQUIRED');
+  const shape = validateExactKeys(value, TRIP_SIGNAL_KEYS, TRIP_SIGNAL_KEYS, path);
+  if (!shape.ok) return shape;
+  for (const key of TRIP_SIGNAL_KEYS) {
+    if (!Array.isArray(value[key])) return invalid(`${path}.${key}`, 'EXPECTED_STRING_ARRAY');
+    for (let index = 0; index < value[key].length; index += 1) {
+      if (typeof value[key][index] !== 'string') {
+        return invalid(`${path}.${key}[${index}]`, 'EXPECTED_STRING');
+      }
+    }
+  }
+  return valid();
 }
 
 function findForbiddenStyleKey(value, path = '$') {
@@ -315,7 +337,7 @@ function validateCommentEvaluationProjection(value, path) {
   //   shouldForward —— 是否值得交给 PlanAgent
   //   judgeStatus   —— actionable / irrelevant / insufficient / unsupported
   //   intentDomain  —— trip / non_trip / unknown
-  const keys = ['commentIntent', 'relevant', 'usable', 'updateRequired', 'reason', 'shouldForward', 'judgeStatus', 'intentDomain'];
+  const keys = ['commentIntent', 'relevant', 'usable', 'updateRequired', 'reason', 'shouldForward', 'judgeStatus', 'intentDomain', 'signals'];
   const required = ['commentIntent', 'relevant', 'usable', 'updateRequired', 'reason'];
   const shape = validateExactKeys(value, keys, required, path);
   if (!shape.ok) return shape;
@@ -331,6 +353,10 @@ function validateCommentEvaluationProjection(value, path) {
     if (value[key] !== undefined && !isNonEmptyString(value[key], 40)) {
       return invalid(`${path}.${key}`, 'JUDGE_SEMANTIC_STRING_INVALID');
     }
+  }
+  if (value.signals !== undefined) {
+    const signals = validateTripSignals(value.signals, `${path}.signals`);
+    if (!signals.ok) return signals;
   }
   return valid();
 }

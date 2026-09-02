@@ -261,6 +261,81 @@ async function runPipelineTests() {
     }
   });
 
+  await record('judge contract: commentEvaluation 不带 signals 保持向后兼容', () => {
+    const result = validatePipelineInput('TRIP_UPDATE', BODIES.TRIP_UPDATE);
+    assert.strictEqual(result.ok, true);
+  });
+
+  await record('judge contract: commentEvaluation 完整合法 signals 通过', () => {
+    const body = clone(BODIES.TRIP_UPDATE);
+    body.tripUpdate.commentEvaluation.shouldForward = true;
+    body.tripUpdate.commentEvaluation.judgeStatus = 'actionable';
+    body.tripUpdate.commentEvaluation.intentDomain = 'trip';
+    body.tripUpdate.commentEvaluation.signals = {
+      places: ['省博', '广图'],
+      timeExpressions: [],
+      durationExpressions: [],
+      sequenceWords: ['参观完', '先去'],
+      actionWords: ['参观', '去', '借'],
+    };
+    assert.strictEqual(validatePipelineInput('TRIP_UPDATE', body).ok, true);
+  });
+
+  await record('judge contract: signals 字段须完整镜像 Server TripSignals', () => {
+    const body = clone(BODIES.TRIP_UPDATE);
+    body.tripUpdate.commentEvaluation.signals = { places: ['北京路'] };
+    const result = validatePipelineInput('TRIP_UPDATE', body);
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.failurePath, 'tripUpdate.commentEvaluation.signals.timeExpressions');
+    assert.strictEqual(result.failureReasonCode, 'REQUIRED_FIELD');
+  });
+
+  await record('judge contract: signals collection 非数组必须拒绝', () => {
+    const body = clone(BODIES.TRIP_UPDATE);
+    body.tripUpdate.commentEvaluation.signals = {
+      places: '北京路',
+      timeExpressions: [],
+      durationExpressions: [],
+      sequenceWords: [],
+      actionWords: [],
+    };
+    const result = validatePipelineInput('TRIP_UPDATE', body);
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.failurePath, 'tripUpdate.commentEvaluation.signals.places');
+    assert.strictEqual(result.failureReasonCode, 'EXPECTED_STRING_ARRAY');
+  });
+
+  await record('judge contract: signals collection 元素非字符串必须拒绝', () => {
+    const body = clone(BODIES.TRIP_UPDATE);
+    body.tripUpdate.commentEvaluation.signals = {
+      places: ['北京路'],
+      timeExpressions: [],
+      durationExpressions: [],
+      sequenceWords: [],
+      actionWords: [true],
+    };
+    const result = validatePipelineInput('TRIP_UPDATE', body);
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.failurePath, 'tripUpdate.commentEvaluation.signals.actionWords[0]');
+    assert.strictEqual(result.failureReasonCode, 'EXPECTED_STRING');
+  });
+
+  await record('judge contract: signals 内未知字段继续严格拒绝', () => {
+    const body = clone(BODIES.TRIP_UPDATE);
+    body.tripUpdate.commentEvaluation.signals = {
+      places: ['北京路'],
+      timeExpressions: [],
+      durationExpressions: [],
+      sequenceWords: [],
+      actionWords: [],
+      randomUnknownField: true,
+    };
+    const result = validatePipelineInput('TRIP_UPDATE', body);
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.failurePath, 'tripUpdate.commentEvaluation.signals.randomUnknownField');
+    assert.strictEqual(result.failureReasonCode, 'UNEXPECTED_KEY');
+  });
+
   await record('pipeline input: 缺少 wrapper / 标题不一致 / baseVersion 不一致均 400', async () => {
     const missing = await gateway().handle({
       ...requestFor('PREPROCESS'),
