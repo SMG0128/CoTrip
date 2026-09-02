@@ -4,15 +4,7 @@
 
 import { Plan } from '../../types/plan';
 import { EventCandidate, EventCandidateGroup } from '../../types/event-candidate';
-import { buildEventDateHeaders } from '../../utils/event-date-grouping';
-
-interface EventRow {
-  id: string;
-  event: Plan['events'][number];
-  candidates: EventCandidate[];
-  /** 日期头文案（同一天后续事件为空串）；来自活动 local date，低干扰层级 */
-  dateHeader: string;
-}
+import { buildTimelineRows, TimelineRow } from '../../utils/timeline-rows';
 
 Component({
   properties: {
@@ -32,7 +24,7 @@ Component({
     },
   },
   data: {
-    eventRows: [] as EventRow[],
+    eventRows: [] as TimelineRow[],
   },
   observers: {
     'plan, candidateGroups'(plan: Plan | null, candidateGroups: EventCandidateGroup[]) {
@@ -41,14 +33,9 @@ Component({
         return;
       }
       const groups = candidateGroups ?? [];
-      const dateHeaders = buildEventDateHeaders(plan.events);
-      const eventRows = plan.events.map((event, index) => ({
-        id: event.id,
-        event,
-        candidates: groups.find((group) => group.eventId === event.id)?.candidates ?? [],
-        dateHeader: dateHeaders[index] ?? '',
-      }));
-      this.setData({ eventRows });
+      // 严格交错：activity[0], route[0], activity[1], route[1], activity[2] ...
+      // routeSegment[i] = activity[i] -> activity[i+1]，来自 event[i+1].route。
+      this.setData({ eventRows: buildTimelineRows(plan.events, groups) });
     },
   },
   methods: {

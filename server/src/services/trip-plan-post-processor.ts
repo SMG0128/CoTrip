@@ -553,9 +553,13 @@ function isTransportTitle(title: string): boolean {
  *   「逛K11」→「K11」
  *   「去酒店休息」→「酒店」
  *   「去完广图吃泰国菜」→「广图」（餐饮标题自带地点 anchor，供 nearby 搜索）
+ *   「北京路吃饭」→「北京路」；「去天河城吃饭」→「天河城」（地点 + 吃/饭 前缀）
  *
  * 规则：
- *   - 餐饮标题只提取「去完X吃…」模式中的 X 作为 anchor，其余不解析地点
+ *   - 餐饮标题提取「去完X吃…」或「地点+吃/饭/菜」中的地点作为 anchor；
+ *     纯餐饮词（吃越南菜 / 晚餐 / 咖啡）无地点前缀 → undefined
+ *   - 剥离前导时间词（晚上/中午…）与泛化短语（找一家/附近/随便…），
+ *     并拒绝通用餐饮词（餐厅/饭馆/店…）作为地点，避免把非具体地点当地点锚点
  *   - 交通类标题不解析地点（移动不是实体地点）
  *   - 剥离前缀动词（去/参观/在/到…）与后缀活动词（看书/打羽毛球…）
  *   - 只接受 2-12 位中文/字母数字短语，其余返回 undefined
@@ -564,9 +568,34 @@ export function extractPlaceQuery(title: string): string | undefined {
   if (!title) return undefined;
   if (isTransportTitle(title)) return undefined;
   if (isMealTitle(title)) {
-    // 餐饮标题自身携带地点 anchor：「去完广图吃泰国菜」→「广图」
-    const anchor = title.match(/去完\s*([\u4e00-\u9fa5A-Za-z0-9]{2,8}?)(?:后|之后|再|就|直接)?(?:吃|喝|来杯|点)/);
-    return anchor ? anchor[1] : undefined;
+    // 餐饮标题自身携带地点 anchor：
+    //   「去完广图吃泰国菜」→「广图」（既有模式）
+    //   「北京路吃饭」→「北京路」；「去天河城吃饭」→「天河城」（地点 + 吃/饭 前缀）
+    const afterPattern = title.match(/去完\s*([\u4e00-\u9fa5A-Za-z0-9]{2,8}?)(?:后|之后|再|就|直接)?(?:吃|喝|来杯|点)/);
+    if (afterPattern) return afterPattern[1];
+
+    // 通用「地点 + 吃/饭/菜」模式：剥离前导动词/时间词/泛化短语后，
+    // 取餐饮动词前的文本作为地点锚点。
+    // 这样「北京路吃饭」→「北京路」，餐厅 nearby 搜索会以北京路为中心，
+    // 而不是回退到上一活动（越秀公园）坐标。
+    let t = title.trim();
+    t = t.replace(/^(?:前往|去往|去|到|在|去)/, '');
+    // 剥离时间词与泛化短语（「晚上附近吃火锅」「找一家餐厅吃饭」→ 无具体地点，回退上一活动）
+    t = t.replace(/^(?:早上|上午|中午|下午|晚上|清晨|深夜|凌晨|白天|傍晚|夜里|之后|随后|然后|接着|帮我|帮我找|找一家|找家|找个|找|附近|周边|随便|就近|就近找)/, '');
+    const mealVerbIndex = t.search(/(?:吃|喝|来杯|点|饭|菜)/);
+    if (mealVerbIndex > 0) {
+      let place = t.slice(0, mealVerbIndex).trim();
+      // 剥离「附近/周边/旁边」等方位后缀，保留具体地点（「越秀公园附近吃饭」→「越秀公园」）
+      place = place.replace(/(?:附近|周边|旁边|左右|那边|这边)$/, '');
+      // 拒绝通用餐饮词（「餐厅/饭馆/店」等无具体指向），只接受具体地点名
+      if (
+        /^[\u4e00-\u9fa5A-Za-z0-9]{2,12}$/.test(place) &&
+        !/^(?:餐厅|饭馆|馆子|饭店|酒楼|菜馆|快餐|小吃|美食|地方|咖啡|甜品|火锅|烧烤|日料|西餐|中餐|早餐|午餐|晚餐|夜宵|宵夜|饭|菜|餐|店)$/.test(place)
+      ) {
+        return place;
+      }
+    }
+    return undefined;
   }
 
   let t = title.trim();

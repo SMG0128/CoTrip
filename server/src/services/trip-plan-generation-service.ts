@@ -62,6 +62,8 @@ import { TencentLBSService } from './tencent-lbs-service';
 import { TencentDirectionService } from './tencent-direction-service';
 import { sanitizePlanForPersist } from './plan-persist-sanitizer';
 import { buildTimeAnchor } from './trip-temporal-resolution';
+import { hasExplicitPlanChangeSignal, judgeShouldForward } from './comment-judge';
+import { diffTripPlans, summarizePlanOperations } from './trip-plan-diff';
 
 export type PlanMutation = 'none' | 'initial_generation' | 'trip_update';
 
@@ -114,8 +116,14 @@ export class TripPlanGenerationService {
       // 评估未成功：绝不据此触发任何计划变更，也绝不当成「判定为不相关」
       return { evaluation, mutation: 'none' };
     }
-    if (!evaluation.relevant || !evaluation.usable) {
-      // 无关评论、或 relevant 但 unusable（例如「我觉得可以」）都不得改动计划
+
+    // JudgeAgent 最终放行（LLM 判定 + 确定性信号兜底，兜底只放行、不收紧）：
+    // 「复杂但有效的行程表达」（多动作 / 省略主语 / 依赖当前 itinerary 上下文）不得被拦在 PlanAgent 之外。
+    if (!evaluation.shouldForward) {
+      // 无关评论、寒暄、噪音：不放行，不改动计划
+      console.info(
+        `JudgeAgent: judgeStatus=${evaluation.judgeStatus} intentDomain=${evaluation.intentDomain} shouldForward=false（${evaluation.reason}）`,
+      );
       return { evaluation, mutation: 'none' };
     }
 
@@ -123,14 +131,27 @@ export class TripPlanGenerationService {
     if (!latest) return { evaluation, mutation: 'none' };
 
     if (!latest.currentPlan) {
+      console.info(
+        `JudgeAgent: status=evaluated shouldForward=true judgeStatus=${evaluation.judgeStatus} intentDomain=${evaluation.intentDomain} → 进入 PlanAgent（INITIAL_GENERATION）`,
+      );
       const generated = await this.generateInitialPlanIfAbsent(comment, latest);
       return { evaluation, mutation: generated ? 'initial_generation' : 'none' };
     }
 
-    // 已有计划：只有明确要求修改的评论才允许触发 TRIP_UPDATE
-    if (!evaluation.updateRequired) {
+    // 已有计划：updateRequired 是最终开关（「好的」「看起来不错」这类评论绝不改动计划）。
+    // 确定性兜底：复杂但明确要求改行程的表达（删/换/改/安排/提前/推后 + 复合顺序表达）
+    // 即使 LLM 保守判为 updateRequired=false，仍交给 PlanAgent 评估。
+    const effectiveUpdateRequired =
+      evaluation.updateRequired || hasExplicitPlanChangeSignal(evaluation.signals, comment.rawText);
+    if (!effectiveUpdateRequired) {
+      console.info(
+        `JudgeAgent: status=evaluated shouldForward=true judgeStatus=${evaluation.judgeStatus} updateRequired=false（计划不改）`,
+      );
       return { evaluation, mutation: 'none' };
     }
+    console.info(
+      `JudgeAgent: status=evaluated shouldForward=true judgeStatus=${evaluation.judgeStatus} updateRequired=${effectiveUpdateRequired} → 进入 PlanAgent（TRIP_UPDATE）`,
+    );
     const updated = await this.updatePlan(comment, latest, evaluation);
     return { evaluation, mutation: updated ? 'trip_update' : 'none' };
   }
@@ -178,11 +199,24 @@ export class TripPlanGenerationService {
           reasonCode: 'AI_INVALID_RESPONSE',
         };
       }
-      return buildCommentEvaluationRecord(envelope, new Date().toISOString());
+      const record = buildCommentEvaluationRecord(envelope, new Date().toISOString(), comment.rawText);
+      const signalCounts = [
+        `places=${record.signals.places.length}`,
+        `time=${record.signals.timeExpressions.length}`,
+        `duration=${record.signals.durationExpressions.length}`,
+        `sequence=${record.signals.sequenceWords.length}`,
+        `action=${record.signals.actionWords.length}`,
+      ].join(' ');
+      // 可观测性：只记录判定语义与信号数量，不记录完整用户评论 / LLM 原始输出
+      console.info(
+        `JudgeAgent: status=evaluated shouldForward=${record.shouldForward} judgeStatus=${record.judgeStatus} intentDomain=${record.intentDomain} signals={${signalCounts}}`,
+      );
+      return record;
     } catch (error) {
       const reasonCode =
         error instanceof CommentEvaluationAIError ? error.code : 'AI_REQUEST_FAILED';
       console.warn(`COMMENT_EVALUATION 调用失败（${reasonCode}）`);
+      console.info(`JudgeAgent: status=unavailable reasonCode=${reasonCode}`);
       return {
         status: 'unavailable',
         requestType: 'COMMENT_EVALUATION',
@@ -272,6 +306,11 @@ export class TripPlanGenerationService {
         latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
       )?.startDate;
       plan = sanitizePlanForPersist(plan, tripStartDate);
+      // 可观测性：PlanAgent 操作摘要（首版全量 ADD），不写完整 LLM 输出
+      const operations = summarizePlanOperations(diffTripPlans(null, plan));
+      console.info(
+        `PlanAgent: operations=[${operations.types.join(',') || 'none'}] count=${operations.count}（首版 v${plan.version}）`,
+      );
       // 完整 snapshot 与 UI 提示同一次原子写入
       await this.trips.update({
         ...latest,
@@ -306,6 +345,10 @@ export class TripPlanGenerationService {
       usable: evaluation.usable,
       updateRequired: evaluation.updateRequired,
       reason: evaluation.reason,
+      // JudgeAgent 只负责放行；shouldForward/judgeStatus/intentDomain 供 PlanAgent 理解最小解析状态
+      shouldForward: evaluation.shouldForward,
+      judgeStatus: evaluation.judgeStatus,
+      intentDomain: evaluation.intentDomain,
     };
 
     let base: Trip = trip;
@@ -379,6 +422,11 @@ export class TripPlanGenerationService {
         latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
       )?.startDate;
       plan = sanitizePlanForPersist(plan, tripStartDate);
+      // 可观测性：PlanAgent 操作摘要（ADD/UPDATE/DELETE/MOVE），不写完整 LLM 输出
+      const operations = summarizePlanOperations(diffTripPlans(basePlan, plan));
+      console.info(
+        `PlanAgent: operations=[${operations.types.join(',') || 'none'}] count=${operations.count}（base v${baseVersion} → v${plan.version}）`,
+      );
       await this.trips.update({
         ...latest,
         currentPlan: plan,

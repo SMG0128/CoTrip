@@ -311,14 +311,27 @@ function validateCurrentPlan(value, path) {
 
 function validateCommentEvaluationProjection(value, path) {
   if (!isRecord(value)) return invalid(path, 'COMMENT_EVALUATION_OBJECT_REQUIRED');
-  const keys = ['commentIntent', 'relevant', 'usable', 'updateRequired', 'reason'];
-  const shape = validateExactKeys(value, keys, keys, path);
+  // JudgeAgent 放行语义（可选，向后兼容）：
+  //   shouldForward —— 是否值得交给 PlanAgent
+  //   judgeStatus   —— actionable / irrelevant / insufficient / unsupported
+  //   intentDomain  —— trip / non_trip / unknown
+  const keys = ['commentIntent', 'relevant', 'usable', 'updateRequired', 'reason', 'shouldForward', 'judgeStatus', 'intentDomain'];
+  const required = ['commentIntent', 'relevant', 'usable', 'updateRequired', 'reason'];
+  const shape = validateExactKeys(value, keys, required, path);
   if (!shape.ok) return shape;
   if (!isNonEmptyString(value.commentIntent, 120)) return invalid(`${path}.commentIntent`, 'COMMENT_INTENT_INVALID');
   for (const key of ['relevant', 'usable', 'updateRequired']) {
     if (typeof value[key] !== 'boolean') return invalid(`${path}.${key}`, 'DECISION_FLAG_NOT_BOOLEAN');
   }
   if (!isNonEmptyString(value.reason, 300)) return invalid(`${path}.reason`, 'DECISION_REASON_INVALID');
+  if (value.shouldForward !== undefined && typeof value.shouldForward !== 'boolean') {
+    return invalid(`${path}.shouldForward`, 'JUDGE_SHOULD_FORWARD_NOT_BOOLEAN');
+  }
+  for (const key of ['judgeStatus', 'intentDomain']) {
+    if (value[key] !== undefined && !isNonEmptyString(value[key], 40)) {
+      return invalid(`${path}.${key}`, 'JUDGE_SEMANTIC_STRING_INVALID');
+    }
+  }
   return valid();
 }
 

@@ -15,10 +15,15 @@ import { AIEnvelopeBase, AIMeta, AIUIConfig } from './ai-envelope';
 import { CommentEvaluationCommentInput } from './ai-comment-evaluation';
 import { AITripSnapshot } from './ai-initial-generation';
 import { TripPlan } from './trip-plan';
+import { JudgeIntentDomain, JudgeStatus } from './comment-judge';
 
 /**
  * 送入更新模型的评论判断结果（受控结构化投影）。
  * 只带对更新有帮助的字段，绝不带作者身份、原始 AI 响应或 prompt。
+ *
+ * JudgeAgent 只负责「是否放行」，不做计划推理；
+ * 因此 PlanAgent 收到的 shouldForward / judgeStatus / intentDomain
+ * 仅用于理解放行语义与最小解析状态，真正的计划修改由 PlanAgent 自己完成。
  */
 export interface TripUpdateCommentEvaluationInput {
   commentIntent: string;
@@ -26,6 +31,12 @@ export interface TripUpdateCommentEvaluationInput {
   usable: boolean;
   updateRequired: boolean;
   reason: string;
+  /** JudgeAgent 放行语义（final） */
+  shouldForward: boolean;
+  /** JudgeAgent 状态（final） */
+  judgeStatus: JudgeStatus;
+  /** 意图域（final） */
+  intentDomain: JudgeIntentDomain;
 }
 
 /**

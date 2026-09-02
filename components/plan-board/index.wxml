@@ -9,14 +9,22 @@
 
   <view class="events">
     <block wx:for="{{eventRows}}" wx:key="id">
-      <view wx:if="{{item.dateHeader}}" class="date-header">{{item.dateHeader}}</view>
+      <view wx:if="{{item.kind === 'event' && item.dateHeader}}" class="date-header">{{item.dateHeader}}</view>
       <plan-event
+        wx:if="{{item.kind === 'event'}}"
         event="{{item.event}}"
         candidates="{{item.candidates}}"
-        isLast="{{index === eventRows.length - 1}}"
+        isLast="{{item.isLast}}"
         bind:place="onEventTap"
         bind:candidate="onCandidateTap"
       />
+      <!-- 低一级路线辅助节点：位于两个活动之间，只显示文字，不遮挡时间轴竖线 -->
+      <view wx:elif="{{item.kind === 'route'}}" class="route-node">
+        <view class="route-rail">
+          <view class="route-rail-line"></view>
+        </view>
+        <text class="route-text">{{item.routeText}}</text>
+      </view>
     </block>
   </view>
 

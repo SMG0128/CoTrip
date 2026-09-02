@@ -149,20 +149,6 @@
   font-size: 20rpx;
 }
 
-.route-line {
-  margin: 8rpx 0 4rpx;
-  color: #8a96aa;
-  font-size: 20rpx;
-}
-
-.route-label {
-  display: inline-flex;
-  align-items: center;
-  padding: 4rpx 10rpx;
-  background: #eef2f8;
-  border-radius: 12rpx;
-}
-
 .candidate-tray {
   margin: 8rpx 0 4rpx;
   overflow: hidden;

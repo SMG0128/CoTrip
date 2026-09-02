@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 276/276、前端全量测试模块全绿）：
+当前已实际实现并通过测试的能力（后端 318/318、前端全量测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -30,12 +30,16 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Tencent Location Service adapter** —— 已实现并启用 POI Search、Reverse Geocoder 与 Direction（walking / transit）适配器；真实行程在「我的推荐」面板选定出发地点后调用腾讯路线 API。
 - **Real route automatic selection** —— 用户未指定交通方式时同时比较腾讯 walking / transit 的真实 `durationMinutes`，确定性选择更短路线（同值 walking 优先），不再采用 first-found transit；显式 walking / transit / driving 时只尊重用户指定方式。
 - **Real POI trip presentation** —— 行程时间线按活动 local date 分组显示日期头；任意活动提取出的物理地点短语统一经腾讯 POI 解析，任意菜系/餐饮关键词统一走腾讯 nearby，anchor 使用前置活动真实坐标。resolved POI 尽最大可能获取真实地址：优先使用 Search 地址，缺失时以同一 Tencent Provider 的 reverse geocode 补全；腾讯仍无法提供时保持 `undefined`、前端隐藏地址行，绝不伪造。
+- **Dining explicit location anchor** —— 餐饮标题自带显式地点时（「北京路吃饭」→「北京路」），餐厅 nearby 搜索以该目的地为圆心；无明确地点的泛化表达（「找一家餐厅吃饭」「附近粤菜」）继续使用前置活动坐标 fallback。
+- **AI Trip Pipeline V2（JudgeAgent / PlanAgent 职责拆分）** —— JudgeAgent 只回答「是否值得交给 PlanAgent」（`shouldForward` + 分类状态），行程增删改查/顺序推理全部归 PlanAgent；复杂复合中文指令（多动作 / 省略主语 / 依赖行程上下文）确定性放行，不再误判「未解析」。
+- **PlanAgent CRUD / MOVE / compound 指令** —— TRIP_UPDATE prompt 明确 CREATE / READ / UPDATE / DELETE / MOVE / REORDER 职责与中文顺序词理解；纯查询评论不改计划、仅在 UI 消息回答。
+- **Timeline route interleave** —— 路线段渲染为相邻两个活动之间的低一级文本节点（activity[i] → route[i] → activity[i+1]），不再附着在目的地下方。
 - **No runtime mock restaurant injection** —— 真实行程候选只来自服务端计划中的已验证实体（腾讯 POI / nearby），生产链路不再引用 `realRestaurants`/`realRestaurantCailan`；`place-detail` 由上游直传实体，mock 表仅保留示例行程 fixture 回查。
 - **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
 - **Immersive Home experience** —— 首页使用广州图片循环横幅、自定义全面屏安全区与底部渐隐；共享玻璃材质覆盖导航、头像、评论和状态组件，主操作保留独立材质控制。
 - **Clipboard-assisted room join** —— 首页聚焦房间号输入时可从剪贴板识别并归一化房间号，仍由用户明确确认加入。
 
-尚未实现：实时同步 / WebSocket、评论与计划的后端持久化。
+尚未实现：实时同步 / WebSocket、计划变更的生产部署与真机双账号 E2E。
 
 ## Route Recommendations
 
@@ -84,7 +88,35 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - 地图预览（Map Preview）尚未实现。
 - 本阶段未使用后端代理转发腾讯地图请求（客户端受限 Key 直连）。
 
-## V0.4 AI Trip Temporal & POI Resolution（本轮交付）
+## V0.5 AI Trip Pipeline & Dining Anchor（本轮交付）
+
+本轮把 AI 行程管线职责拆分清晰，并修正餐饮目的地锚点与时间线路线层级，全部通过验证：
+
+### AI Trip Pipeline
+
+- **JudgeAgent narrowed to forwarding/classification** —— Judge 只回答「这条评论是否值得交给 PlanAgent」，输出 `shouldForward` / `judgeStatus` / `intentDomain`；不做任何计划推理。
+- **PlanAgent owns itinerary CRUD/reorder reasoning** —— 新增 / 删除 / 修改 / 移动 / 排序 / 时长 / 时间 / 地点全部归 PlanAgent（TRIP_UPDATE / INITIAL_GENERATION）。
+- **compound Chinese trip instructions are forwarded correctly** —— 「看两个小时书再去省博看一个小时再走」「参观完省博我想先去广图借个书」等多动作连续表达进入 PlanAgent，不再显示「未解析」。
+- **contextual / omitted-subject instructions supported** —— 省略主语、依赖当前行程上下文的表达由确定性信号兜底放行；兜底只放宽、不反向收紧。
+- **shouldForward becomes the primary PlanAgent gate** —— COMMENT_EVALUATION 主闸门从 `relevant && usable` 收紧为 `shouldForward`；`updateRequired` 仍是计划修改的最终开关，但复杂明确改行程表达由信号兜底放行。
+
+### Dining POI
+
+- **explicit destination anchors now take precedence** —— 餐饮标题自带显式目的地（「北京路吃饭」→「北京路」）时，餐厅 nearby 搜索以该 POI 为圆心，不再回退上一活动坐标。
+- **「北京路吃饭」searches around 北京路** —— 真实腾讯 E2E：搜索中心 = 北京路步行街坐标（距所选餐厅 153m），上一活动（越秀公园）未被用作中心。
+- **generic nearby dining requests continue fallback** —— 「找一家餐厅吃饭」「附近粤菜」等无明确地点表达仍使用上一活动坐标附近搜索。
+
+### Timeline Route UI
+
+- **route rendered between adjacent activities** —— 路线段严格交错在 `activity[i] → route[i] → activity[i+1]`。
+- **route is a lower-level text node** —— 不再附着在目的地卡片下方；首项活动上方、末项活动下方绝不出现路线，缺失段不伪造占位。
+
+### 测试覆盖
+
+- 后端：318/318 通过（新增 JudgeAgent 放行/拒绝/兜底、PlanAgent ADD/UPDATE/DELETE/MOVE/复合指令、餐饮 anchor 与 fallback 全链路测试）。
+- 前端：全部核心逻辑测试通过（新增 timeline-rows 严格交错测试）。
+
+## V0.4 AI Trip Temporal & POI Resolution（上一轮交付）
 
 本轮加固了 AI 行程生成的时间 / 地点 / 时长确定性，并接入腾讯真实 POI，全部通过验证：
 

@@ -120,6 +120,22 @@ export async function runGenericPoiFoodTests(): Promise<void> {
     assert.strictEqual(extractPlaceQuery('咖啡'), undefined);
   });
 
+  await record('B. 「北京路吃饭」→ placeQuery「北京路」（地点+吃 前缀，不丢 anchor）', () => {
+    assert.strictEqual(extractPlaceQuery('北京路吃饭'), '北京路');
+  });
+
+  await record('B. 「去天河城吃饭」→ placeQuery「天河城」（通用，非 hardcode 北京路）', () => {
+    assert.strictEqual(extractPlaceQuery('去天河城吃饭'), '天河城');
+  });
+
+  await record('B. 「越秀公园附近吃饭」→ placeQuery「越秀公园」（剥离方位后缀）', () => {
+    assert.strictEqual(extractPlaceQuery('越秀公园附近吃饭'), '越秀公园');
+  });
+
+  await record('B. 「去完广图吃泰国菜」→ placeQuery「广图」（既有模式不受影响）', () => {
+    assert.strictEqual(extractPlaceQuery('去完广图吃泰国菜'), '广图');
+  });
+
   await record('B. 交通标题不做 POI 解析（前往越秀）', () => {
     assert.strictEqual(extractPlaceQuery('前往越秀'), undefined);
   });
@@ -362,4 +378,94 @@ export async function runGenericPoiFoodTests(): Promise<void> {
     assert.strictEqual(resolved[2].sequenceConstraint?.locationConstraint, 'near_previous_activity');
     assert.strictEqual(resolved[1].sequenceConstraint, undefined, '省博自身无先后关系');
   });
+
+  // ---------- 明确地点锚点 → 餐厅 nearby 搜索中心（本次修复核心） ----------
+  await record('ANCHOR A. 「去北京路吃饭」→ 搜索中心来自北京路坐标，不是越秀公园', async () => {
+    const lbs = stubLBS({
+      poiByQuery: {
+        北京路: { status: 'FOUND', candidates: [tencentCandidate('北京路步行街', undefined, '广东省广州市越秀区北京路')] },
+      },
+      nearby: { status: 'FOUND', candidates: [tencentCandidate('北京路附近餐厅', 200)] },
+      nearbyKeyword: ['餐厅'],
+    });
+    const result = await postProcessTripPlan(
+      {
+        plan: makePlan([
+          makeEvent({ id: 'event_1', type: 'DINING', title: '去北京路吃饭', time: { start: '2026-09-10T13:00:00+08:00', timezone: TZ } }),
+        ]),
+        timeRange: DEFAULT_TIME_RANGE,
+        city: '广州市',
+        commentText: '去北京路吃饭',
+      },
+      lbs,
+    );
+    // 必须先解析北京路坐标，再以其为 nearby 中心
+    assert.ok(lbs.poiQueries.includes('北京路'), '必须先用 searchPOI 解析北京路');
+    assert.strictEqual(lbs.nearbyQueries.length, 1);
+    assert.strictEqual(lbs.nearbyQueries[0].lat, 23.13, 'nearby 中心必须是北京路坐标');
+    assert.strictEqual(lbs.nearbyQueries[0].lng, 113.32, 'nearby 中心必须是北京路坐标');
+    assert.strictEqual(result.plan.events[0].restaurant?.name, '北京路附近餐厅');
+  });
+
+  await record('A. 「北京路吃饭」在越秀公园之后 → 搜索中心仍是北京路，不继承越秀公园', async () => {
+    const lbs = stubLBS({
+      poiByQuery: {
+        北京路: { status: 'FOUND', candidates: [placeAt('北京路步行街', 23.12, 113.28)] },
+      },
+      nearby: { status: 'FOUND', candidates: [placeAt('北京路附近餐厅', 23.12, 113.28)] },
+      nearbyKeyword: ['餐厅'],
+    });
+    const result = await postProcessTripPlan(
+      {
+        plan: makePlan([
+          makeEvent({ id: 'event_1', type: 'OTHER', title: '广州图书馆看书', time: { start: '2026-09-10T10:00:00+08:00', timezone: TZ } }),
+          makeEvent({ id: 'event_2', type: 'OTHER', title: '越秀公园', time: { start: '2026-09-10T14:00:00+08:00', timezone: TZ } }),
+          makeEvent({ id: 'event_3', type: 'DINING', title: '去北京路吃饭', time: { start: '2026-09-10T18:00:00+08:00', timezone: TZ } }),
+        ]),
+        timeRange: DEFAULT_TIME_RANGE,
+        city: '广州市',
+        commentText: '去北京路吃饭',
+      },
+      lbs,
+    );
+    // 越秀公园未解析出坐标（stub 未提供），但北京路必须被解析并作为 nearby 中心
+    assert.ok(lbs.poiQueries.includes('北京路'), '必须解析北京路');
+    assert.strictEqual(lbs.nearbyQueries[0].lat, 23.12, 'nearby 中心必须是北京路坐标，不是越秀公园');
+    assert.strictEqual(lbs.nearbyQueries[0].lng, 113.28);
+    assert.strictEqual(result.plan.events[2].restaurant?.name, '北京路附近餐厅');
+  });
+
+  await record('C. 无明确地点「找一家餐厅吃饭」→ 允许回退上一活动附近', async () => {
+    const lbs = stubLBS({
+      poiByQuery: {
+        越秀公园: { status: 'FOUND', candidates: [placeAt('越秀公园', 23.14, 113.26)] },
+      },
+      nearby: { status: 'FOUND', candidates: [placeAt('越秀公园附近餐厅', 23.14, 113.26)] },
+    });
+    const result = await postProcessTripPlan(
+      {
+        plan: makePlan([
+          makeEvent({ id: 'event_1', type: 'OTHER', title: '越秀公园', time: { start: '2026-09-10T14:00:00+08:00', timezone: TZ } }),
+          makeEvent({ id: 'event_2', type: 'DINING', title: '找一家餐厅吃饭', time: { start: '2026-09-10T18:00:00+08:00', timezone: TZ } }),
+        ]),
+        timeRange: DEFAULT_TIME_RANGE,
+        city: '广州市',
+        commentText: '找一家餐厅吃饭',
+      },
+      lbs,
+    );
+    // 无明确地点 → 允许回退上一活动（越秀公园）作为 nearby 中心
+    assert.strictEqual(lbs.nearbyQueries[0].lat, 23.14, '无明确地点时回退上一活动坐标');
+    assert.strictEqual(lbs.nearbyQueries[0].lng, 113.26);
+    assert.strictEqual(result.plan.events[1].restaurant?.name, '越秀公园附近餐厅');
+  });
+
+  await record('D. 「去天河城吃饭」→ anchor 为天河城（非 hardcode 北京路）', () => {
+    assert.strictEqual(extractPlaceQuery('去天河城吃饭'), '天河城');
+  });
+}
+
+/** 构造带指定坐标的候选 */
+function placeAt(name: string, latitude: number, longitude: number): PlaceCandidate {
+  return { provider: 'tencent', providerPoiId: `poi_${name}`, name, latitude, longitude };
 }

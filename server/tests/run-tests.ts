@@ -23,6 +23,8 @@ import { runTencentLocationAddressTests } from './tencent-location-address.test'
 import { runMealResolutionTests } from './trip-meal-resolution.test';
 import { runRouteDurationTests } from './trip-route-duration.test';
 import { runIntentCoverageTests } from './trip-intent-coverage.test';
+import { runCommentJudgeTests } from './comment-judge.test';
+import { runTripPlanAgentTests } from './trip-plan-agent.test';
 
 interface TestResult {
   name: string;
@@ -66,6 +68,8 @@ async function main(): Promise<void> {
   await runMealResolutionTests();
   await runRouteDurationTests();
   await runIntentCoverageTests();
+  await runCommentJudgeTests();
+  await runTripPlanAgentTests();
 
   let failed = 0;
   for (const r of results) {

@@ -7,6 +7,7 @@
 
 import { AIRequestType, TripAIContext, TripPreprocessTripInput } from './ai-preprocess';
 import { AIEnvelopeBase, AIMeta, AIUIConfig } from './ai-envelope';
+import { JudgeIntentDomain, JudgeStatus, TripSignals } from './comment-judge';
 
 /** 送入 AI 的评论视图：只带判断所需内容，不带作者身份（隐私最小化） */
 export interface CommentEvaluationCommentInput {
@@ -82,6 +83,14 @@ export type CommentEvaluationRecord =
       usable: boolean;
       updateRequired: boolean;
       reason: string;
+      /** JudgeAgent 放行语义（final）：true = 值得交给 PlanAgent（LLM 判定 + 确定性信号兜底） */
+      shouldForward: boolean;
+      /** JudgeAgent 状态（final）：actionable / irrelevant / insufficient / unsupported */
+      judgeStatus: JudgeStatus;
+      /** 意图域（final）：trip / non_trip / unknown */
+      intentDomain: JudgeIntentDomain;
+      /** 确定性抽取的最小行程信号（可观测性；不是 PlanAgent 的输入） */
+      signals: TripSignals;
     }
   | {
       status: 'unavailable';

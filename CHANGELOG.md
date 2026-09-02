@@ -6,6 +6,13 @@
 ## [Unreleased]
 
 ### Added
+- JudgeAgent / PlanAgent 职责拆分：JudgeAgent 只负责是否放行（`shouldForward` / `judgeStatus` / `intentDomain` / 最小行程信号），PlanAgent（TRIP_UPDATE / INITIAL_GENERATION）负责真正的行程增删改查与顺序推理
+- JudgeAgent 确定性兜底：`deriveJudgeResult` 只在确定性信号充分时放宽 `shouldForward`，绝不反向收紧；复杂但有效的行程表达（多动作 / 省略主语 / 依赖行程上下文）不再被误判为「未解析」
+- 复合中文行程指令放行：连续顺序表达（如「看两个小时书再去省博看一个小时再走」「参观完省博我想先去广图借个书」）进入 PlanAgent 而非显示未解析
+- PlanAgent CRUD / MOVE / 复合指令支持：COMMENT_EVALUATION 与 TRIP_UPDATE prompt 明确 PlanAgent 增删改查、顺序词理解与省略表达结合 currentPlan 更新
+- PlanAgent 操作可观测性（`diffTripPlans` / `summarizePlanOperations`）：计划更新日志收敛为 ADD/UPDATE/DELETE/MOVE 摘要，不写完整 LLM 输出
+- 时间线路线交错渲染（`utils/timeline-rows.ts`）：route 段严格显示在相邻两个活动之间（activity[i] → route[i] → activity[i+1]），为低一级文本节点，不再挂在目的地下方
+- 餐饮地点锚点通用解析：餐饮标题提取「地点 + 吃/饭/菜」前缀（「北京路吃饭」→「北京路」），显式目的地锚点优先于上一活动坐标
 - 行程时间线日期分组展示：按活动 local date（+08:00）生成日期头（如「9月10日 · 周四」），同一天仅首次显示、跨天生成新日期头，日期由活动 ISO 时间推导而非系统当前日期
 - 通用地点短语提取（`extractPlaceQuery`）：「广州图书馆看书 / 参观省博物馆 / 去广州塔 / 在天河体育中心打羽毛球」等统一剥离动作词得到地点短语，结合 trip city 走腾讯 POI 解析为真实地点并渲染地址
 - 通用餐饮关键词提取（`extractFoodKeyword`）：越南菜 / 泰国菜 / 粤菜 / 火锅 / 咖啡 / 甜品等统一走腾讯 nearby，无菜系 special-case 分支；「吃饭 / 附近吃饭 / 找个餐厅」→「餐厅」
@@ -15,6 +22,8 @@
 - Tencent 地址补全：POI Search / nearby 未返回 address 但有合法坐标时，复用同一 Provider 的 Reverse Geocoder；腾讯仍无法提供时保持 `undefined`，绝不伪造
 
 ### Changed
+- COMMENT_EVALUATION 主闸门从 `relevant && usable` 收紧为 `shouldForward`；`updateRequired` 仍为计划修改的最终开关，但复杂明确改行程表达由确定性信号兜底放行（兜底只放行、不收紧）
+- 路线文案渲染位置迁移：从 `plan-event`（目的地卡片下方）上移到 `plan-board` 时间轴活动之间，`formatRouteMode` / `routeText` 随行结构迁移
 - 移除真实行程 production runtime 中的本地 mock 餐厅注入：`pages/trip-detail` 真实行程分支不再以 `realRestaurants` 排序生成候选，候选只来自服务端计划中的已验证实体；`place-detail` 支持上游直传实体数据跳转，mock 表仅保留 id 回查 fallback（示例行程 fixture）
 - `place-detail` 的「AI 推荐理由」不再注入伪造文案：无真实理由时不显示该卡片
 - 餐厅可选字段 truth-preserving：腾讯未返回 rating / avgPrice 时保持 `undefined`，前端按缺省隐藏，绝不补齐伪造事实
@@ -22,6 +31,7 @@
 
 ### Fixed
 - 修复真实行程默认路线按首个 `FOUND` 偏向 transit：未指定 mode 时比较腾讯 walking / transit 的真实时长并确定性选择最短路线（同值 walking 优先）；显式 walking / transit / driving 仍只尊重用户指定方式
+- 修复复杂复合行程表达被误判「未解析」：LLM 保守判为 relevant=false/usable=false/updateRequired=false 时，确定性信号兜底仍放行进入 PlanAgent
 - 修复「广州图书馆看书」等非「去X」句型活动无法解析 POI 的问题（原提取器仅匹配「去」前缀）
 - 修复 `isMealTitle` 漏判「咖啡 / 火锅 / 甜品」等纯菜系标题导致误当地点解析的问题
 

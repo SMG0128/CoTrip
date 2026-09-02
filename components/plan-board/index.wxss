@@ -63,6 +63,38 @@
   letter-spacing: 1rpx;
 }
 
+/* 交通路线段：低一级辅助节点，位于两个活动之间。
+   只显示文字，无图标、无卡片、无背景块、无与 Activity 同级的大圆点；
+   文本靠近时间轴（活动竖线同一列右侧），不遮挡竖线。 */
+.route-node {
+  display: grid;
+  grid-template-columns: 28rpx minmax(0, 1fr);
+  gap: 16rpx;
+  padding: 4rpx 0;
+}
+
+.route-rail {
+  position: relative;
+}
+
+.route-rail-line {
+  position: absolute;
+  top: 0;
+  bottom: -30rpx;
+  left: 50%;
+  width: 3rpx;
+  background: #dce7fa;
+  transform: translateX(-50%);
+}
+
+.route-text {
+  display: block;
+  color: #a8b3c7;
+  font-size: 20rpx;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
 .budget-summary {
   display: flex;
   align-items: center;
@@ -141,4 +173,8 @@
     padding: 0 10rpx;
   }
 
+  .route-node {
+    grid-template-columns: 24rpx minmax(0, 1fr);
+    gap: 12rpx;
+  }
 }

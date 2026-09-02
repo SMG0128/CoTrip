@@ -14,6 +14,7 @@ import './comment-composer.test';
 import './comment-author.test';
 import './candidate-ranker.test';
 import './event-date-grouping.test';
+import './timeline-rows.test';
 import './event-candidates.test';
 import './location-display.test';
 import './tencent-map-adapter.test';

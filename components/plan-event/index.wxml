@@ -37,10 +37,6 @@
       </view>
     </view>
 
-    <view wx:if="{{routeText}}" class="route-line">
-      <text class="route-label">{{routeText}}</text>
-    </view>
-
     <view wx:if="{{alternatives.length}}" class="candidate-tray">
       <view class="candidate-toggle" catch:tap="onToggleCandidates">
         <text>{{expanded ? '收起备选' : '查看 ' + alternatives.length + ' 个备选'}}</text>

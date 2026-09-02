@@ -14,6 +14,7 @@ import {
 } from '../types/ai-comment-evaluation';
 import { AIEnvelopeValidationResult } from '../types/ai-envelope';
 import { validateAIUIConfig } from './ai-ui-config-validation';
+import { deriveJudgeResult } from './comment-judge';
 
 export type CommentEvaluationValidationResult = AIEnvelopeValidationResult;
 
@@ -91,11 +92,24 @@ export function validateCommentEvaluationEnvelope(
 /**
  * 验证通过后构造可持久化的评估记录。
  * 字符串一律截断（有界存储）；绝不写入 AI 原始响应或内部 prompt。
+ *
+ * rawText 用于计算 JudgeAgent 的确定性信号与放行语义：
+ *   - shouldForward / judgeStatus / intentDomain：LLM 判定 + 确定性信号兜底后的最终语义
+ *   - signals：确定性抽取的最小行程信号（可观测性，不是 PlanAgent 的输入）
  */
 export function buildCommentEvaluationRecord(
   envelope: AICommentEvaluationEnvelope,
   evaluatedAt: string,
-): CommentEvaluationRecord {
+  rawText: string,
+): Extract<CommentEvaluationRecord, { status: 'evaluated' }> {
+  const judge = deriveJudgeResult(
+    {
+      relevant: envelope.decision.relevant,
+      usable: envelope.decision.usable,
+      updateRequired: envelope.decision.updateRequired,
+    },
+    rawText,
+  );
   return {
     status: 'evaluated',
     schemaVersion: envelope.schemaVersion,
@@ -106,5 +120,9 @@ export function buildCommentEvaluationRecord(
     usable: envelope.decision.usable,
     updateRequired: envelope.decision.updateRequired,
     reason: envelope.decision.reason.slice(0, COMMENT_EVALUATION_REASON_MAX_LENGTH),
+    shouldForward: judge.shouldForward,
+    judgeStatus: judge.status,
+    intentDomain: judge.intentDomain,
+    signals: judge.signals,
   };
 }
