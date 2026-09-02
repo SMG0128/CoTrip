@@ -83,14 +83,21 @@ function stubLBS(options: {
   return service;
 }
 
-/** 可编程 direction stub：记录 from/to/mode，返回预置结果 */
+interface DirectionCall {
+  from: { latitude: number; longitude: number };
+  to: { latitude: number; longitude: number };
+  mode: TencentDirectionMode;
+}
+
+type StubDirectionService = TencentDirectionService & { calls: DirectionCall[] };
+
+/** 可编程 direction stub：记录 from/to/mode，按 mode 返回预置结果 */
 function stubDirections(options: {
   outcome?: DirectionOutcome;
+  outcomeByMode?: Partial<Record<TencentDirectionMode, DirectionOutcome | 'THROW'>>;
   throwOn?: boolean;
-}): TencentDirectionService & { calls: { from: { latitude: number; longitude: number }; to: { latitude: number; longitude: number }; mode: TencentDirectionMode }[] } {
-  const service = new TencentDirectionService({ key: 'test-key' }) as TencentDirectionService & {
-    calls: { from: { latitude: number; longitude: number }; to: { latitude: number; longitude: number }; mode: TencentDirectionMode }[];
-  };
+}): StubDirectionService {
+  const service = new TencentDirectionService({ key: 'test-key' }) as StubDirectionService;
   service.calls = [];
   (service as unknown as { getDirection: (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }, mode: TencentDirectionMode) => Promise<DirectionOutcome> }).getDirection = async (
     from,
@@ -99,6 +106,9 @@ function stubDirections(options: {
   ) => {
     service.calls.push({ from, to, mode });
     if (options.throwOn) throw new Error('direction provider down');
+    const modeOutcome = options.outcomeByMode?.[mode];
+    if (modeOutcome === 'THROW') throw new Error(`${mode} provider down`);
+    if (modeOutcome) return modeOutcome;
     return options.outcome ?? { status: 'DIRECTION_UNAVAILABLE' };
   };
   return service;
@@ -118,6 +128,45 @@ const LIBRARY_POIS: {
     越秀公园: { status: 'FOUND', candidates: [YUEXIU_PARK] },
   },
 };
+
+async function runRouteSelection(options: {
+  outcomeByMode: Partial<Record<TencentDirectionMode, DirectionOutcome | 'THROW'>>;
+  routeMode?: string;
+}): Promise<{ event: TripPlanEvent; directions: StubDirectionService }> {
+  const lbs = stubLBS(LIBRARY_POIS);
+  const directions = stubDirections({ outcomeByMode: options.outcomeByMode });
+  const result = await postProcessTripPlan(
+    {
+      plan: makePlan([
+        makeEvent({ id: 'event_1', title: '广州图书馆看书', time: { start: '2026-09-10T10:00:00+08:00', timezone: TZ } }),
+        makeEvent({ id: 'event_2', type: 'OTHER', title: '参观省博物馆', time: { start: '2026-09-10T11:00:00+08:00', timezone: TZ } }),
+      ]),
+      timeRange: DEFAULT_TIME_RANGE,
+      city: '广州市',
+      commentText: '10点到广州图书馆看书1小时，然后去省博物馆参观。',
+      ...(options.routeMode ? { routeMode: options.routeMode } : {}),
+    },
+    lbs,
+    directions,
+  );
+  return { event: result.plan.events[1], directions };
+}
+
+function foundRoute(
+  mode: TencentDirectionMode,
+  durationMinutes: number,
+  distanceMeters?: number,
+): DirectionOutcome {
+  return {
+    status: 'FOUND',
+    route: {
+      durationMinutes,
+      ...(distanceMeters !== undefined ? { distanceMeters } : {}),
+      mode,
+      provider: 'tencent',
+    },
+  };
+}
 
 export async function runRouteDurationTests(): Promise<void> {
   // ---------- Q. 真实 route duration 参与排程 ----------
@@ -149,7 +198,8 @@ export async function runRouteDurationTests(): Promise<void> {
     assert.strictEqual(museum.route?.durationMinutes, 12);
     assert.strictEqual(museum.route?.fromEventId, 'event_1');
     assert.strictEqual(museum.route?.provider, 'tencent');
-    assert.strictEqual(directions.calls.length, 1);
+    assert.strictEqual(museum.route?.mode, 'walking', '同 duration 时必须确定性优先 walking');
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
   });
 
   // ---------- L. 用户硬约束晚于 earliest → 尊重用户时间 ----------
@@ -272,68 +322,102 @@ export async function runRouteDurationTests(): Promise<void> {
     assert.ok(meal.restaurant, '餐厅必须解析成功');
     assert.ok(meal.route, '餐厅活动必须参与路线');
     assert.strictEqual(meal.route?.fromEventId, 'event_1');
-    assert.strictEqual(directions.calls.length, 1);
+    assert.strictEqual(directions.calls.length, 2);
     // route 终点是餐厅真实坐标（23.1105/113.301），不是公园坐标（23.13/113.32）
-    assert.strictEqual(directions.calls[0].to.latitude, 23.1105, '路线终点必须是餐厅坐标');
-    assert.strictEqual(directions.calls[0].to.longitude, 113.301);
-    assert.strictEqual(directions.calls[0].from.latitude, 23.13, '路线起点是公园坐标');
+    for (const call of directions.calls) {
+      assert.strictEqual(call.to.latitude, 23.1105, '路线终点必须是餐厅坐标');
+      assert.strictEqual(call.to.longitude, 113.301);
+      assert.strictEqual(call.from.latitude, 23.13, '路线起点是公园坐标');
+    }
     // 18:00 远晚于 park.end + 8min → 保持 18:00
     assert.strictEqual(meal.time?.start, '2026-09-10T18:00:00+08:00');
   });
 
-  // ---------- I. 用户明确指定交通偏好 ----------
-  await record('I. routeMode=步行 → 使用 walking，不用默认 transit', async () => {
-    const lbs = stubLBS(LIBRARY_POIS);
-    const directions = stubDirections({
-      outcome: { status: 'FOUND', route: { durationMinutes: 12, mode: 'walking', provider: 'tencent' } },
-    });
-    const result = await postProcessTripPlan(
-      {
-        plan: makePlan([
-          makeEvent({ id: 'event_1', title: '广州图书馆看书', time: { start: '2026-09-10T10:00:00+08:00', timezone: TZ } }),
-          makeEvent({ id: 'event_2', type: 'OTHER', title: '参观省博物馆', time: { start: '2026-09-10T11:00:00+08:00', timezone: TZ } }),
-        ]),
-        timeRange: DEFAULT_TIME_RANGE,
-        city: '广州市',
-        commentText: '10点到广州图书馆看书1小时，然后走路去省博物馆参观。',
-        routeMode: '步行',
+  // ---------- AUTO. 未指定 mode：比较所有真实候选 ----------
+  await record('AUTO CASE 1. walking=5 / transit=60 → 选择 walking 5', async () => {
+    const { event, directions } = await runRouteSelection({
+      outcomeByMode: {
+        walking: foundRoute('walking', 5, 450),
+        transit: foundRoute('transit', 60, 3100),
       },
-      lbs,
-      directions,
-    );
-    assert.strictEqual(directions.calls[0].mode, 'walking', '必须尊重用户指定「步行」');
-    assert.strictEqual(result.plan.events[1].route?.mode, 'walking');
+    });
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.strictEqual(event.route?.mode, 'walking');
+    assert.strictEqual(event.route?.durationMinutes, 5);
+    assert.strictEqual(event.time?.start, '2026-09-10T11:05:00+08:00');
   });
 
-  // ---------- G. 默认 mode：transit 优先，失败后 walking 兜底 ----------
-  await record('G. 未指定 mode → transit 优先，transit 不可用时 walking 兜底', async () => {
-    const lbs = stubLBS(LIBRARY_POIS);
-    const directions = stubDirections({
-      outcome: { status: 'FOUND', route: { durationMinutes: 20, mode: 'walking', provider: 'tencent' } },
-    });
-    // 第一次（transit）返回不可用，第二次（walking）返回 FOUND
-    let call = 0;
-    (directions as unknown as { getDirection: (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }, mode: TencentDirectionMode) => Promise<DirectionOutcome> }).getDirection = async (from, to, mode) => {
-      directions.calls.push({ from, to, mode });
-      call += 1;
-      if (call === 1) return { status: 'DIRECTION_UNAVAILABLE' };
-      return { status: 'FOUND', route: { durationMinutes: 20, mode: 'walking', provider: 'tencent' } };
-    };
-    const result = await postProcessTripPlan(
-      {
-        plan: makePlan([
-          makeEvent({ id: 'event_1', title: '广州图书馆看书', time: { start: '2026-09-10T10:00:00+08:00', timezone: TZ } }),
-          makeEvent({ id: 'event_2', type: 'OTHER', title: '参观省博物馆', time: { start: '2026-09-10T11:00:00+08:00', timezone: TZ } }),
-        ]),
-        timeRange: DEFAULT_TIME_RANGE,
-        city: '广州市',
-        commentText: '10点到广州图书馆看书1小时，然后去省博物馆参观。',
+  await record('AUTO CASE 2. walking=55 / transit=25 → 选择 transit 25', async () => {
+    const { event, directions } = await runRouteSelection({
+      outcomeByMode: {
+        walking: foundRoute('walking', 55, 4200),
+        transit: foundRoute('transit', 25, 5100),
       },
-      lbs,
-      directions,
-    );
-    assert.deepStrictEqual(directions.calls.map((c) => c.mode), ['transit', 'walking']);
-    assert.strictEqual(result.plan.events[1].route?.mode, 'walking');
-    assert.strictEqual(result.plan.events[1].time?.start, '2026-09-10T11:20:00+08:00', '用真实 walking 20min 排程');
+    });
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.strictEqual(event.route?.mode, 'transit');
+    assert.strictEqual(event.route?.durationMinutes, 25);
+    assert.strictEqual(event.time?.start, '2026-09-10T11:25:00+08:00');
+  });
+
+  await record('AUTO CASE 3. walking=10 / transit unavailable → 选择 walking', async () => {
+    const { event } = await runRouteSelection({
+      outcomeByMode: {
+        walking: foundRoute('walking', 10, 800),
+        transit: { status: 'DIRECTION_UNAVAILABLE' },
+      },
+    });
+    assert.strictEqual(event.route?.mode, 'walking');
+    assert.strictEqual(event.route?.durationMinutes, 10);
+  });
+
+  await record('AUTO CASE 4. walking unavailable / transit=30 → 选择 transit', async () => {
+    const { event } = await runRouteSelection({
+      outcomeByMode: {
+        walking: { status: 'DIRECTION_UNAVAILABLE' },
+        transit: foundRoute('transit', 30, 6000),
+      },
+    });
+    assert.strictEqual(event.route?.mode, 'transit');
+    assert.strictEqual(event.route?.durationMinutes, 30);
+  });
+
+  await record('AUTO CASE 5. walking / transit 都 unavailable → route undefined', async () => {
+    const { event, directions } = await runRouteSelection({
+      outcomeByMode: {
+        walking: { status: 'DIRECTION_UNAVAILABLE' },
+        transit: { status: 'DIRECTION_UNAVAILABLE' },
+      },
+    });
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.strictEqual(event.route, undefined);
+    assert.strictEqual(event.time?.start, '2026-09-10T11:00:00+08:00', '两者失败时不得补 fake duration');
+  });
+
+  // ---------- I. 用户明确指定交通偏好：只请求指定 mode ----------
+  await record('EXPLICIT CASE 6. 坐地铁：walking=5 / transit=30 → 只用 transit 30', async () => {
+    const { event, directions } = await runRouteSelection({
+      routeMode: '坐地铁',
+      outcomeByMode: {
+        walking: foundRoute('walking', 5, 450),
+        transit: foundRoute('transit', 30, 3500),
+      },
+    });
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['transit']);
+    assert.strictEqual(event.route?.mode, 'transit');
+    assert.strictEqual(event.route?.durationMinutes, 30);
+  });
+
+  await record('EXPLICIT CASE 7. 步行：walking=20 / transit=8 → 只用 walking 20', async () => {
+    const { event, directions } = await runRouteSelection({
+      routeMode: '步行',
+      outcomeByMode: {
+        walking: foundRoute('walking', 20, 1600),
+        transit: foundRoute('transit', 8, 2300),
+      },
+    });
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking']);
+    assert.strictEqual(event.route?.mode, 'walking');
+    assert.strictEqual(event.route?.durationMinutes, 20);
   });
 }

@@ -22,7 +22,12 @@ import {
   normalizePlaceKeyword,
 } from './trip-sequence-resolution';
 import { PlaceCandidate, TencentLBSService } from './tencent-lbs-service';
-import { DirectionOutcome, TencentDirectionService, resolveDirectionMode } from './tencent-direction-service';
+import {
+  TencentDirectionMode,
+  TencentDirectionService,
+  TencentRouteResult,
+  resolveDirectionMode,
+} from './tencent-direction-service';
 import { rankPlaceCandidates, RankedPlaceCandidate } from './place-candidate-ranker';
 import { isResolvedPhysicalLocation } from './resolved-physical-location';
 
@@ -271,10 +276,27 @@ function eventPhysicalLocation(event: ResolvedTripEvent): { latitude: number; lo
  *
  * mode 规则（I 节）：
  *   - 用户明确指定（步行/地铁/公交/打车…）→ 尊重并只用该 mode。
- *   - 未指定 → 复用项目默认推荐逻辑：transit 优先，失败后 walking 兜底（与前端一致）。
+ *   - 未指定 → 同时获取 walking / transit 真实候选，选择 duration 最短者；平局 walking 优先。
  *
  * 失败（J 节）：route 不写入、duration 不参与排程、sequence 保留 —— 绝不伪造 travel time。
  */
+export function selectBestRealRoute(
+  candidates: readonly TencentRouteResult[],
+): TencentRouteResult | undefined {
+  const modePriority: Record<TencentDirectionMode, number> = {
+    walking: 0,
+    transit: 1,
+    driving: 2,
+  };
+  return candidates.reduce<TencentRouteResult | undefined>((best, candidate) => {
+    if (!best) return candidate;
+    if (candidate.durationMinutes !== best.durationMinutes) {
+      return candidate.durationMinutes < best.durationMinutes ? candidate : best;
+    }
+    return modePriority[candidate.mode] < modePriority[best.mode] ? candidate : best;
+  }, undefined);
+}
+
 async function applyRealRoutes(
   events: ResolvedTripEvent[],
   directions: TencentDirectionService,
@@ -288,31 +310,25 @@ async function applyRealRoutes(
     const to = eventPhysicalLocation(result[i + 1]);
     if (!from || !to) continue;
 
-    const modes: Array<'transit' | 'walking' | 'driving'> = userMode
+    const modes: TencentDirectionMode[] = userMode
       ? [userMode]
-      : ['transit', 'walking'];
+      : ['walking', 'transit'];
 
-    let route: { durationMinutes: number; distanceMeters?: number; mode: 'transit' | 'walking' | 'driving' } | undefined;
-    for (const mode of modes) {
-      // 失败（R 节）：provider 抛错 / 网络异常 / 无 route 一律视同不可用，
-      // 不写入 route、不伪造 travel duration、不中断整次后处理。
-      let outcome: DirectionOutcome;
-      try {
-        outcome = await directions.getDirection(from, to, mode);
-      } catch {
-        continue;
-      }
-      if (outcome.status === 'FOUND') {
-        route = {
-          durationMinutes: outcome.route.durationMinutes,
-          ...(outcome.route.distanceMeters !== undefined
-            ? { distanceMeters: outcome.route.distanceMeters }
-            : {}),
-          mode,
-        };
-        break;
-      }
-    }
+    // 失败（R 节）：provider 抛错 / 网络异常 / 无 route 一律不进入候选，
+    // 两种自动模式都不可用时不写 route，绝不补 mock duration。
+    const candidates = (
+      await Promise.all(
+        modes.map(async (mode): Promise<TencentRouteResult | undefined> => {
+          try {
+            const outcome = await directions.getDirection(from, to, mode);
+            return outcome.status === 'FOUND' ? { ...outcome.route, mode } : undefined;
+          } catch {
+            return undefined;
+          }
+        }),
+      )
+    ).filter((candidate): candidate is TencentRouteResult => candidate !== undefined);
+    const route = selectBestRealRoute(candidates);
     if (!route) continue;
 
     result[i + 1].route = {

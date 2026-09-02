@@ -21,6 +21,7 @@
 - 地址持久化与展示保持 truth-preserving：sanitizer 只保留已验证 Tencent location 的非空 address；活动与餐厅统一展示真实 address，缺失时隐藏地址节点且不以 district 或占位文案替代
 
 ### Fixed
+- 修复真实行程默认路线按首个 `FOUND` 偏向 transit：未指定 mode 时比较腾讯 walking / transit 的真实时长并确定性选择最短路线（同值 walking 优先）；显式 walking / transit / driving 仍只尊重用户指定方式
 - 修复「广州图书馆看书」等非「去X」句型活动无法解析 POI 的问题（原提取器仅匹配「去」前缀）
 - 修复 `isMealTitle` 漏判「咖啡 / 火锅 / 甜品」等纯菜系标题导致误当地点解析的问题
 

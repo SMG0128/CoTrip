@@ -131,7 +131,7 @@ export class TencentDirectionService {
 
 /**
  * 把用户明确指定的交通偏好映射为 direction mode。
- * 未指定时返回 undefined，由调用方使用项目默认推荐逻辑（transit 优先，walking 兜底）。
+ * 未指定时返回 undefined，由调用方比较 walking / transit 的真实路线时长。
  * 不做复杂交通策略：只做 步行/地铁公交/打车 三类常见映射。
  */
 export function resolveDirectionMode(preference?: string): TencentDirectionMode | undefined {

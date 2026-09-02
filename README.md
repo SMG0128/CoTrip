@@ -17,7 +17,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 247/247、前端全量测试模块全绿）：
+当前已实际实现并通过测试的能力（后端 276/276、前端全量测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -28,6 +28,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - **Real room joining** —— Join 落地页 / 首页房间入口 / 微信分享均已接通真实加入流程：公开 Preview → Bearer 认证幂等加入；身份只来自服务端校验的 token，失败不回退 Mock。
 - **Navigation-style route recommendations** —— 见下节；示例行程使用已固化、可重复验证的广州路线数据。
 - **Tencent Location Service adapter** —— 已实现并启用 POI Search、Reverse Geocoder 与 Direction（walking / transit）适配器；真实行程在「我的推荐」面板选定出发地点后调用腾讯路线 API。
+- **Real route automatic selection** —— 用户未指定交通方式时同时比较腾讯 walking / transit 的真实 `durationMinutes`，确定性选择更短路线（同值 walking 优先），不再采用 first-found transit；显式 walking / transit / driving 时只尊重用户指定方式。
 - **Real POI trip presentation** —— 行程时间线按活动 local date 分组显示日期头；任意活动提取出的物理地点短语统一经腾讯 POI 解析，任意菜系/餐饮关键词统一走腾讯 nearby，anchor 使用前置活动真实坐标。resolved POI 尽最大可能获取真实地址：优先使用 Search 地址，缺失时以同一 Tencent Provider 的 reverse geocode 补全；腾讯仍无法提供时保持 `undefined`、前端隐藏地址行，绝不伪造。
 - **No runtime mock restaurant injection** —— 真实行程候选只来自服务端计划中的已验证实体（腾讯 POI / nearby），生产链路不再引用 `realRestaurants`/`realRestaurantCailan`；`place-detail` 由上游直传实体，mock 表仅保留示例行程 fixture 回查。
 - **Guangzhou Metro / Bus presentation layer** —— 线路徽章由本地 registry 维护（编号线路 / APM / 广佛），公交徽章使用 Provider 真实线路名，不依赖 Provider 线路色、不伪造线路。
@@ -107,7 +108,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ### 测试覆盖
 
-- 后端：222/222 通过（含无真实 route duration 不出现 hardcoded 30min、有真实 route duration 时 start = previous.end + real duration）。
+- 后端：276/276 通过（含 walking / transit 真实时长比较、显式交通方式保留、无真实 route duration 不出现 hardcoded 30min，以及 `start = previous.end + selected real duration`）。
 - 前端：全部核心逻辑测试通过。
 
 ## V0.3 Room Foundation（上一轮交付）

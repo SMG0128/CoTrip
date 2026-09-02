@@ -22,12 +22,38 @@
 // 真实网络不可用时输出 BLOCKED 并以退出码 2 结束（不伪造 PASS）。
 
 import { TencentLBSService } from '../src/services/tencent-lbs-service';
-import { TencentDirectionService } from '../src/services/tencent-direction-service';
+import {
+  DirectionOutcome,
+  TencentDirectionMode,
+  TencentDirectionService,
+  TencentRouteResult,
+} from '../src/services/tencent-direction-service';
 import { postProcessTripPlan } from '../src/services/trip-plan-post-processor';
 import { TripPlan, TripPlanEvent } from '../src/types/trip-plan';
 
 /** 本地 mock / fixture 餐厅名单：真实 E2E 候选不得命中（命中即 FAIL） */
 const MOCK_RESTAURANT_MARKERS = ['蔡澜Pho', '越芽', '大头虾', '泰香米', '一记面馆', '大家乐'];
+
+interface RecordedDirectionCall {
+  from: { latitude: number; longitude: number };
+  to: { latitude: number; longitude: number };
+  mode: TencentDirectionMode;
+  outcome: DirectionOutcome;
+}
+
+class RecordingTencentDirectionService extends TencentDirectionService {
+  readonly calls: RecordedDirectionCall[] = [];
+
+  async getDirection(
+    from: { latitude: number; longitude: number },
+    to: { latitude: number; longitude: number },
+    mode: TencentDirectionMode = 'transit',
+  ): Promise<DirectionOutcome> {
+    const outcome = await super.getDirection(from, to, mode);
+    this.calls.push({ from, to, mode, outcome });
+    return outcome;
+  }
+}
 
 function getKey(): string {
   const fromEnv = process.env.TENCENT_MAP_KEY?.trim();
@@ -56,10 +82,28 @@ function minutesBetween(fromIso: string, toIso: string): number {
   return Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60_000);
 }
 
+function eventPoint(event: TripPlanEvent): { latitude: number; longitude: number } {
+  const location = event.restaurant?.location ?? event.location;
+  assert(!!location, `${event.id} 必须存在真实物理坐标`);
+  return { latitude: location!.latitude, longitude: location!.longitude };
+}
+
+function isSamePoint(
+  left: { latitude: number; longitude: number },
+  right: { latitude: number; longitude: number },
+): boolean {
+  return left.latitude === right.latitude && left.longitude === right.longitude;
+}
+
+function formatRecordedOutcome(call: RecordedDirectionCall): string {
+  if (call.outcome.status !== 'FOUND') return 'status=UNAVAILABLE';
+  return `status=FOUND durationMinutes=${call.outcome.route.durationMinutes} distanceMeters=${call.outcome.route.distanceMeters ?? 'undefined'}`;
+}
+
 async function main(): Promise<void> {
   const key = getKey();
   const lbs = new TencentLBSService({ key });
-  const directions = new TencentDirectionService({ key });
+  const directions = new RecordingTencentDirectionService({ key });
 
   console.log('=== REAL TENCENT E2E: 广州 2026-09-10（POI + 三段真实 route）===');
 
@@ -203,6 +247,50 @@ async function main(): Promise<void> {
     realDurations.push(ev!.route!.durationMinutes);
   }
   console.log(`\n三段真实 route duration（分钟）: ${realDurations.join(' / ')}`);
+
+  // 每段必须实际请求 walking + transit，并由两个真实候选中的最短 duration 决定 selected。
+  const comparisonSegments = [
+    { label: 'LIBRARY_TO_MUSEUM', from: e1!, to: e2! },
+    { label: 'MUSEUM_TO_YUEXIU', from: e2!, to: e3! },
+    { label: 'YUEXIU_TO_RESTAURANT', from: e3!, to: e4! },
+  ];
+  console.log('\n--- REAL ROUTE CANDIDATE COMPARISON ---');
+  for (const segment of comparisonSegments) {
+    const from = eventPoint(segment.from);
+    const to = eventPoint(segment.to);
+    const calls = directions.calls.filter(
+      (call) => isSamePoint(call.from, from) && isSamePoint(call.to, to),
+    );
+    const walking = calls.find((call) => call.mode === 'walking');
+    const transit = calls.find((call) => call.mode === 'transit');
+    assert(!!walking, `${segment.label} 必须实际请求 walking`);
+    assert(!!transit, `${segment.label} 必须实际请求 transit`);
+
+    const found: { mode: TencentDirectionMode; route: TencentRouteResult }[] = [];
+    for (const call of [walking!, transit!]) {
+      if (call.outcome.status === 'FOUND') {
+        found.push({ mode: call.mode, route: call.outcome.route });
+      }
+    }
+    found.sort((left, right) =>
+      left.route.durationMinutes - right.route.durationMinutes ||
+      (left.mode === 'walking' ? -1 : right.mode === 'walking' ? 1 : 0),
+    );
+    assert(found.length > 0, `${segment.label} walking / transit 不得同时 unavailable`);
+    const selected = segment.to.route!;
+    assert(selected.mode === found[0].mode, `${segment.label} selected mode 必须来自最短真实候选`);
+    assert(
+      selected.durationMinutes === found[0].route.durationMinutes,
+      `${segment.label} selected duration 必须等于最短真实候选`,
+    );
+
+    console.log(segment.label);
+    console.log(`  WALKING: ${formatRecordedOutcome(walking!)}`);
+    console.log(`  TRANSIT: ${formatRecordedOutcome(transit!)}`);
+    console.log(
+      `  SELECTED: mode=${selected.mode} durationMinutes=${selected.durationMinutes} distanceMeters=${selected.distanceMeters ?? 'undefined'}`,
+    );
+  }
 
   // 6. 时间轴不重叠：event[i+1].start >= event[i].end + route[i+1].durationMinutes
   const timeline: [TripPlanEvent | undefined, TripPlanEvent | undefined][] = [
