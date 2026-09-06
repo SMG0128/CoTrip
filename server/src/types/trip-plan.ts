@@ -24,6 +24,8 @@ export interface TripPlanTimeRange {
 
 /** 地点「要求」而非已验证地点：由用户表达的约束推导，交给 Provider 层去检索真实实体 */
 export interface TripPlanLocationRequirement {
+  /** 未验证的用户/AI 搜索意图；不得当作地点实体。 */
+  query?: string;
   city?: string;
   district?: string;
   locationId?: string;
@@ -36,6 +38,9 @@ export interface TripPlanEvent {
   time: TripPlanTimeRange;
   locationRequirement?: TripPlanLocationRequirement;
   alternatives?: string[];
+  transportPreference?: 'walking' | 'transit' | 'driving';
+  locationStatus?: 'resolved' | 'unresolved' | 'search_unavailable';
+  routeStatus?: 'resolved' | 'unresolved' | 'unavailable' | 'not_required';
   /**
    * Provider 验证后的真实地点（腾讯 POI 解析结果）。
    * 仅由确定性 Provider 层写入，AI 绝不产出；缺省表示尚未解析。
@@ -102,6 +107,9 @@ export interface TripPlanEvent {
    */
   route?: {
     fromEventId: string;
+    toEventId?: string;
+    origin?: NonNullable<TripPlanEvent['location']>;
+    destination?: NonNullable<TripPlanEvent['location']>;
     durationMinutes: number;
     distanceMeters?: number;
     mode: 'transit' | 'walking' | 'driving';
@@ -110,6 +118,8 @@ export interface TripPlanEvent {
 }
 
 export interface TripPlan {
+  status?: 'actionable' | 'needs_attention';
+  validationIssues?: Array<{ eventId: string; code: string }>;
   id: string;
   tripId: string;
   version: number;

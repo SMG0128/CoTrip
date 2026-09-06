@@ -167,9 +167,10 @@ function updateEnvelopeFor(
           id: keptId,
           type: 'SPORT',
           title: '羽毛球',
-          time: { start: '2026-09-05T15:00:00+08:00', timezone: 'Asia/Shanghai' },
+          time: { start: `2026-09-05T${14 + basePlan.version}:00:00+08:00`, timezone: 'Asia/Shanghai' },
         },
         {
+          id: basePlan.events[1].id,
           type: 'DINING',
           title: '晚餐（粤菜）',
           time: { start: '2026-09-05T18:00:00+08:00', timezone: 'Asia/Shanghai' },
@@ -368,7 +369,8 @@ export async function runTripUpdateTests(): Promise<void> {
       assert.ok(trip!.latestAIUI, 'UI 提示必须与新计划一起落库');
       assert.strictEqual(trip!.latestAIUI!.planVersion, 2, 'UI 提示必须标记所属计划版本');
       assert.strictEqual(trip!.latestAIUI!.requestType, 'TRIP_UPDATE');
-      assert.strictEqual(trip!.latestAIUI!.ui.message, '晚餐已改为粤菜');
+      assert.strictEqual(trip!.currentPlan!.status, 'needs_attention');
+      assert.ok(trip!.latestAIUI!.ui.message?.includes('尚不可执行'));
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

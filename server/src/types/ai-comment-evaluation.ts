@@ -18,6 +18,7 @@ export interface CommentEvaluationCommentInput {
 
 /** COMMENT_EVALUATION 的 AI 输入：title + 创建原始输入 + PREPROCESS 上下文 + 当前评论 */
 export interface CommentEvaluationAIInput {
+  currentPlan?: import('./trip-plan').TripPlan | null;
   title: string;
   tripInput: TripPreprocessTripInput;
   /** PREPROCESS 结构化结果；AI 不可用时创建流程不写 aiContext，故可能缺席 */

@@ -68,7 +68,7 @@ function validateLocationRequirement(
     return fail(path, 'LOCATION_REQUIREMENT_OBJECT_REQUIRED');
   }
   const record = value as Record<string, unknown>;
-  const allowed = ['city', 'district', 'locationId'];
+  const allowed = ['city', 'district', 'locationId', 'query'];
   for (const key of Object.keys(record)) {
     if (!allowed.includes(key)) {
       return fail(`${path}.${key}`, 'LOCATION_REQUIREMENT_UNKNOWN_KEY');
@@ -102,6 +102,9 @@ function validateItem(
     return fail(path, 'ITEM_OBJECT_REQUIRED');
   }
   const item = value as Record<string, unknown>;
+  if (item.transportPreference !== undefined && !['walking', 'transit', 'driving'].includes(String(item.transportPreference))) {
+    return fail(`${path}.transportPreference`, 'TRANSPORT_PREFERENCE_INVALID');
+  }
 
   // AI 不得越过 Provider 直接给出已验证的真实世界实体
   for (const forbidden of FORBIDDEN_ITEM_KEYS) {
@@ -149,7 +152,7 @@ function validateItem(
     if (!isValidIsoWithTimezone(timeRecord.end)) {
       return fail(`${path}.time.end`, 'ITEM_TIME_END_NOT_ISO');
     }
-    if (Date.parse(timeRecord.end as string) < Date.parse(timeRecord.start as string)) {
+    if (Date.parse(timeRecord.end as string) <= Date.parse(timeRecord.start as string)) {
       return fail(`${path}.time.end`, 'ITEM_TIME_RANGE_INVERTED');
     }
   }
@@ -224,6 +227,7 @@ function toPlanEvent(
 ): TripPlanEvent {
   const locationRequirement: TripPlanLocationRequirement | undefined = item.locationRequirement
     ? {
+        ...(item.locationRequirement.query ? { query: item.locationRequirement.query } : {}),
         ...(item.locationRequirement.city ? { city: item.locationRequirement.city } : {}),
         ...(item.locationRequirement.district
           ? { district: item.locationRequirement.district }
@@ -239,6 +243,7 @@ function toPlanEvent(
     id: item.id ?? `event_${tripId}_${version}_${index + 1}`,
     type: item.type,
     title: item.title,
+    ...(item.transportPreference ? { transportPreference: item.transportPreference } : {}),
     time: {
       start: item.time.start,
       ...(item.time.end ? { end: item.time.end } : {}),

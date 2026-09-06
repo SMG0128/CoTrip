@@ -67,6 +67,7 @@ export class CloudBaseGatewayCommentEvaluationAIService implements CommentEvalua
             tripInput: input.tripInput,
             aiContext: input.aiContext,
             comment: input.comment,
+            ...(input.currentPlan !== undefined ? { currentPlan: input.currentPlan } : {}),
           },
         }),
         signal: controller.signal,

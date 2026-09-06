@@ -102,6 +102,7 @@ function envelopeFor(requestType: AIRequestType): Record<string, unknown> {
         title: '羽毛球',
         time: { start: '2026-09-05T16:00:00+08:00', timezone: 'Asia/Shanghai' },
       },
+      ...(requestType === 'TRIP_UPDATE' ? [previousPlan().events[1]] : []),
     ],
   };
   return { ...base, analysis: {}, decision: { tripChanged: true }, trip: snapshot };

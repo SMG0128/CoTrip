@@ -16,15 +16,11 @@
 // 本模块是纯函数，便于确定性测试。
 
 import { TripPlan, TripPlanEvent } from '../types/trip-plan';
+import { isVerifiedPlace, validateItinerary } from './itinerary-validator';
 
 /** 判定 location 是否来自已验证 Provider（腾讯 POI） */
 function isVerifiedLocation(location: TripPlanEvent['location']): boolean {
-  if (!location) return false;
-  if (typeof location.latitude !== 'number' || typeof location.longitude !== 'number') return false;
-  if (!Array.isArray(location.providerRefs)) return false;
-  return location.providerRefs.some(
-    (ref) => ref.provider === 'tencent' && typeof ref.externalId === 'string' && ref.externalId.length > 0,
-  );
+  return isVerifiedPlace(location);
 }
 
 /** 只复制 Provider 验证后的白名单 factual fields；空白 address 视为缺失。 */
@@ -61,11 +57,6 @@ function isVerifiedRestaurant(restaurant: TripPlanEvent['restaurant']): boolean 
 }
 
 /** 判定时间是否锚定到行程开始日期（禁止当前时钟污染） */
-function isAnchoredToTripStart(time: TripPlanEvent['time'], startDate: string): boolean {
-  if (!time?.start) return false;
-  const startDay = time.start.slice(0, 10);
-  return startDay === startDate;
-}
 
 /** 清洗单个真实餐厅候选（与 restaurant 同一验证规则，供 restaurantCandidates 使用） */
 function sanitizeRestaurantCandidate(
@@ -103,6 +94,9 @@ function sanitizeRoute(
   if (typeof route.fromEventId !== 'string' || route.fromEventId.length === 0) return undefined;
   return {
     fromEventId: route.fromEventId,
+    toEventId: route.toEventId,
+    origin: sanitizeVerifiedLocation(route.origin),
+    destination: sanitizeVerifiedLocation(route.destination),
     durationMinutes: route.durationMinutes,
     ...(typeof route.distanceMeters === 'number' && Number.isFinite(route.distanceMeters)
       ? { distanceMeters: route.distanceMeters }
@@ -120,17 +114,17 @@ function sanitizeRoute(
  */
 function sanitizeEvent(
   event: TripPlanEvent,
-  tripStartDate: string | undefined,
 ): TripPlanEvent {
-  // 时间：必须锚定到行程日期，否则剥离（fail-closed，不落未验证时间）。
-  // 注意：time 在类型上是必填，但落库时若未锚定则置为 undefined（运行时可选）。
-  const timeAnchored = !tripStartDate || isAnchoredToTripStart(event.time, tripStartDate);
+  // 保留结构化时间意图供修复；非法时间由 validator 明确阻止 actionable。
 
   const sanitized: TripPlanEvent = {
     id: event.id,
     type: event.type,
     title: event.title,
-    time: timeAnchored ? event.time : (undefined as unknown as TripPlanEvent['time']),
+    locationStatus: event.locationStatus,
+    routeStatus: event.routeStatus,
+    transportPreference: event.transportPreference,
+    time: event.time,
     ...(event.locationRequirement ? { locationRequirement: event.locationRequirement } : {}),
     ...(event.alternatives ? { alternatives: event.alternatives } : {}),
     ...(event.sequenceConstraint ? { sequenceConstraint: event.sequenceConstraint } : {}),
@@ -191,9 +185,10 @@ function sanitizeEvent(
 export function sanitizePlanForPersist(
   plan: TripPlan,
   tripStartDate: string | undefined,
+  tripEndDate?: string,
 ): TripPlan {
-  return {
+  return validateItinerary({
     ...plan,
-    events: plan.events.map((event) => sanitizeEvent(event, tripStartDate)),
-  };
+    events: plan.events.map((event) => sanitizeEvent(event)),
+  }, { start: tripStartDate, end: tripEndDate });
 }

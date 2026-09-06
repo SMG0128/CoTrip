@@ -121,8 +121,11 @@ function createGateway({ aiProvider, secret, maxBodyBytes = 64 * 1024, maxRawTex
 async function handlePipeline(aiProvider, requestType, body) {
   const input = validatePipelineInput(requestType, body);
   if (!input.ok) {
+    console.info(JSON.stringify({ intent: requestType, stage: 'gateway_input', failurePath: input.failurePath, failureReasonCode: input.failureReasonCode, planAgentCalled: false }));
     return json(400, { ok: false, error: 'INVALID_INPUT' });
   }
+  const source = input.value;
+  console.info(JSON.stringify({ requestId: (source.triggeringComment || source.comment || {}).id, tripId: source.currentPlan && source.currentPlan.tripId, tripVersion: source.baseVersion, intent: requestType, planAgentCalled: requestType === 'TRIP_UPDATE' || requestType === 'INITIAL_GENERATION' }));
   if (!aiProvider.tripPipeline || typeof aiProvider.tripPipeline !== 'function') {
     return json(503, { ok: false, error: 'PIPELINE_NOT_SUPPORTED' });
   }

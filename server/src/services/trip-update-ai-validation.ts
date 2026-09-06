@@ -27,6 +27,7 @@ function fail(path: string, reasonCode: string): AIEnvelopeValidationResult {
 export function validateTripUpdateEnvelope(
   value: unknown,
   previousPlan: TripPlan,
+  allowRegenerate = false,
 ): AIEnvelopeValidationResult {
   if (!value || typeof value !== 'object') {
     return fail('$', 'NOT_OBJECT');
@@ -68,6 +69,16 @@ export function validateTripUpdateEnvelope(
   if (!snapshot.ok) {
     return { ok: false, failurePath: snapshot.failurePath, failureReasonCode: snapshot.failureReasonCode };
   }
+  const proposal = (envelope as unknown as AITripUpdateEnvelope).trip;
+  const retained = new Set(proposal.items.map(item => item.id).filter(Boolean));
+  const removals = (envelope as unknown as AITripUpdateEnvelope).ui?.removedEventIds ?? [];
+  if (!allowRegenerate) {
+    for (const event of previousPlan.events) {
+      if (!retained.has(event.id) && !removals.includes(event.id)) {
+        return fail('trip.items', 'ACTIVITY_ID_OR_EXPLICIT_REMOVAL_REQUIRED');
+      }
+    }
+  }
 
   // ui 的 id 必须对齐「校验后真正会落库」的新计划，因此先构造再校验
   const candidate = buildTripPlanFromSnapshot(
@@ -102,10 +113,29 @@ export function buildUpdatedTripPlan(
   previousPlan: TripPlan,
   updatedAt: string,
 ): TripPlan {
-  return buildTripPlanFromSnapshot(
+  const candidate = buildTripPlanFromSnapshot(
     envelope.trip,
     previousPlan.tripId,
     previousPlan.version + 1,
     updatedAt,
   );
+  // 把快照提案转换为按稳定 ID 的操作。保留未改变活动的服务端地图事实，
+  // 变更地点时清除该活动全部地点事实；所有旧交通统一失效并由后处理重算。
+  const previousById = new Map(previousPlan.events.map(event => [event.id, event]));
+  candidate.events = candidate.events.map(event => {
+    const old = previousById.get(event.id);
+    if (!old) return event;
+    const placeChanged = old.title !== event.title || old.type !== event.type
+      || JSON.stringify(old.locationRequirement ?? {}) !== JSON.stringify(event.locationRequirement ?? {});
+    const { route: _route, sequenceConstraint: _sequence, ...preserved } = old;
+    const merged = { ...preserved, ...event, transportPreference: event.transportPreference ?? old.transportPreference };
+    if (placeChanged) {
+      delete merged.location;
+      delete merged.restaurant;
+      delete merged.restaurantCandidates;
+      merged.locationStatus = 'unresolved';
+    }
+    return merged;
+  });
+  return candidate;
 }

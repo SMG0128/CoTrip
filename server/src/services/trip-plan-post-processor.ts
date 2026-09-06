@@ -30,6 +30,7 @@ import {
 } from './tencent-direction-service';
 import { rankPlaceCandidates, RankedPlaceCandidate } from './place-candidate-ranker';
 import { isResolvedPhysicalLocation } from './resolved-physical-location';
+import { isVerifiedPlace } from './itinerary-validator';
 
 /** 解析后的活动：在既有 TripPlanEvent 基础上附加可选字段（全部向后兼容） */
 export interface ResolvedTripEvent extends SequencedTripPlanEvent {
@@ -67,6 +68,8 @@ export interface PostProcessInput {
   preferLowCost?: boolean;
   /** 用户明确指定的交通偏好（步行/地铁/公交/打车…）；未指定时使用项目默认推荐逻辑 */
   routeMode?: string;
+  requestId?: string;
+  previousPlan?: TripPlan;
 }
 
 export interface PostProcessResult {
@@ -92,14 +95,13 @@ export function applySequenceTimes(
   events: ResolvedTripEvent[],
   realTravelMinutesByEventId?: ReadonlyMap<string, number>,
 ): ResolvedTripEvent[] {
-  const byId = new Map(events.map((e) => [e.id, e]));
   const result = events.map((e) => ({ ...e }));
+  const byId = new Map(result.map((e) => [e.id, e]));
 
-  for (const event of result) {
+  for (const [index, event] of result.entries()) {
     const seq = event.sequenceConstraint;
-    if (!seq) continue;
-    const prior = byId.get(seq.afterActivityId);
-    if (!prior || !prior.time.end) continue;
+    const prior = seq ? byId.get(seq.afterActivityId) : result[index - 1];
+    if (!prior || !prior.time?.end || prior.time.start.slice(0, 10) !== event.time?.start?.slice(0, 10)) continue;
 
     const priorEnd = new Date(prior.time.end).getTime();
     // 真实路线 duration（分钟）；无真实数据时为 0，即 start = previous.end，不伪造 travel
@@ -158,27 +160,33 @@ export async function postProcessTripPlan(
   directions?: TencentDirectionService | null,
 ): Promise<PostProcessResult> {
   const anchor = buildTimeAnchor(input.timeRange);
-  const city = input.city || '广州市';
+  const city = input.city || '';
 
   // 1. 时间锚定（B/J）
   let events: ResolvedTripEvent[] = anchor
     ? (resolvePlanTimes(input.plan.events, anchor) as ResolvedTripEvent[])
     : input.plan.events.map((e) => ({ ...e }));
 
+  // 输入路线全部失效；地图事实只可复用服务端已有的已验证地点。
+  events = events.map(event => {
+    const { route: _route, ...rest } = event;
+    return { ...rest, routeStatus: 'unresolved' };
+  });
+
   // 2. 时长解析（C）：从评论提取时长，绑定到最近、语义相关的活动
   const duration = input.commentText ? parseDurationMinutes(input.commentText) : { ok: false };
-  if (duration.ok && duration.durationMinutes !== undefined && events.length > 0) {
+  if (!input.previousPlan && duration.ok && duration.durationMinutes !== undefined && events.length > 0) {
     // 优先绑定到与时长上下文语义相关的活动（如「看三个小时」→ 看书活动），
-    // 找不到时回退到最后一个活动。
+    // 目标不明确时不猜测绑定对象。
     const targetIndex = findDurationTargetIndex(events, input.commentText ?? '');
-    events[targetIndex] = applyDuration(events[targetIndex], duration.durationMinutes);
+    if (targetIndex >= 0) events[targetIndex] = applyDuration(events[targetIndex], duration.durationMinutes);
   }
 
   // 3. 先后关系（D）：标题法 + 评论驱动法（含 compound sequence A→B→C 通用链接）
   events = resolveSequenceConstraints(events, input.commentText) as ResolvedTripEvent[];
 
   // 4. POI 解析（E/F/G/H/I）：真实地点 + 附近餐厅候选
-  if (lbs) {
+  if (lbs && city) {
     events = await resolvePOIs(events, city, lbs, input);
   }
 
@@ -187,7 +195,7 @@ export async function postProcessTripPlan(
   //    餐厅活动以真实餐厅坐标为路线终点（餐厅不是排程例外）。
   let realTravelMinutesByEventId: ReadonlyMap<string, number> | undefined;
   if (directions) {
-    events = await applyRealRoutes(events, directions, input.routeMode);
+    events = await applyRealRoutes(events, directions, input);
     realTravelMinutesByEventId = collectRealTravelMinutes(events);
   }
 
@@ -209,6 +217,7 @@ export async function postProcessTripPlan(
       } = event;
       const planEvent: TripPlanEvent = {
         ...rest,
+        locationStatus: locationStatus ?? 'unresolved',
         ...(sequenceConstraint ? { sequenceConstraint } : {}),
       };
       // Provider 验证后的真实地点写入 event.location（前端可直接展示）
@@ -243,6 +252,8 @@ export async function postProcessTripPlan(
           };
         };
         planEvent.restaurant = toRestaurant(rankedRestaurantCandidates[0]);
+        planEvent.location = planEvent.restaurant.location;
+        planEvent.locationStatus = 'resolved';
         planEvent.restaurantCandidates = rankedRestaurantCandidates.map(toRestaurant);
       }
       // 真实路线段写入 event.route（final plan 数据必须保存真实 route segment）
@@ -257,18 +268,9 @@ export async function postProcessTripPlan(
 }
 
 /** 事件的实际物理坐标：餐厅事件优先用真实餐厅坐标（M 节），其余用解析后的真实地点。 */
-function eventPhysicalLocation(event: ResolvedTripEvent): { latitude: number; longitude: number } | undefined {
-  if (event.rankedRestaurantCandidates && event.rankedRestaurantCandidates.length > 0) {
-    const top = event.rankedRestaurantCandidates[0];
-    if (Number.isFinite(top.latitude) && Number.isFinite(top.longitude)) {
-      return { latitude: top.latitude, longitude: top.longitude };
-    }
-  }
-  const resolved = event.resolvedLocation;
-  if (resolved && Number.isFinite(resolved.latitude) && Number.isFinite(resolved.longitude)) {
-    return { latitude: resolved.latitude, longitude: resolved.longitude };
-  }
-  return undefined;
+function eventPhysicalLocation(event: ResolvedTripEvent): TripPlanEvent['location'] {
+  const place = event.resolvedLocation ?? event.restaurant?.location ?? event.location;
+  return isVerifiedPlace(place) ? place : undefined;
 }
 
 /**
@@ -300,19 +302,22 @@ export function selectBestRealRoute(
 async function applyRealRoutes(
   events: ResolvedTripEvent[],
   directions: TencentDirectionService,
-  routeModePreference?: string,
+  input: PostProcessInput,
 ): Promise<ResolvedTripEvent[]> {
-  const userMode = resolveDirectionMode(routeModePreference);
   const result: ResolvedTripEvent[] = events.map((e) => ({ ...e }));
 
   for (let i = 0; i + 1 < result.length; i += 1) {
     const from = eventPhysicalLocation(result[i]);
     const to = eventPhysicalLocation(result[i + 1]);
-    if (!from || !to) continue;
+    if (!from || !to || result[i].time?.start?.slice(0, 10) !== result[i + 1].time?.start?.slice(0, 10)) continue;
+    // 更新时交通偏好必须由目标 activity 承载，不能把一句局部指令广播到每段。
+    const userMode = result[i + 1].transportPreference
+      ?? (!input.previousPlan ? resolveDirectionMode(input.routeMode) : undefined);
+    if (userMode) result[i + 1].transportPreference = userMode;
 
     const modes: TencentDirectionMode[] = userMode
       ? [userMode]
-      : ['walking', 'transit'];
+      : ['walking', 'transit', 'driving'];
 
     // 失败（R 节）：provider 抛错 / 网络异常 / 无 route 一律不进入候选，
     // 两种自动模式都不可用时不写 route，绝不补 mock duration。
@@ -329,9 +334,15 @@ async function applyRealRoutes(
       )
     ).filter((candidate): candidate is TencentRouteResult => candidate !== undefined);
     const route = selectBestRealRoute(candidates);
+    console.info(JSON.stringify({ requestId: input.requestId, tripId: input.plan.tripId, tripVersion: input.plan.version,
+      origin: from.id, destination: to.id, routeProvider: 'tencent', routeModeCandidates: candidates.map(c => ({ mode: c.mode, duration: c.durationMinutes })),
+      selectedRoute: route?.mode ?? null, routeInvalidated: true }));
     if (!route) continue;
 
     result[i + 1].route = {
+      toEventId: result[i + 1].id,
+      origin: from,
+      destination: to,
       fromEventId: result[i].id,
       ...route,
       provider: 'tencent',
@@ -373,128 +384,68 @@ async function resolveEventPOI(
   input: PostProcessInput,
   resolvedSoFar: ResolvedTripEvent[],
 ): Promise<ResolvedTripEvent> {
-  const seq = event.sequenceConstraint;
-  const prior = seq
-    ? resolvedSoFar.find((e) => e.id === seq.afterActivityId)
-    : undefined;
-  const priorLocation = prior?.resolvedLocation;
-
-  // 从标题提取地点关键词（通用：任意需要实体地点的活动都尝试解析）
-  const locationQuery = extractPlaceQuery(event.title);
-
-  // 锚点/地点解析优先级（B 节，全局规则）：
-  //   1. 本活动标题里的明确地点（locationQuery）→ POI 解析。
-  //      活动自身的地点优先于任何前置坐标 —— 例如「参观省博物馆」即使排在
-  //      「广州图书馆看书」之后，也绝不把图书馆坐标当作博物馆坐标。
-  //   2. 无明确地点且 sequenceConstraint 前置活动已解析 → 复用前置真实坐标
-  //      （near_previous_activity，如「去完省博吃越南菜」的 nearby 锚点）。
-  //   3. 无 sequenceConstraint 时 → 回看最近一个已解析真实坐标的前置活动
-  //      （「晚上附近吃粤菜」这类省略地点的餐饮意图）。
-  //   4. 以上都没有 → unresolved，不伪造地点。
-  let resolvedLat: number | undefined;
-  let resolvedLng: number | undefined;
-  let resolvedLocation: ResolvedTripEvent['resolvedLocation'];
-  let locationStatus: ResolvedTripEvent['locationStatus'] = 'unresolved';
-
-  if (locationQuery) {
-    // 「去完广图吃泰国菜」：anchor 与前置活动地点一致时复用前置真实坐标，
-    // 避免对「广图」这类简称再做一次有风险的 POI 搜索。
-    if (prior && priorLocation && priorMatchesLocationQuery(prior, locationQuery)) {
-      resolvedLat = priorLocation.latitude;
-      resolvedLng = priorLocation.longitude;
-      resolvedLocation = priorLocation;
-      locationStatus = 'resolved';
-    } else {
-      const poiOutcome = await lbs.searchPOI(locationQuery, city);
-      if (poiOutcome.status === 'FOUND' && poiOutcome.candidates.length > 0) {
-        const top = poiOutcome.candidates.find(isResolvedPhysicalLocation);
-        if (!top) {
-          locationStatus = 'unresolved';
-        } else {
-          resolvedLat = top.latitude;
-          resolvedLng = top.longitude;
-          resolvedLocation = {
-            id: top.providerPoiId,
-            name: top.name,
-            latitude: top.latitude,
-            longitude: top.longitude,
-            ...(top.address ? { address: top.address } : {}),
-            providerRefs: [{ provider: 'tencent', externalId: top.providerPoiId }],
-          };
-          locationStatus = 'resolved';
-        }
-      } else {
-        locationStatus =
-          poiOutcome.status === 'POI_SEARCH_UNAVAILABLE' ? 'search_unavailable' : 'unresolved';
+  // 已保留活动的地点是服务端事实；仅修改时间/交通不重新选择餐厅。
+  const existing = event.restaurant?.location ?? event.location;
+  if (isVerifiedPlace(existing)) return { ...event, resolvedLocation: existing, locationStatus: 'resolved' };
+  const meal = event.type === 'DINING' || isMealTitle(event.title);
+  const query = event.locationRequirement?.query?.trim() || extractPlaceQuery(event.title);
+  const prior = resolvedSoFar.find(e => e.id === event.sequenceConstraint?.afterActivityId)
+    ?? resolvedSoFar[resolvedSoFar.length - 1];
+  const anchor = prior ? eventPhysicalLocation(prior) : undefined;
+  const keyword = extractFoodKeyword(event.locationRequirement?.query || event.title) || '餐厅';
+  const asLocation = (poi: PlaceCandidate): NonNullable<TripPlanEvent['location']> => ({
+    id: poi.providerPoiId, name: poi.name, latitude: poi.latitude, longitude: poi.longitude,
+    ...(poi.address ? { address: poi.address } : {}),
+    providerRefs: [{ provider: 'tencent', externalId: poi.providerPoiId }],
+  });
+  const result: ResolvedTripEvent = { ...event, locationStatus: 'unresolved' };
+  delete result.location;
+  delete result.restaurant;
+  delete result.restaurantCandidates;
+  delete result.resolvedLocation;
+  try {
+    // 参考点仅用于 nearby 请求，绝不能作为用餐/其他活动的最终地点。
+    let searchAnchor = anchor;
+    let candidates: PlaceCandidate[] = [];
+    const genericMeal = !query || /附近|找一家|粤菜|餐厅|午餐|晚餐/.test(query) && query.length < 12;
+    if (meal && query && !genericMeal && !event.locationRequirement?.query) {
+      const found = await lbs.searchPOI(query, city);
+      if (found.status === 'FOUND') {
+        const poi = found.candidates.find(isResolvedPhysicalLocation);
+        if (poi) searchAnchor = asLocation(poi);
       }
     }
-  } else if (prior && priorLocation) {
-    // 复用前置活动真实坐标（near_previous_activity）
-    resolvedLat = priorLocation.latitude;
-    resolvedLng = priorLocation.longitude;
-    resolvedLocation = priorLocation;
-    locationStatus = 'resolved';
-  } else {
-    // 回看最近一个已解析真实坐标的前置活动（省略地点的餐饮意图通用锚点）
-    for (let i = resolvedSoFar.length - 1; i >= 0; i -= 1) {
-      const anchor = resolvedSoFar[i].resolvedLocation;
-      if (anchor) {
-        resolvedLat = anchor.latitude;
-        resolvedLng = anchor.longitude;
-        resolvedLocation = anchor;
-        locationStatus = 'resolved';
-        break;
-      }
+    const outcome = meal && searchAnchor && (genericMeal || !event.locationRequirement?.query)
+      ? await lbs.searchNearby(keyword, searchAnchor.latitude, searchAnchor.longitude)
+      : await lbs.searchPOI(meal && genericMeal ? keyword : query || event.title, event.locationRequirement?.city || city);
+    if (outcome.status === 'FOUND') candidates = outcome.candidates.filter(isResolvedPhysicalLocation);
+    // 指名地点不能把 provider 的近似/无关命中当作用户要求的地点。
+    const explicitQuery = event.locationRequirement?.query;
+    const categoryQuery = !explicitQuery || /附近|找一家|就近/.test(explicitQuery)
+      || /^(?:餐厅|酒店|咖啡店|博物馆|公园|商场|车站|羽毛球馆|羽毛球|粤菜)$/.test(explicitQuery);
+    if (explicitQuery && !categoryQuery) {
+      const expected = normalizePlaceKeyword(explicitQuery);
+      candidates = candidates.filter(poi => normalizePlaceKeyword(poi.name).includes(expected));
     }
-  }
-
-  const resolvedEvent: ResolvedTripEvent = {
-    ...event,
-    ...(resolvedLocation ? { resolvedLocation } : {}),
-    locationStatus,
-  };
-
-  // 若活动是餐饮（DINING）或标题含「吃/菜/餐」，则搜索附近餐厅
-  // 全局规则（A/B/P 节）：meal intent + foodKeyword + 可解析 anchor → 腾讯 nearby
-  if (event.type === 'DINING' || isMealTitle(event.title)) {
-    const keyword = extractFoodKeyword(event.title) || '餐厅';
-    if (resolvedLat !== undefined && resolvedLng !== undefined) {
-      const nearby = await lbs.searchNearby(keyword, resolvedLat, resolvedLng);
-      if (nearby.status === 'FOUND') {
-        resolvedEvent.rankedRestaurantCandidates = rankPlaceCandidates(
-          nearby.candidates.filter(isResolvedPhysicalLocation),
-          keyword,
-          {
-            budgetMaxPerPerson: input.budgetMaxPerPerson,
-            preferLowCost: input.preferLowCost,
-          },
-        );
-      }
+    if (outcome.status === 'POI_SEARCH_UNAVAILABLE') result.locationStatus = 'search_unavailable';
+    if (meal) {
+      result.rankedRestaurantCandidates = rankPlaceCandidates(candidates, keyword, {
+        budgetMaxPerPerson: input.budgetMaxPerPerson, preferLowCost: input.preferLowCost,
+      });
+      candidates = result.rankedRestaurantCandidates;
     }
-  }
-
-  return resolvedEvent;
-}
-
-/** 前置活动的地点是否与标题提取的地点关键词一致（含别名归一化） */
-function priorMatchesLocationQuery(
-  prior: ResolvedTripEvent,
-  locationQuery: string,
-): boolean {
-  const priorPlace = extractPlaceQuery(prior.title);
-  if (!priorPlace) return false;
-  const a = normalizePlaceKeyword(locationQuery);
-  const b = normalizePlaceKeyword(priorPlace);
-  if (a === b) return true;
-  const priorName = prior.resolvedLocation?.name;
-  if (priorName && (priorName.includes(a) || a.includes(priorName))) return true;
-  return false;
+    const top = candidates.find(poi => isVerifiedPlace(asLocation(poi)));
+    if (top) { result.resolvedLocation = asLocation(top); result.locationStatus = 'resolved'; }
+  } catch { result.locationStatus = 'search_unavailable'; }
+  console.info(JSON.stringify({ requestId: input.requestId, tripId: input.plan.tripId, tripVersion: input.plan.version,
+    targetActivityId: event.id, placeResolution: result.locationStatus, resolvedPoi: result.resolvedLocation?.id ?? null }));
+  return result;
 }
 
 /**
  * 找到时长应绑定的活动下标。
  * 策略：从评论中提取时长短语前的动作词（如「看三个小时」→「看」），
- * 在事件标题中寻找包含该动作词（或其同义）的活动；找不到则回退到最后一个活动。
+ * 在事件标题中寻找包含该动作词（或其同义）的活动；找不到则保持结构化时间不变。
  */
 function findDurationTargetIndex(events: ResolvedTripEvent[], commentText: string): number {
   const lastIndex = events.length - 1;
@@ -505,7 +456,7 @@ function findDurationTargetIndex(events: ResolvedTripEvent[], commentText: strin
     /([\u4e00-\u9fa5]{1,4}?)(?:[一二两三四五六七八九十\d]+|一个|两个|半)?\s*(?:个)?\s*(?:小时|个小时|分钟|半小时)/,
   );
   const action = actionMatch ? actionMatch[1] : undefined;
-  if (!action) return lastIndex;
+  if (!action) return events.length === 1 ? 0 : -1;
 
   // 在事件标题中寻找包含该动作词（或其语义近义词）的活动
   for (let i = events.length - 1; i >= 0; i -= 1) {
@@ -516,7 +467,7 @@ function findDurationTargetIndex(events: ResolvedTripEvent[], commentText: strin
     if (/(吃|餐|饭|菜)/.test(action) && /(吃|餐|饭|菜)/.test(title)) return i;
     if (/(打|运动|球)/.test(action) && /(打|运动|球)/.test(title)) return i;
   }
-  return lastIndex;
+  return events.length === 1 ? lastIndex : -1;
 }
 
 /** 常见菜系/餐饮关键词表（通用意图表，禁止对单一菜系做 special-case 分支） */

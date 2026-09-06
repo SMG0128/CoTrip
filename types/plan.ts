@@ -33,6 +33,8 @@ export interface PlanningContext {
 }
 
 export interface Plan {
+  status?: 'actionable' | 'needs_attention';
+  validationIssues?: Array<{ eventId: string; code: string }>;
   id: string;
   tripId: string;
   version: number;

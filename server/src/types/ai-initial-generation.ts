@@ -33,6 +33,7 @@ export interface AITripItem {
   time: TripPlanTimeRange;
   locationRequirement?: TripPlanLocationRequirement;
   alternatives?: string[];
+  transportPreference?: 'walking' | 'transit' | 'driving';
 }
 
 /** AI 返回的首版行程快照 */

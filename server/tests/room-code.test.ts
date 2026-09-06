@@ -51,6 +51,7 @@ function assertValidRoomCode(code: string): void {
 /** 记录 findByRoomCode 调用次数的桩仓库，用于确定性碰撞测试。 */
 class CollisionOnceRepo implements TripRepository {
   calls = 0;
+  async commitPlan(): Promise<boolean> { throw new Error('CollisionOnceRepo 不支持 commitPlan'); }
   async create(trip: Trip): Promise<Trip> {
     return trip;
   }

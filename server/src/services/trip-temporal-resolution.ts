@@ -19,6 +19,7 @@ import { TripPlanEvent, TripPlanTimeRange } from '../types/trip-plan';
 export interface TripTimeAnchor {
   /** 行程开始日期，如 2026-09-10 */
   startDate: string;
+  endDate?: string;
   /** 行程时区，如 Asia/Shanghai */
   timezone: string;
   /** 行程开始时间（HH:mm），可选 */
@@ -62,7 +63,7 @@ export function extractTime(iso: string): string {
 
 /** 判断 ISO 时间戳是否落在行程开始日期当天 */
 function isOnStartDate(iso: string, anchor: TripTimeAnchor): boolean {
-  return extractDate(iso) === anchor.startDate;
+  return extractDate(iso) >= anchor.startDate && extractDate(iso) <= (anchor.endDate ?? anchor.startDate);
 }
 
 /**
@@ -138,6 +139,7 @@ export function buildTimeAnchor(
   if (!timeRange || !timeRange.start) return null;
   return {
     startDate: extractDate(timeRange.start),
+    endDate: timeRange.end ? extractDate(timeRange.end) : extractDate(timeRange.start),
     timezone: timeRange.timezone || 'Asia/Shanghai',
     startTime: extractTime(timeRange.start),
   };

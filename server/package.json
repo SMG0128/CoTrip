@@ -9,7 +9,8 @@
     "start": "node dist/app.js",
     "dev": "ts-node src/app.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json && node dist-test/tests/run-tests.js"
+    "test": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json && node dist-test/tests/run-tests.js",
+    "e2e:real": "node tests/real-itinerary-e2e.js"
   },
   "dependencies": {
     "express": "^4.19.2",

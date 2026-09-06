@@ -188,7 +188,7 @@ export function computeIntentCoverage(
       return { intent, status: 'PENDING' };
     }
     const matched = findMatchedEvent(intent, plan.events);
-    if (matched) {
+    if (matched && !(plan.status === 'needs_attention' && plan.validationIssues?.some(issue => issue.eventId === matched.id))) {
       return { intent, status: 'PLANNED', matchedEventId: matched.id };
     }
     return { intent, status: 'UNRESOLVED' };

@@ -219,6 +219,14 @@ function walkingResponseFixture(): unknown {
 }
 
 export async function runRouteOptionTests(): Promise<void> {
+  // 真实时长比较不能继承 transit-first API 拼接顺序；短途步行 398m / 6min 更优。
+  const shortDistance = selectTopRouteOptions([
+    routeFixture('transit-first', { durationMinutes: 20, modes: ['METRO'] }),
+    routeFixture('walking-398m', { durationMinutes: 6, distanceMeters: 398, modes: ['WALK'] }),
+  ]);
+  assert(shortDistance[0].id === 'walking-398m' && shortDistance[0].recommended, '短途必须按真实时长推荐步行');
+  assert(shortDistance.length === 2, 'provider 返回两条不能补三条');
+
   // ---- selectTopRouteOptions：数量上限 ----
   const fiveOptions = [
     routeFixture('a_30_walk', { durationMinutes: 30, modes: ['WALK'] }),

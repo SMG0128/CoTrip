@@ -59,6 +59,17 @@ export class JsonTripRepository implements TripRepository {
     return this.store.trips.find((trip) => trip.id === id) ?? null;
   }
 
+  async commitPlan(tripId: string, baseVersion: number, plan: NonNullable<Trip['currentPlan']>, ui: NonNullable<Trip['latestAIUI']>): Promise<boolean> {
+    // 此段无 await：版本校验、成员合并、原子磁盘替换在同一进程提交点执行。
+    const current = this.store.trips.find(trip => trip.id === tripId);
+    if (!current || (current.currentPlan?.version ?? 0) !== baseVersion) return false;
+    const updated = { ...current, currentPlan: plan, latestAIUI: ui };
+    const nextStore = { trips: this.store.trips.map(trip => trip.id === tripId ? updated : trip) };
+    this.save(nextStore);
+    this.store = nextStore;
+    return true;
+  }
+
   async findByRoomCode(roomCode: string): Promise<Trip | null> {
     if (!isValidRoomCode(roomCode)) {
       return null;

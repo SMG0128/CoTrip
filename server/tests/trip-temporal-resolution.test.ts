@@ -443,7 +443,7 @@ export async function runTemporalResolutionTests(): Promise<void> {
     assert.strictEqual(sanitized.events[0].restaurant?.averagePrice?.amount, 80);
   });
 
-  await record('sanitize: 剥离当前时钟派生的行程时间（未锚定到 trip.startDate）', () => {
+  await record('sanitize: 行程外时间保留为待修复意图，拒绝 actionable', () => {
     const plan = makePlan([
       event({
         id: 'event_1',
@@ -452,7 +452,9 @@ export async function runTemporalResolutionTests(): Promise<void> {
       }),
     ]);
     const sanitized = sanitizePlanForPersist(plan, '2026-09-10');
-    assert.strictEqual(sanitized.events[0].time, undefined, '未锚定到行程日期的当前时钟时间必须剥离');
+    assert.strictEqual(sanitized.status, 'needs_attention');
+    assert.ok(sanitized.validationIssues?.some(issue => issue.code === 'TIME_OUTSIDE_TRIP'));
+    assert.strictEqual(sanitized.events[0].time.start, plan.events[0].time.start);
   });
 
   await record('sanitize: 保留已验证 location（含 tencent providerRefs）', () => {

@@ -10,6 +10,9 @@ import { Restaurant } from './restaurant';
 /** 真实路线段（腾讯 direction 返回，挂在被到达的活动上） */
 export interface PlanEventRoute {
   fromEventId: string;
+  toEventId?: string;
+  origin?: Location;
+  destination?: Location;
   durationMinutes: number;
   distanceMeters?: number;
   mode: 'transit' | 'walking' | 'driving';
@@ -36,12 +39,16 @@ export type PlanEventType =
 
 /** 事件地点要求：由 Location Constraint 推导，结构化而非塞进 description */
 export interface LocationRequirement {
+  query?: string;
   district?: string;
   city?: string;
   locationId?: string;
 }
 
 export interface PlanEvent {
+  transportPreference?: 'walking' | 'transit' | 'driving';
+  locationStatus?: 'resolved' | 'unresolved' | 'search_unavailable';
+  routeStatus?: 'resolved' | 'unresolved' | 'unavailable' | 'not_required';
   id: string;
   type: PlanEventType;
   title: string;

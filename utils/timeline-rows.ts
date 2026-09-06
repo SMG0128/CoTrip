@@ -23,11 +23,11 @@ import { PlanEvent } from '../types/event';
 import { EventCandidate, EventCandidateGroup } from '../types/event-candidate';
 import { buildEventDateHeaders } from './event-date-grouping';
 
-/** 路线 mode → 中文文案（与产品「步行/地铁/打车」一致） */
+/** 路线 mode → 中文文案（与产品「步行/公共交通/打车」一致） */
 export function formatRouteMode(mode: 'transit' | 'walking' | 'driving'): string {
   if (mode === 'walking') return '步行';
   if (mode === 'driving') return '打车';
-  return '地铁';
+  return '公共交通';
 }
 
 /** 渲染行：活动节点或低一级的路线段辅助节点 */
@@ -45,7 +45,7 @@ export type TimelineRow =
   | {
       kind: 'route';
       id: string;
-      /** 如「地铁 50 分钟」；仅真实路线段存在时产生 */
+      /** 如「公共交通 50 分钟」；仅真实路线段存在时产生 */
       routeText: string;
     };
 

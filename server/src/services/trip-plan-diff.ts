@@ -66,6 +66,7 @@ export function diffTripPlans(previous: TripPlan | null, next: TripPlan): TripPl
 
     const changedFields: string[] = [];
     if (prev.title !== event.title) changedFields.push('title');
+    if (prev.transportPreference !== event.transportPreference) changedFields.push('transportPreference');
     if (prev.type !== event.type) changedFields.push('type');
     if (!sameJson(prev.time, event.time)) changedFields.push('time');
     if (!sameJson(prev.locationRequirement, event.locationRequirement)) changedFields.push('locationRequirement');

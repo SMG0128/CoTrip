@@ -84,6 +84,8 @@ export class TencentDirectionService {
   ): Promise<DirectionOutcome> {
     if (!this.isConfigured) return { status: 'DIRECTION_UNAVAILABLE' };
     if (
+      Math.abs(from.latitude) > 90 || Math.abs(to.latitude) > 90 ||
+      Math.abs(from.longitude) > 180 || Math.abs(to.longitude) > 180 ||
       !Number.isFinite(from.latitude) ||
       !Number.isFinite(from.longitude) ||
       !Number.isFinite(to.latitude) ||

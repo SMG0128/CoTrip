@@ -28,7 +28,7 @@ function routeTexts(rows: TimelineRow[]): string[] {
   return rows.filter((row) => row.kind === 'route').map((row) => (row as { routeText: string }).routeText);
 }
 
-// ---- 1. A/B/C + A->B 地铁 50 分钟 + B->C 步行 9 分钟 → 严格交错 ----
+// ---- 1. A/B/C + A->B 公共交通 50 分钟 + B->C 步行 9 分钟 → 严格交错 ----
 {
   const rows = buildTimelineRows([
     event('event_a'),
@@ -38,15 +38,15 @@ function routeTexts(rows: TimelineRow[]): string[] {
   const seq = toSequence(rows);
   assert(
     JSON.stringify(seq) ===
-      JSON.stringify(['A:event_a', 'R:地铁 50 分钟', 'A:event_b', 'R:步行 9 分钟', 'A:event_c']),
-    `渲染顺序必须是 A / 地铁50 / B / 步行9 / C，实际 ${JSON.stringify(seq)}`,
+      JSON.stringify(['A:event_a', 'R:公共交通 50 分钟', 'A:event_b', 'R:步行 9 分钟', 'A:event_c']),
+    `渲染顺序必须是 A / 公共交通50 / B / 步行9 / C，实际 ${JSON.stringify(seq)}`,
   );
 
   // 关键验证：路线不会出现在对应目的地（B/C）下方
   const aIdx = seq.indexOf('A:event_a');
   const bIdx = seq.indexOf('A:event_b');
   const cIdx = seq.indexOf('A:event_c');
-  assert(seq[aIdx + 1] === 'R:地铁 50 分钟', '「地铁 50 分钟」必须在 B 之前（A 与 B 之间），不得出现在 B 下方');
+  assert(seq[aIdx + 1] === 'R:公共交通 50 分钟', '「公共交通 50 分钟」必须在 B 之前（A 与 B 之间），不得出现在 B 下方');
   assert(seq[bIdx + 1] === 'R:步行 9 分钟', '「步行 9 分钟」必须在 C 之前（B 与 C 之间），不得出现在 C 下方');
   assert(seq[cIdx + 1] === undefined, '最后一项活动 C 下方绝不能出现 route');
   assert(seq[0] === 'A:event_a', '第一项活动 A 上方绝不能出现 route');

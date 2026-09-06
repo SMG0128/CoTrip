@@ -243,7 +243,7 @@ function updateEnvelope(
     analysis: {},
     decision: { tripChanged: true },
     trip: { title: '周末广州游', summary: `基于 v${basePlan.version} 的更新`, items },
-    ui: { ...emptyAIUIConfig(), message },
+    ui: { ...emptyAIUIConfig(), message, removedEventIds: basePlan.events.filter(e => !items.some(i => i.id === e.id)).map(e => e.id) },
     meta: {},
   };
 }

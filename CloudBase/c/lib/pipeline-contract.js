@@ -173,9 +173,9 @@ function validateAIContext(value, path) {
 function validateLocationRequirement(value, path, options) {
   if (value === undefined) return valid();
   if (!isRecord(value)) return invalid(path, 'LOCATION_REQUIREMENT_OBJECT_REQUIRED');
-  const shape = validateExactKeys(value, ['city', 'district', 'locationId'], [], path);
+  const shape = validateExactKeys(value, ['city', 'district', 'locationId', 'query'], [], path);
   if (!shape.ok) return shape;
-  for (const key of ['city', 'district', 'locationId']) {
+  for (const key of ['city', 'district', 'locationId', 'query']) {
     if (value[key] !== undefined && typeof value[key] !== 'string') {
       return invalid(`${path}.${key}`, 'LOCATION_REQUIREMENT_NOT_STRING');
     }
@@ -197,8 +197,10 @@ function validateTripItem(value, index, options) {
       return invalid(`${path}.${forbidden}`, 'AI_FORBIDDEN_REAL_WORLD_FACT');
     }
   }
-  const keys = ['id', 'type', 'title', 'time', 'locationRequirement', 'alternatives'];
-  const required = options.requireId
+  const keys = ['id', 'type', 'title', 'time', 'locationRequirement', 'alternatives', 'transportPreference'];
+  const required = options.authoritative
+    ? ['id', 'type', 'title']
+    : options.requireId
     ? ['id', 'type', 'title', 'time']
     : ['type', 'title', 'time'];
   const shape = validateExactKeys(value, keys, required, path);
@@ -213,21 +215,25 @@ function validateTripItem(value, index, options) {
     if (options.seenIds.has(value.id)) return invalid(`${path}.id`, 'ITEM_ID_DUPLICATED');
     options.seenIds.add(value.id);
   }
+  if (value.transportPreference !== undefined && !['walking', 'transit', 'driving'].includes(value.transportPreference)) return invalid(`${path}.transportPreference`, 'TRANSPORT_PREFERENCE_INVALID');
   if (!EVENT_TYPES.includes(value.type)) return invalid(`${path}.type`, 'ITEM_TYPE_INVALID');
   if (!isNonEmptyString(value.title, 500)) return invalid(`${path}.title`, 'ITEM_TITLE_REQUIRED');
 
+  if (!(options.authoritative && value.time === undefined)) {
   if (!isRecord(value.time)) return invalid(`${path}.time`, 'ITEM_TIME_OBJECT_REQUIRED');
   const timeShape = validateExactKeys(value.time, ['start', 'end', 'timezone'], ['start', 'timezone'], `${path}.time`);
   if (!timeShape.ok) return timeShape;
   if (!isIsoWithTimezone(value.time.start)) return invalid(`${path}.time.start`, 'ITEM_TIME_START_NOT_ISO');
   if (value.time.end !== undefined) {
     if (!isIsoWithTimezone(value.time.end)) return invalid(`${path}.time.end`, 'ITEM_TIME_END_NOT_ISO');
-    if (Date.parse(value.time.end) < Date.parse(value.time.start)) {
+    if (Date.parse(value.time.end) <= Date.parse(value.time.start)) {
       return invalid(`${path}.time.end`, 'ITEM_TIME_RANGE_INVERTED');
     }
   }
   if (!isNonEmptyString(value.time.timezone, 100)) {
     return invalid(`${path}.time.timezone`, 'ITEM_TIME_TIMEZONE_REQUIRED');
+  }
+
   }
 
   const previous = value.id && options.previousEventsById
@@ -268,9 +274,9 @@ function validateCurrentPlan(value, path) {
     'satisfiedConstraintCount',
     'totalConstraintCount',
     'conflicts',
-    'updatedAt',
+    'updatedAt', 'status', 'validationIssues',
   ];
-  const required = keys.filter((key) => key !== 'summary');
+  const required = keys.filter((key) => !['summary', 'status', 'validationIssues'].includes(key));
   const shape = validateExactKeys(value, keys, required, path);
   if (!shape.ok) return shape;
   if (!isNonEmptyString(value.id, MAX_ID_LENGTH)) return invalid(`${path}.id`, 'PLAN_ID_INVALID');
@@ -295,13 +301,26 @@ function validateCurrentPlan(value, path) {
 
   const seenIds = new Set();
   for (let index = 0; index < value.events.length; index += 1) {
-    const result = validateTripItem(value.events[index], index, {
+    const event = value.events[index];
+    if (!isRecord(event)) return invalid(`${path}.events[${index}]`, 'ITEM_OBJECT_REQUIRED');
+    // 输入是 Server 权威计划，输出才禁止地图事实。二者不能共用同一白名单。
+    const { location, restaurant, restaurantCandidates, route, sequenceConstraint, locationStatus, routeStatus, ...intent } = event;
+    if (restaurantCandidates !== undefined && !Array.isArray(restaurantCandidates)) return invalid(`${path}.events[${index}].restaurantCandidates`, 'CANDIDATES_INVALID');
+    for (const place of [location, restaurant && restaurant.location, ...(restaurantCandidates || []).map(c => c && c.location)]) {
+      if (place !== undefined && (!isRecord(place) || !isNonEmptyString(place.name, 500)
+        || !Number.isFinite(place.latitude) || Math.abs(place.latitude) > 90
+        || !Number.isFinite(place.longitude) || Math.abs(place.longitude) > 180)) {
+        return invalid(`${path}.events[${index}].location`, 'RESOLVED_PLACE_INVALID');
+      }
+    }
+    const result = validateTripItem(intent, index, {
       pathPrefix: `${path}.events`,
+      authoritative: true,
       allowIds: true,
       requireId: true,
       allowLocationId: true,
       allowedIds: null,
-      previousEventsById: null,
+      previousEventsById: new Map(value.events.map(e => [e.id, e])),
       seenIds,
     });
     if (!result.ok) return result;
@@ -357,8 +376,13 @@ function validatePipelineInput(requestType, body) {
     INITIAL_GENERATION: ['aiContext', 'triggeringComment'],
     TRIP_UPDATE: ['aiContext', 'currentPlan', 'triggeringComment', 'commentEvaluation', 'baseVersion'],
   }[requestType];
-  const allowed = [...commonKeys, ...additionalKeys];
-  const shape = validateExactKeys(input, allowed, allowed, property);
+  const required = [...commonKeys, ...additionalKeys];
+  const allowed = requestType === 'COMMENT_EVALUATION' ? [...required, 'currentPlan'] : required;
+  const shape = validateExactKeys(input, allowed, required, property);
+  if (requestType === 'COMMENT_EVALUATION' && input.currentPlan) {
+    const plan = validateCurrentPlan(input.currentPlan, `${property}.currentPlan`);
+    if (!plan.ok) return plan;
+  }
   if (!shape.ok) return shape;
   if (!isNonEmptyString(input.title, MAX_TITLE_LENGTH)) return invalid(`${property}.title`, 'TITLE_INVALID');
   const tripInput = validateTripInput(input.tripInput, `${property}.tripInput`);

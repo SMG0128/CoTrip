@@ -111,6 +111,8 @@ export class TripPlanGenerationService {
    * 返回评估记录供上层附加到评论；本方法自身绝不修改评论。
    */
   async processComment(comment: Comment, trip: Trip): Promise<ProcessCommentResult> {
+    trip = await this.trips.findById(trip.id) ?? trip;
+    console.info(JSON.stringify({ requestId: comment.id, tripId: trip.id, tripVersion: trip.currentPlan?.version ?? 0, intent: trip.currentPlan ? 'TRIP_UPDATE' : 'INITIAL_GENERATION' }));
     const evaluation = await this.evaluateComment(comment, trip);
     if (evaluation.status !== 'evaluated') {
       // 评估未成功：绝不据此触发任何计划变更，也绝不当成「判定为不相关」
@@ -183,6 +185,7 @@ export class TripPlanGenerationService {
       tripInput: this.buildTripInput(trip),
       aiContext: trip.aiContext ?? null,
       comment: this.toCommentInput(comment),
+      currentPlan: trip.currentPlan ?? null,
     };
 
     try {
@@ -241,6 +244,12 @@ export class TripPlanGenerationService {
     };
   }
 
+  private planUI(requestType: TripLatestAIUI['requestType'], plan: TripPlan, ui: AIUIConfig | undefined, updatedAt: string): TripLatestAIUI {
+    const result = this.buildLatestAIUI(requestType, plan.version, ui, updatedAt);
+    if (plan.status === 'needs_attention') result.ui = { ...result.ui, message: '行程尚不可执行：地点、交通或时间仍需确认，请补充具体地点或重试。' };
+    return result;
+  }
+
   /**
    * 仅当权威 Trip 仍无 currentPlan 时生成首版并落库。
    * 返回是否真正写入；任何拒绝路径都保持 currentPlan 原样。
@@ -265,6 +274,7 @@ export class TripPlanGenerationService {
         triggeringComment: this.toCommentInput(comment),
       };
 
+      console.info(JSON.stringify({ requestId: comment.id, tripId, intent: 'INITIAL_GENERATION', planAgentCalled: true }));
       const envelope = await this.generationAI.generateInitialTrip(input);
       const validation = validateInitialGenerationEnvelope(envelope);
       if (!validation.ok) {
@@ -294,9 +304,11 @@ export class TripPlanGenerationService {
             commentText: comment.rawText,
             city: extractCity(latest.areaConstraint),
             routeMode: comment.rawText,
+            requestId: comment.id,
           });
           plan = processed.plan;
         } catch {
+          console.warn(JSON.stringify({ requestId: comment.id, tripId: trip.id, stage: 'post_process', status: 'unavailable' }));
           // 后处理失败：保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离
         }
       }
@@ -305,19 +317,16 @@ export class TripPlanGenerationService {
       const tripStartDate = buildTimeAnchor(
         latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
       )?.startDate;
-      plan = sanitizePlanForPersist(plan, tripStartDate);
+      plan = sanitizePlanForPersist(plan, tripStartDate, (latest.timeRange as { end?: string } | undefined)?.end?.slice(0, 10));
       // 可观测性：PlanAgent 操作摘要（首版全量 ADD），不写完整 LLM 输出
       const operations = summarizePlanOperations(diffTripPlans(null, plan));
       console.info(
         `PlanAgent: operations=[${operations.types.join(',') || 'none'}] count=${operations.count}（首版 v${plan.version}）`,
       );
       // 完整 snapshot 与 UI 提示同一次原子写入
-      await this.trips.update({
-        ...latest,
-        currentPlan: plan,
-        latestAIUI: this.buildLatestAIUI('INITIAL_GENERATION', plan.version, validation.ui, updatedAt),
-      });
-      return true;
+      const committed = await this.trips.commitPlan(tripId, 0, plan, this.planUI('INITIAL_GENERATION', plan, validation.ui, updatedAt));
+      console.info(JSON.stringify({ requestId: comment.id, tripId, persistedVersion: committed ? plan.version : null, status: plan.status }));
+      return committed;
     } catch (error) {
       const reasonCode =
         error instanceof InitialGenerationAIError ? error.code : 'AI_REQUEST_FAILED';
@@ -372,6 +381,7 @@ export class TripPlanGenerationService {
 
       let envelope;
       try {
+        console.info(JSON.stringify({ requestId: comment.id, tripId: base.id, tripVersion: baseVersion, intent: 'TRIP_UPDATE', planAgentCalled: true }));
         envelope = await this.updateAI.updateTrip(input);
       } catch (error) {
         const reasonCode = error instanceof TripUpdateAIError ? error.code : 'AI_REQUEST_FAILED';
@@ -379,7 +389,7 @@ export class TripPlanGenerationService {
         return false;
       }
 
-      const validation = validateTripUpdateEnvelope(envelope, basePlan);
+      const validation = validateTripUpdateEnvelope(envelope, basePlan, /重新生成|重做整个|全部重新/.test(comment.rawText));
       if (!validation.ok) {
         console.warn(
           `TRIP_UPDATE 响应验证失败（${validation.failureReasonCode} @ ${validation.failurePath}），currentPlan 保持 v${baseVersion}`,
@@ -401,6 +411,12 @@ export class TripPlanGenerationService {
 
       const updatedAt = new Date().toISOString();
       let plan = buildUpdatedTripPlan(envelope, latest.currentPlan, updatedAt);
+      const requestedOperations = diffTripPlans(basePlan, plan);
+      console.info(JSON.stringify({ requestId: comment.id, tripId: base.id, targetActivityId: requestedOperations.map(op => op.eventId), routeInvalidated: basePlan.events.filter(e => e.route).map(e => e.id) }));
+      if (requestedOperations.length === 0 && basePlan.status !== 'needs_attention') {
+        console.info(JSON.stringify({ requestId: comment.id, tripId: base.id, persistedVersion: baseVersion, reason: 'NO_CONTENT_CHANGE' }));
+        return false;
+      }
       // 确定性后处理：时间锚定 / 时长 / 先后关系 / POI 解析。
       // 失败时保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离（fail-closed）。
       if (this.postProcessor) {
@@ -411,9 +427,12 @@ export class TripPlanGenerationService {
             commentText: comment.rawText,
             city: extractCity(latest.areaConstraint),
             routeMode: comment.rawText,
+            requestId: comment.id,
+            previousPlan: basePlan,
           });
           plan = processed.plan;
         } catch {
+          console.warn(JSON.stringify({ requestId: comment.id, tripId: trip.id, stage: 'post_process', status: 'unavailable' }));
           // 后处理失败：保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离
         }
       }
@@ -421,18 +440,19 @@ export class TripPlanGenerationService {
       const tripStartDate = buildTimeAnchor(
         latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
       )?.startDate;
-      plan = sanitizePlanForPersist(plan, tripStartDate);
+      plan = sanitizePlanForPersist(plan, tripStartDate, (latest.timeRange as { end?: string } | undefined)?.end?.slice(0, 10));
       // 可观测性：PlanAgent 操作摘要（ADD/UPDATE/DELETE/MOVE），不写完整 LLM 输出
       const operations = summarizePlanOperations(diffTripPlans(basePlan, plan));
       console.info(
         `PlanAgent: operations=[${operations.types.join(',') || 'none'}] count=${operations.count}（base v${baseVersion} → v${plan.version}）`,
       );
-      await this.trips.update({
-        ...latest,
-        currentPlan: plan,
-        latestAIUI: this.buildLatestAIUI('TRIP_UPDATE', plan.version, validation.ui, updatedAt),
-      });
-      return true;
+      if (JSON.stringify(basePlan.events) === JSON.stringify(plan.events) && basePlan.status === plan.status) return false;
+      const committed = await this.trips.commitPlan(base.id, baseVersion, plan, this.planUI('TRIP_UPDATE', plan, validation.ui, updatedAt));
+      console.info(JSON.stringify({ requestId: comment.id, tripId: base.id, persistedVersion: committed ? plan.version : null, status: plan.status }));
+      if (committed) return true;
+      const reloaded = await this.trips.findById(base.id);
+      if (!reloaded) return false;
+      base = reloaded;
     }
 
     console.warn('TRIP_UPDATE 连续版本冲突，放弃本次过期结果（不重试、不覆盖）');

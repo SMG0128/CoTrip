@@ -31,16 +31,19 @@ export const NEAR_DUPLICATE_THRESHOLD_MINUTES = 3;
 const MAX_WALKING_STEPS = 12;
 
 /**
- * top-N 选择：保持 provider 排序（第一条即推荐），剔除近似重复项。
+ * top-N 选择：比较真实 duration（最短者推荐），剔除近似重复项。
  * 规则：
  * - 与已保留任一选项「modes 完全相同 且 |时长差| < 3 分钟」→ 判定为近似重复，跳过；
- * - 最多保留 max 条，不足不补；输入顺序即输出顺序；
+ * - 最多保留 max 条，不足不补；跨交通方式按真实时长排序；
  * - 输出的 recommended 标记被归一化：index 0 → true，其余 false。
  * 独立纯函数以便单测覆盖。
  */
 export function selectTopRouteOptions(all: RouteOption[], max: number = MAX_ROUTE_OPTIONS): RouteOption[] {
   const kept: RouteOption[] = [];
-  for (const option of all) {
+  // 候选合并后按真实时长排序；平局纯步行优先，不能继承 API 调用顺序。
+  const ranked = [...all].sort((a, b) => a.durationMinutes - b.durationMinutes
+    || Number(b.modes.every(mode => mode === 'WALK')) - Number(a.modes.every(mode => mode === 'WALK')));
+  for (const option of ranked) {
     if (kept.length >= max) break;
     const isNearDuplicate = kept.some(
       (existing) =>
@@ -594,7 +597,8 @@ export class TencentDirectionProvider {
     if (!this.isConfigured) {
       throw new RouteOptionError('NOT_CONFIGURED', '未配置腾讯地图 Key，无法规划真实路线');
     }
-    if (!query.origin) {
+    if (!query.origin || !Number.isFinite(query.origin.latitude) || Math.abs(query.origin.latitude) > 90
+      || !Number.isFinite(query.origin.longitude) || Math.abs(query.origin.longitude) > 180) {
       throw new RouteOptionError('PERMISSION_DENIED', '缺少出发地定位：请先授权定位后再查询路线');
     }
 
@@ -651,7 +655,9 @@ export class TencentDirectionProvider {
       });
       const first = hits[0];
       // Location 的坐标为可选字段：缺坐标的 POI 无法用于路线规划，按解析失败处理
-      if (!first || first.latitude === undefined || first.longitude === undefined) {
+      if (!first || first.latitude === undefined || first.longitude === undefined
+        || !Number.isFinite(first.latitude) || Math.abs(first.latitude) > 90
+        || !Number.isFinite(first.longitude) || Math.abs(first.longitude) > 180) {
         throw new RouteOptionError('GEOCODE_FAILED', `目的地解析失败: ${query.destinationName}`);
       }
       return { name: first.name, latitude: first.latitude, longitude: first.longitude };

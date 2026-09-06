@@ -199,7 +199,7 @@ export async function runRouteDurationTests(): Promise<void> {
     assert.strictEqual(museum.route?.fromEventId, 'event_1');
     assert.strictEqual(museum.route?.provider, 'tencent');
     assert.strictEqual(museum.route?.mode, 'walking', '同 duration 时必须确定性优先 walking');
-    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit', 'driving']);
   });
 
   // ---------- L. 用户硬约束晚于 earliest → 尊重用户时间 ----------
@@ -322,7 +322,7 @@ export async function runRouteDurationTests(): Promise<void> {
     assert.ok(meal.restaurant, '餐厅必须解析成功');
     assert.ok(meal.route, '餐厅活动必须参与路线');
     assert.strictEqual(meal.route?.fromEventId, 'event_1');
-    assert.strictEqual(directions.calls.length, 2);
+    assert.strictEqual(directions.calls.length, 3);
     // route 终点是餐厅真实坐标（23.1105/113.301），不是公园坐标（23.13/113.32）
     for (const call of directions.calls) {
       assert.strictEqual(call.to.latitude, 23.1105, '路线终点必须是餐厅坐标');
@@ -341,7 +341,7 @@ export async function runRouteDurationTests(): Promise<void> {
         transit: foundRoute('transit', 60, 3100),
       },
     });
-    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit', 'driving']);
     assert.strictEqual(event.route?.mode, 'walking');
     assert.strictEqual(event.route?.durationMinutes, 5);
     assert.strictEqual(event.time?.start, '2026-09-10T11:05:00+08:00');
@@ -354,7 +354,7 @@ export async function runRouteDurationTests(): Promise<void> {
         transit: foundRoute('transit', 25, 5100),
       },
     });
-    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit', 'driving']);
     assert.strictEqual(event.route?.mode, 'transit');
     assert.strictEqual(event.route?.durationMinutes, 25);
     assert.strictEqual(event.time?.start, '2026-09-10T11:25:00+08:00');
@@ -389,7 +389,7 @@ export async function runRouteDurationTests(): Promise<void> {
         transit: { status: 'DIRECTION_UNAVAILABLE' },
       },
     });
-    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit']);
+    assert.deepStrictEqual(directions.calls.map((call) => call.mode), ['walking', 'transit', 'driving']);
     assert.strictEqual(event.route, undefined);
     assert.strictEqual(event.time?.start, '2026-09-10T11:00:00+08:00', '两者失败时不得补 fake duration');
   });
