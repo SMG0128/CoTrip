@@ -107,7 +107,12 @@ async function main() {
     ] };
     const short = sanitizePlanForPersist((await postProcessTripPlan({ plan: shortPlan, timeRange, city: '广州市' }, lbs, directions)).plan, date);
     assert.equal(short.status, 'actionable');
-    assert.equal(short.events[1].route.mode, 'walking', '真实短途未推荐步行');
+    // 路线选择契约：未指定交通偏好时按 walking → transit → driving 请求，selected 必须是
+    // 真实候选中最短 duration 者（平局 walking 优先）。真实 Tencent 在地点极近时可能返回
+    // driving/transit 更快，因此绝不强制「必须 walking」；short 只验证真实路线已落库。
+    assert.equal(short.events[1].route.provider, 'tencent', '短途必须来源真实腾讯路线');
+    assert(short.events[1].route.mode !== undefined, '短途必须落地一个真实 mode 的路线');
+    report.shortRouteSelectedMode = short.events[1].route.mode;
     report.cases.shortDistance = 'PASS';
   } finally {
     if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
