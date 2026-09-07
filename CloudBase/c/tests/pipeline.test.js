@@ -524,12 +524,13 @@ async function runPipelineTests() {
     }
   });
 
-  await record('transportPreference: null 视为「未指定」，不得丢弃整份合法 snapshot', async () => {
-    // 真实回归：hy3 会把未指定交通偏好的活动输出为 transportPreference: null，
-    // 过严的枚举校验会连带丢弃整份合法计划（502 AI_INVALID_RESPONSE）。
+  await record('model null: transportPreference / locationRequirement 的 null = 未指定', async () => {
+    // 真实回归：hy3 把未指定的可选字段输出为 null（transportPreference、district…），
+    // 过严的「非 undefined 即必须合法」校验会连带丢弃整份合法计划（502）。
     const envelope = clone(ENVELOPES.INITIAL_GENERATION);
     envelope.trip.items[0].transportPreference = null;
     envelope.trip.items[1].transportPreference = 'walking';
+    envelope.trip.items[0].locationRequirement = { city: '测试城', district: null, query: '测试地点' };
     const response = await gateway(providerReturning({ INITIAL_GENERATION: envelope }))
       .handle(requestFor('INITIAL_GENERATION'));
     assert.strictEqual(response.status, 200, 'null 交通偏好必须放行');

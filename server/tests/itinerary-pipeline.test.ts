@@ -265,14 +265,14 @@ export async function runItineraryPipelineTests(): Promise<void> {
     const invalid = baseline(); invalid.events[0].location!.longitude = NaN;
     assert.equal(sanitizePlanForPersist(invalid, undefined).events[0].location, undefined);
   });
-  await record('AI snapshot: transportPreference null = 未指定（不得丢弃整份合法 snapshot）', () => {
-    // 真实回归：hy3 把未指定交通偏好的活动输出为 transportPreference: null，
-    // 过严的枚举校验会连带丢弃整份合法计划（AI_INVALID_RESPONSE / 计划不生成）。
+  await record('AI snapshot: transportPreference / locationRequirement 的 null = 未指定（不得丢弃整份合法 snapshot）', () => {
+    // 真实回归：hy3 把未指定的可选字段输出为 null（transportPreference、district…），
+    // 过严的「非 undefined 即必须合法」校验会连带丢弃整份合法计划（计划不生成）。
     const snapshot = {
       title: '广州一日游',
       summary: '博物馆、粤菜、广州塔',
       items: [
-        { type: 'OTHER', title: '参观博物馆', time: time(10), locationRequirement: { query: '广东省博物馆' }, transportPreference: null },
+        { type: 'OTHER', title: '参观博物馆', time: time(10), locationRequirement: { query: '广东省博物馆', city: '广州市', district: null }, transportPreference: null },
         { type: 'DINING', title: '午餐', time: time(12), locationRequirement: { query: '附近粤菜' }, transportPreference: 'walking' },
       ],
     };
@@ -291,5 +291,13 @@ export async function runItineraryPipelineTests(): Promise<void> {
     assert.equal(result.ok, false);
     assert.equal(result.failurePath, 'trip.items[0].transportPreference');
     assert.equal(result.failureReasonCode, 'TRANSPORT_PREFERENCE_INVALID');
+    // 非 null 的非法类型仍然拒绝（校验强度不变）
+    const badDistrict = validateAITripSnapshot({
+      title: '广州一日游',
+      summary: '博物馆、粤菜、广州塔',
+      items: [{ type: 'OTHER', title: '参观博物馆', time: time(10), locationRequirement: { district: 123 } }],
+    }, { allowItemIds: false });
+    assert.equal(badDistrict.ok, false);
+    assert.equal(badDistrict.failureReasonCode, 'LOCATION_REQUIREMENT_NOT_STRING');
   });
 }

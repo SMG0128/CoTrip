@@ -198,7 +198,8 @@ function validateLocationRequirement(value, path, options) {
   const shape = validateExactKeys(value, ['city', 'district', 'locationId', 'query'], [], path);
   if (!shape.ok) return shape;
   for (const key of ['city', 'district', 'locationId', 'query']) {
-    if (value[key] !== undefined && typeof value[key] !== 'string') {
+    // null 是「未指定」的显式表示，等价于字段缺失：不得因此丢弃整份合法 snapshot。
+    if (value[key] !== undefined && value[key] !== null && typeof value[key] !== 'string') {
       return invalid(`${path}.${key}`, 'LOCATION_REQUIREMENT_NOT_STRING');
     }
   }

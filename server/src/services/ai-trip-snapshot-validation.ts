@@ -73,7 +73,8 @@ function validateLocationRequirement(
     if (!allowed.includes(key)) {
       return fail(`${path}.${key}`, 'LOCATION_REQUIREMENT_UNKNOWN_KEY');
     }
-    if (record[key] !== undefined && typeof record[key] !== 'string') {
+    // null 是「未指定」的显式表示，等价于字段缺失：不得因此丢弃整份合法 snapshot。
+    if (record[key] !== undefined && record[key] !== null && typeof record[key] !== 'string') {
       return fail(`${path}.${key}`, 'LOCATION_REQUIREMENT_NOT_STRING');
     }
   }
