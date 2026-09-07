@@ -102,7 +102,10 @@ function validateItem(
     return fail(path, 'ITEM_OBJECT_REQUIRED');
   }
   const item = value as Record<string, unknown>;
-  if (item.transportPreference !== undefined && !['walking', 'transit', 'driving'].includes(String(item.transportPreference))) {
+  // null 是「未指定交通偏好」的显式表示，等价于字段缺失：不得因此丢弃整份合法 snapshot。
+  // 真正的非法值（如「地铁」）仍然拒绝，校验强度不变。
+  if (item.transportPreference !== undefined && item.transportPreference !== null
+    && !['walking', 'transit', 'driving'].includes(String(item.transportPreference))) {
     return fail(`${path}.transportPreference`, 'TRANSPORT_PREFERENCE_INVALID');
   }
 

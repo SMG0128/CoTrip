@@ -524,6 +524,32 @@ async function runPipelineTests() {
     }
   });
 
+  await record('transportPreference: null 视为「未指定」，不得丢弃整份合法 snapshot', async () => {
+    // 真实回归：hy3 会把未指定交通偏好的活动输出为 transportPreference: null，
+    // 过严的枚举校验会连带丢弃整份合法计划（502 AI_INVALID_RESPONSE）。
+    const envelope = clone(ENVELOPES.INITIAL_GENERATION);
+    envelope.trip.items[0].transportPreference = null;
+    envelope.trip.items[1].transportPreference = 'walking';
+    const response = await gateway(providerReturning({ INITIAL_GENERATION: envelope }))
+      .handle(requestFor('INITIAL_GENERATION'));
+    assert.strictEqual(response.status, 200, 'null 交通偏好必须放行');
+    assert.strictEqual(response.body.envelope.trip.items.length, 2);
+    assert.ok(!['string'].includes(typeof response.body.envelope.trip.items[0].transportPreference)
+      || ['walking', 'transit', 'driving'].includes(response.body.envelope.trip.items[0].transportPreference),
+      'null 交通偏好等价于未指定');
+  });
+
+  await record('transportPreference: 真正的非法值仍然拒绝（校验强度不变）', async () => {
+    const envelope = clone(ENVELOPES.INITIAL_GENERATION);
+    envelope.trip.items[0].transportPreference = '地铁';
+    const { result, calls } = await captureConsoleError(async () => gateway(
+      providerReturning({ INITIAL_GENERATION: envelope }),
+    ).handle(requestFor('INITIAL_GENERATION')));
+    assert.strictEqual(result.status, 502);
+    assert.strictEqual(result.body.error, 'AI_INVALID_RESPONSE');
+    assert.ok(JSON.stringify(calls).includes('TRANSPORT_PREFERENCE_INVALID'), '非法值必须被拒绝');
+  });
+
   await record('pipeline prompts: JSON、事实、ID、稳定更新与 UI 边界齐全', () => {
     for (const prompt of Object.values(PIPELINE_SYSTEM_PROMPTS)) {
       assert.ok(prompt.includes('只输出一个纯 JSON object'));

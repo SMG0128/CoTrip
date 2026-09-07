@@ -237,7 +237,10 @@ function validateTripItem(value, index, options) {
     if (options.seenIds.has(value.id)) return invalid(`${path}.id`, 'ITEM_ID_DUPLICATED');
     options.seenIds.add(value.id);
   }
-  if (value.transportPreference !== undefined && !['walking', 'transit', 'driving'].includes(value.transportPreference)) return invalid(`${path}.transportPreference`, 'TRANSPORT_PREFERENCE_INVALID');
+  // null 是「未指定交通偏好」的显式表示，等价于字段缺失：不得因此丢弃整份合法 snapshot。
+  // 真正的非法值仍然拒绝，校验强度不变。
+  if (value.transportPreference !== undefined && value.transportPreference !== null
+    && !['walking', 'transit', 'driving'].includes(value.transportPreference)) return invalid(`${path}.transportPreference`, 'TRANSPORT_PREFERENCE_INVALID');
   if (!EVENT_TYPES.includes(value.type)) return invalid(`${path}.type`, 'ITEM_TYPE_INVALID');
   if (!isNonEmptyString(value.title, 500)) return invalid(`${path}.title`, 'ITEM_TITLE_REQUIRED');
 

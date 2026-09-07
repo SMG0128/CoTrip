@@ -29,6 +29,7 @@ import { validateItinerary } from '../src/services/itinerary-validator';
 import { buildUpdatedTripPlan, validateTripUpdateEnvelope } from '../src/services/trip-update-ai-validation';
 import { postProcessTripPlan } from '../src/services/trip-plan-post-processor';
 import { sanitizePlanForPersist } from '../src/services/plan-persist-sanitizer';
+import { validateAITripSnapshot } from '../src/services/ai-trip-snapshot-validation';
 import { record } from './run-tests';
 
 const time = (hour: number, day = '2026-09-07') => ({ start: `${day}T${hour}:00:00+08:00`, end: `${day}T${hour + 1}:00:00+08:00`, timezone: 'Asia/Shanghai' });
@@ -263,5 +264,32 @@ export async function runItineraryPipelineTests(): Promise<void> {
     assert.equal(result.plan.status, 'needs_attention');
     const invalid = baseline(); invalid.events[0].location!.longitude = NaN;
     assert.equal(sanitizePlanForPersist(invalid, undefined).events[0].location, undefined);
+  });
+  await record('AI snapshot: transportPreference null = 未指定（不得丢弃整份合法 snapshot）', () => {
+    // 真实回归：hy3 把未指定交通偏好的活动输出为 transportPreference: null，
+    // 过严的枚举校验会连带丢弃整份合法计划（AI_INVALID_RESPONSE / 计划不生成）。
+    const snapshot = {
+      title: '广州一日游',
+      summary: '博物馆、粤菜、广州塔',
+      items: [
+        { type: 'OTHER', title: '参观博物馆', time: time(10), locationRequirement: { query: '广东省博物馆' }, transportPreference: null },
+        { type: 'DINING', title: '午餐', time: time(12), locationRequirement: { query: '附近粤菜' }, transportPreference: 'walking' },
+      ],
+    };
+    const result = validateAITripSnapshot(snapshot, { allowItemIds: false });
+    assert.equal(result.ok, true, JSON.stringify(result));
+  });
+  await record('AI snapshot: transportPreference 非法值仍然拒绝（校验强度不变）', () => {
+    const snapshot = {
+      title: '广州一日游',
+      summary: '博物馆、粤菜、广州塔',
+      items: [
+        { type: 'OTHER', title: '参观博物馆', time: time(10), locationRequirement: { query: '广东省博物馆' }, transportPreference: '地铁' },
+      ],
+    };
+    const result = validateAITripSnapshot(snapshot, { allowItemIds: false });
+    assert.equal(result.ok, false);
+    assert.equal(result.failurePath, 'trip.items[0].transportPreference');
+    assert.equal(result.failureReasonCode, 'TRANSPORT_PREFERENCE_INVALID');
   });
 }
