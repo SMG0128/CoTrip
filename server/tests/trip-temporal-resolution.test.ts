@@ -31,6 +31,7 @@ import {
 } from '../src/services/tencent-lbs-service';
 import { rankPlaceCandidates } from '../src/services/place-candidate-ranker';
 import { postProcessTripPlan, applySequenceTimes } from '../src/services/trip-plan-post-processor';
+import { validateItinerary } from '../src/services/itinerary-validator';
 import { sanitizePlanForPersist } from '../src/services/plan-persist-sanitizer';
 import { TripPlan, TripPlanEvent } from '../src/types/trip-plan';
 
@@ -57,6 +58,61 @@ function planFixture(events: TripPlanEvent[]): TripPlan {
     conflicts: [],
     updatedAt: '2026-09-01T00:00:00.000Z',
   };
+}
+
+/** 已验证地点（带 providerRefs，代表腾讯真实返回，非 AI 生成） */
+function verifiedPlace(id: string, name: string): NonNullable<TripPlanEvent['location']> {
+  return {
+    id,
+    name,
+    latitude: 23.1,
+    longitude: 113.3,
+    address: '广州市',
+    providerRefs: [{ provider: 'tencent', externalId: id }],
+  };
+}
+
+/**
+ * 给三点链路补上已验证地点与真实 Tencent route（博物馆→午餐 13min、午餐→广州塔 39min），
+ * 用于验证排程结果与可执行性门禁一致。
+ */
+function realRoutePlanFixture(events: TripPlanEvent[]): TripPlan {
+  const museum = verifiedPlace('poi_museum', '广东省博物馆');
+  const meal = verifiedPlace('poi_meal', '头啖汤粤菜');
+  const tower = verifiedPlace('poi_tower', '广州塔');
+  const [first, second, third] = events;
+  return planFixture([
+    { ...first, location: museum },
+    {
+      ...second,
+      location: meal,
+      restaurant: { id: meal.id, name: meal.name, location: meal },
+      route: {
+        fromEventId: first.id,
+        toEventId: second.id,
+        origin: museum,
+        destination: meal,
+        durationMinutes: 13,
+        distanceMeters: 887,
+        mode: 'walking',
+        provider: 'tencent',
+      },
+    },
+    {
+      ...third,
+      location: tower,
+      route: {
+        fromEventId: second.id,
+        toEventId: third.id,
+        origin: meal,
+        destination: tower,
+        durationMinutes: 39,
+        distanceMeters: 2562,
+        mode: 'walking',
+        provider: 'tencent',
+      },
+    },
+  ]);
 }
 
 /** 可编程 Tencent LBS stub：模拟腾讯 API 返回 / 0 结果 / 抛错 */
@@ -208,6 +264,47 @@ export async function runTemporalResolutionTests(): Promise<void> {
       '2026-09-10T13:45:00+08:00',
       '有真实 route duration 时 start = previous.end + real duration',
     );
+  });
+
+  await record('3e. 含餐饮的三点链路：时间按「相邻活动 + 真实路线时长」后移，不残留 TIME_CONFLICT', () => {
+    // 复现真实链路：评论「上午去广东省博物馆，中午吃粤菜，下午去广州塔」。
+    // 餐饮活动没有地点提及，不进入地点链，因此广州塔的 sequenceConstraint 会跳过
+    // 午餐直接链到博物馆；时间排程必须与真实路线/可执行性校验一致地按相邻活动计算。
+    const events = [
+      event({ id: 'event_1', title: '广东省博物馆', time: { start: '2026-09-10T09:00:00+08:00', end: '2026-09-10T12:00:00+08:00', timezone: 'Asia/Shanghai' } }),
+      event({ id: 'event_2', type: 'DINING', title: '粤菜', time: { start: '2026-09-10T12:00:00+08:00', end: '2026-09-10T14:00:00+08:00', timezone: 'Asia/Shanghai' } }),
+      event({ id: 'event_3', title: '广州塔', time: { start: '2026-09-10T14:00:00+08:00', end: '2026-09-10T18:00:00+08:00', timezone: 'Asia/Shanghai' } }),
+    ];
+    const sequenced = resolveSequenceConstraints(
+      events,
+      '明天在广州玩一天，上午去广东省博物馆，中午吃粤菜，下午去广州塔。',
+    );
+    assert.strictEqual(
+      sequenced[2].sequenceConstraint?.afterActivityId,
+      'event_1',
+      '餐饮活动不进入地点链：广州塔的语义链接会跳过午餐',
+    );
+
+    const adjusted = applySequenceTimes(
+      sequenced as never[],
+      // 真实 Tencent direction 结果：博物馆→午餐 13min，午餐→广州塔 39min
+      new Map([['event_2', 13], ['event_3', 39]]),
+    ) as Array<{ id: string; time: { start: string; end?: string } }>;
+    const meal = adjusted.find((e) => e.id === 'event_2')!;
+    const tower = adjusted.find((e) => e.id === 'event_3')!;
+    assert.strictEqual(meal.time.start, '2026-09-10T12:13:00+08:00', '午餐 start = 博物馆 end + 13min');
+    assert.strictEqual(
+      tower.time.start,
+      '2026-09-10T14:52:00+08:00',
+      '广州塔 start = 午餐 end + 真实路线 39min（不得按被跳过的语义链接排程）',
+    );
+
+    const validated = validateItinerary(realRoutePlanFixture(adjusted as never), {
+      start: '2026-09-10',
+      end: '2026-09-10',
+    });
+    assert.strictEqual(validated.status, 'actionable', '三点链路落库不得残留 TIME_CONFLICT');
+    assert.deepStrictEqual(validated.validationIssues ?? [], [], '无可执行性问题');
   });
 
   // ---------- 4. 先后关系 ----------

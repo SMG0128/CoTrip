@@ -88,8 +88,15 @@ export interface PostProcessResult {
  *     则 start = 前一活动 end + realTravelMinutes。
  *   - 本模块不新造第二套路由系统；真实 route duration 由外部注入。
  *
+ * 排程前置活动 = 数组相邻的前一个活动：与真实路线计算（相邻活动之间调用 Tencent
+ * direction）以及可执行性校验（validateItinerary 按相邻活动判定 TIME_CONFLICT）使用
+ * 同一对活动。sequenceConstraint 表达的是「附近搜索锚点」语义（餐饮活动不进入地点
+ * 链，可跳过中间活动），不能作为排程前置，否则后续活动不会按真实路线时长后移，
+ * 落库计划必然残留 TIME_CONFLICT 而降级为 needs_attention。
+ *
  * @param realTravelMinutesByEventId 可选：真实路线 duration（分钟），key 为活动 id。
  *   仅当来自真实 route provider 时提供；缺省表示无真实路线，不伪造 travel。
+ *   只有排程前置就是该真实路线的起点活动时才计入，绝不把别处的时长张冠李戴。
  */
 export function applySequenceTimes(
   events: ResolvedTripEvent[],
@@ -99,13 +106,16 @@ export function applySequenceTimes(
   const byId = new Map(result.map((e) => [e.id, e]));
 
   for (const [index, event] of result.entries()) {
-    const seq = event.sequenceConstraint;
-    const prior = seq ? byId.get(seq.afterActivityId) : result[index - 1];
+    const adjacent = result[index - 1];
+    const linked = event.sequenceConstraint
+      ? byId.get(event.sequenceConstraint.afterActivityId)
+      : undefined;
+    const prior = adjacent ?? linked;
     if (!prior || !prior.time?.end || prior.time.start.slice(0, 10) !== event.time?.start?.slice(0, 10)) continue;
 
     const priorEnd = new Date(prior.time.end).getTime();
     // 真实路线 duration（分钟）；无真实数据时为 0，即 start = previous.end，不伪造 travel
-    const realTravelMs = (realTravelMinutesByEventId?.get(event.id) ?? 0) * 60_000;
+    const realTravelMs = (prior === adjacent ? realTravelMinutesByEventId?.get(event.id) ?? 0 : 0) * 60_000;
     const earliestStart = new Date(priorEnd + realTravelMs);
     // event[i+1].start = max(已有硬约束 start, event[i].end + 真实路线 duration)
     const existingStart = new Date(event.time.start).getTime();
