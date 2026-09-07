@@ -20,6 +20,7 @@ const {
 } = require('./coordinate-response-parser');
 const {
   parseStrictJsonContent,
+  stripNullValues,
   validatePipelineInput,
   validatePipelineEnvelope,
 } = require('./pipeline-contract');
@@ -141,7 +142,12 @@ async function handlePipeline(aiProvider, requestType, body) {
 
   let envelope;
   try {
-    envelope = parseStrictJsonContent(aiResult && aiResult.text);
+    const parsed = parseStrictJsonContent(aiResult && aiResult.text);
+    // null = 未指定：仅对 AI  authored 的 trip 部分剔除（ui.message: null 是合法值，
+    // 必须原样保留）。必填字段写成 null 仍按缺失拒绝，校验强度不变。
+    envelope = parsed && typeof parsed.trip !== 'undefined'
+      ? { ...parsed, trip: stripNullValues(parsed.trip) }
+      : parsed;
   } catch {
     return json(502, { ok: false, error: 'AI_INVALID_RESPONSE' });
   }

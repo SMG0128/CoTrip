@@ -59,6 +59,28 @@ function isValidIsoWithTimezone(value: unknown): value is string {
   );
 }
 
+/**
+ * 归一化 AI 输出：显式 null 表示「未指定」，等价于字段缺失。
+ *
+ * 真实回归：hy3 会把未指定的可选字段写成 null（transportPreference、district…），
+ * 逐个字段放宽会造成打地鼠。校验前统一剔除 null：
+ *   - 可选字段：null → 缺失，语义不变；
+ *   - 必填字段：null → 缺失，仍按缺失拒绝（校验强度不变）。
+ * 绝不把 null 改写成任何真实世界事实。
+ */
+function stripNullValues(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripNullValues);
+  if (value && typeof value === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      if (nested === null) continue;
+      output[key] = stripNullValues(nested);
+    }
+    return output;
+  }
+  return value;
+}
+
 function validateLocationRequirement(
   value: unknown,
   path: string,
@@ -195,7 +217,8 @@ export function validateAITripSnapshot(
   if (typeof trip !== 'object' || Array.isArray(trip)) {
     return fail('trip', 'TRIP_OBJECT_REQUIRED');
   }
-  const tripRecord = trip as Record<string, unknown>;
+  // null = 未指定：统一剔除后再校验（可选字段等价缺失，必填字段仍按缺失拒绝）
+  const tripRecord = stripNullValues(trip) as Record<string, unknown>;
 
   if (typeof tripRecord.title !== 'string' || tripRecord.title.trim() === '') {
     return fail('trip.title', 'TRIP_TITLE_REQUIRED');

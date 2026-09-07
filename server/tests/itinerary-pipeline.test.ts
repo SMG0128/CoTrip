@@ -299,5 +299,13 @@ export async function runItineraryPipelineTests(): Promise<void> {
     }, { allowItemIds: false });
     assert.equal(badDistrict.ok, false);
     assert.equal(badDistrict.failureReasonCode, 'LOCATION_REQUIREMENT_NOT_STRING');
+    // 必填字段写成 null 仍然按「缺失」拒绝（剔除 null 不等于放宽必填校验）
+    const missingTitle = validateAITripSnapshot({
+      title: '广州一日游',
+      summary: '博物馆、粤菜、广州塔',
+      items: [{ type: 'OTHER', title: null, time: time(10) }],
+    }, { allowItemIds: false });
+    assert.equal(missingTitle.ok, false);
+    assert.equal(missingTitle.failureReasonCode, 'ITEM_TITLE_REQUIRED');
   });
 }

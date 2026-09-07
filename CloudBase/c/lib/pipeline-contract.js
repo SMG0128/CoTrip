@@ -78,6 +78,28 @@ function isRecord(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * 归一化模型输出：显式 null 表示「未指定」，等价于字段缺失。
+ *
+ * 真实回归：hy3 会把未指定的可选字段写成 null（transportPreference、district…），
+ * 逐个字段放宽会造成打地鼠。这里在校验前统一剔除 null：
+ *   - 可选字段：null → 缺失，语义不变；
+ *   - 必填字段：null → 缺失，仍会按 REQUIRED_FIELD 拒绝（校验强度不变）。
+ * 绝不把 null 改写成任何真实世界事实。
+ */
+function stripNullValues(value) {
+  if (Array.isArray(value)) return value.map(stripNullValues);
+  if (isRecord(value)) {
+    const output = {};
+    for (const [key, nested] of Object.entries(value)) {
+      if (nested === null) continue;
+      output[key] = stripNullValues(nested);
+    }
+    return output;
+  }
+  return value;
+}
+
 function validateExactKeys(value, allowed, required, path) {
   const unexpected = Object.keys(value).find((key) => !allowed.includes(key));
   if (unexpected !== undefined) return invalid(`${path}.${unexpected}`, 'UNEXPECTED_KEY');
@@ -597,6 +619,7 @@ module.exports = {
   REQUEST_TYPES,
   SCHEMA_VERSION,
   parseStrictJsonContent,
+  stripNullValues,
   validatePipelineInput,
   validatePipelineEnvelope,
 };
