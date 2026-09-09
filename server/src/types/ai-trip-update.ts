@@ -46,6 +46,8 @@ export interface TripUpdateCommentEvaluationInput {
  * 无完整数据库对象、无不相关评论、无无界历史。
  */
 export interface TripUpdateAIInput {
+  /** 服务端解析的明确单活动授权边界；缺省沿用完整计划编辑。 */
+  editScope?: TripEditScope;
   title: string;
   tripInput: TripPreprocessTripInput;
   aiContext: TripAIContext | null;
@@ -58,6 +60,12 @@ export interface TripUpdateAIInput {
    * 提交时必须仍等于 currentPlan.version 才允许落库（compare-and-set）。
    */
   baseVersion: number;
+}
+
+export interface TripEditScope {
+  mode: 'single_activity';
+  targetActivityId: string;
+  absoluteStartTime?: string;
 }
 
 export interface TripUpdateDecision {

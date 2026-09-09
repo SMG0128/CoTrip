@@ -25,7 +25,7 @@ import { JsonCommentRepository } from '../src/repositories/json-comment-reposito
 import { JsonUserRepository } from '../src/repositories/json-user-repository';
 import { CommentService } from '../src/services/comment-service';
 import { UnavailableAICommentService } from '../src/services/ai-comment-service';
-import { TripPlanGenerationService } from '../src/services/trip-plan-generation-service';
+import { DefaultTripPlanPostProcessor, TripPlanGenerationService } from '../src/services/trip-plan-generation-service';
 import {
   CommentEvaluationAIService,
   UnavailableCommentEvaluationAIService,
@@ -47,6 +47,8 @@ import { TripPlan } from '../src/types/trip-plan';
 import { TripAIContext } from '../src/types/ai-preprocess';
 import { User } from '../src/types/user';
 import { diffTripPlans } from '../src/services/trip-plan-diff';
+import { resolveTripEditScope, normalizeScopedTripUpdate, enforceAppliedEditScope } from '../src/services/trip-edit-scope';
+import { buildUpdatedTripPlan, validateTripUpdateEnvelope } from '../src/services/trip-update-ai-validation';
 import { record } from './run-tests';
 
 const userA: User = {
@@ -203,6 +205,7 @@ interface Harness {
 function setup(options: {
   evaluationAI?: CommentEvaluationAIService;
   updateAI?: TripUpdateAIService;
+  postProcess?: boolean;
 }): Harness {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cotrip-plan-agent-'));
   fs.writeFileSync(
@@ -218,6 +221,7 @@ function setup(options: {
     options.evaluationAI ?? new UnavailableCommentEvaluationAIService(),
     new UnavailableInitialGenerationAIService(),
     options.updateAI ?? new UnavailableTripUpdateAIService(),
+    options.postProcess ? new DefaultTripPlanPostProcessor(null) : null,
   );
   const service = new CommentService(
     comments,
@@ -260,6 +264,92 @@ function keep(basePlan: TripPlan, eventId: string, overrides: Partial<{ time: un
 }
 
 export async function runTripPlanAgentTests(): Promise<void> {
+  await record('minimal-edit: 模糊目标不能猜 ID，多目标与显式协调保留原契约', () => {
+    const base = basePlanFixture();
+    base.events[1].title = '另一家图书馆';
+    assert.equal(resolveTripEditScope('把图书馆推迟到下午两点', base), undefined);
+    assert.equal(resolveTripEditScope('把不存在的目标改成公园', base), undefined);
+    assert.equal(resolveTripEditScope('把广州图书馆推迟到下午两点并协调后续行程', base), undefined);
+    assert.equal(resolveTripEditScope('把广州图书馆改成另一家图书馆', base), undefined);
+    assert.equal(resolveTripEditScope('把广州图书馆推迟到下午两点，不要重排', base)?.targetActivityId, 'event_gzlib');
+  });
+  await record('minimal-edit: validator 拒绝越界 update/move/add/delete/alternatives', () => {
+    const base = basePlanFixture();
+    const scope = resolveTripEditScope('把广州图书馆提前到上午九点半', base)!;
+    assert.equal(scope.absoluteStartTime, '09:30');
+    const items = base.events.map(event => keep(base, event.id));
+    const proposals: AITripUpdateEnvelope['trip']['items'][] = [
+      [items[0], { ...items[1], title: '越界修改' }, items[2]],
+      [items[1], items[0], items[2]],
+      [...items, { ...items[0], id: undefined }],
+      [items[0], items[2]],
+      [items[0], { ...items[1], alternatives: ['越界备选'] }, items[2]],
+    ];
+    for (const proposal of proposals) {
+      const envelope = updateEnvelope(base, proposal, '越界');
+      const result = validateTripUpdateEnvelope(envelope, base, false, scope);
+      assert.equal(result.ok, false);
+      assert.equal(result.failureReasonCode, 'ACTIVITY_EDIT_SCOPE_VIOLATION');
+      const normalized = normalizeScopedTripUpdate(envelope, base, scope)!;
+      assert.equal(validateTripUpdateEnvelope(normalized, base, false, scope).ok, true);
+    }
+    assert.equal(normalizeScopedTripUpdate(updateEnvelope(base, items.slice(1), '删除目标'), base, scope), undefined);
+  });
+  await record('minimal-edit: apply 门禁阻止后处理额外扩散并保留目标绝对时间', () => {
+    const base = basePlanFixture();
+    const scope = resolveTripEditScope('把广州图书馆推迟到14:30', base)!;
+    const normalized = normalizeScopedTripUpdate(updateEnvelope(base, base.events.map(e => keep(base, e.id)), ''), base, scope)!;
+    const requested = buildUpdatedTripPlan(normalized, base, base.updatedAt);
+    const expanded = { ...requested, events: [...requested.events].reverse().map(e => ({ ...e, title: '后处理越界', time: { ...e.time, start: '2026-09-05T20:00:00+08:00' } })) };
+    const guarded = enforceAppliedEditScope(expanded, requested, scope);
+    assert.deepStrictEqual(guarded.events.map(e => e.id), base.events.map(e => e.id));
+    assert.equal(guarded.events[0].time.start.slice(11, 16), '14:30');
+    assert.deepStrictEqual(diffTripPlans(base, guarded).filter(op => op.eventId !== scope.targetActivityId), []);
+  });
+  for (const scenario of [
+    { name: '单活动绝对时间，丢弃模型无关 update/move', text: '把博物馆推迟到下午两点', replan: false, rename: false },
+    { name: '显式重排允许多活动调整', text: '把博物馆推迟到下午两点，并重新安排后面的活动避免冲突', replan: true, rename: false },
+    { name: '单活动更换地点仍保持局部修改', text: '把博物馆改成广东省博物馆', replan: false, rename: true },
+    { name: '硬时间冲突保留 needs_attention，不顺延其他活动', text: '把博物馆推迟到下午两点，不要调整其他活动', replan: false, rename: false },
+    { name: '其他活动名称与中文时刻同样受约束', text: '把图书馆提前到上午十一点', replan: false, rename: false },
+  ]) {
+    await record(`minimal-edit: ${scenario.name}`, async () => {
+      const base = basePlanFixture();
+      base.events[0].title = scenario.text.includes('图书馆') ? '参观图书馆' : '参观博物馆';
+      base.events.forEach(event => { event.time.end = event.time.start.replace(/T(\d{2})/, (_, hour: string) => `T${Number(hour) + 1}`); });
+      const updateAI = stubUpdateAI({ envelopeFor: input => {
+        const items = input.currentPlan.events.map(event => keep(input.currentPlan, event.id));
+        // 故意返回错误时刻和无关重排，证明约束由确定性层执行。
+        items[0] = keep(input.currentPlan, base.events[0].id, scenario.rename
+          ? { title: '广东省博物馆' }
+          : { time: { start: '2026-09-05T16:00:00+08:00', end: '2026-09-05T17:00:00+08:00', timezone: 'Asia/Shanghai' } });
+        items[1] = keep(input.currentPlan, base.events[1].id, { time: { start: '2026-09-05T17:00:00+08:00', end: '2026-09-05T18:00:00+08:00', timezone: 'Asia/Shanghai' } });
+        return updateEnvelope(input.currentPlan, [items[0], items[2], items[1]], '模型试图优化整天');
+      } });
+      const { directory, trips, service } = setup({ evaluationAI: stubEvaluationAI(evaluationEnvelope({ relevant: true, usable: true, updateRequired: true })), updateAI, postProcess: true });
+      try {
+        await trips.create(tripFixture({ currentPlan: base }));
+        await service.addComment('usr_A', 'trip_T', scenario.text);
+        const plan = (await trips.findById('trip_T'))!.currentPlan!;
+        const unrelated = diffTripPlans(base, plan).filter(op => op.eventId !== base.events[0].id);
+        assert.equal(plan.version, 2);
+        if (scenario.replan) {
+          assert(unrelated.length > 0, '显式授权仍可调整多个活动');
+        } else {
+          assert.deepStrictEqual(unrelated, [], '非目标活动不得出现 update/move/add/delete');
+          assert.deepStrictEqual(plan.events.map(e => e.id), base.events.map(e => e.id));
+          if (scenario.rename) assert.equal(plan.events[0].title, '广东省博物馆');
+          else assert.equal(plan.events[0].time.start.slice(11, 16), scenario.text.includes('十一点') ? '11:00' : '14:00');
+          if (!scenario.rename && !scenario.text.includes('十一点')) {
+            assert.equal(plan.status, 'needs_attention');
+            assert(plan.validationIssues?.some(issue => issue.code === 'TIME_CONFLICT'));
+          }
+        }
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  }
   // ---------- Judge → PlanAgent 贯通：确定性兜底放行 ----------
 
   await record(

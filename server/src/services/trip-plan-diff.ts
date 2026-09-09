@@ -10,6 +10,7 @@
 // 边界：本模块只描述「计划发生了哪些变化」，不做任何推荐/路线/POI 决策。
 
 import { TripPlan } from '../types/trip-plan';
+import { isDeepStrictEqual } from 'util';
 
 export type TripPlanOperation =
   | { type: 'add'; eventId: string; title: string; afterEventId?: string }
@@ -24,7 +25,7 @@ export interface TripPlanOperationSummary {
 }
 
 function sameJson(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  return isDeepStrictEqual(a ?? null, b ?? null);
 }
 
 /**

@@ -410,6 +410,27 @@ async function runPipelineTests() {
     }
   });
 
+  await record('TRIP_UPDATE: 单活动 scope 按当前稳定 ID 验证并透传', () => {
+    const body = clone(BODIES.TRIP_UPDATE);
+    body.tripUpdate.editScope = { mode: 'single_activity', targetActivityId: CURRENT_PLAN.events[0].id, absoluteStartTime: '14:00' };
+    const result = validatePipelineInput('TRIP_UPDATE', body);
+    assert.strictEqual(result.ok, true);
+  });
+
+  await record('TRIP_UPDATE: 非法 scope ID、时刻、类型、额外字段必须拒绝', () => {
+    for (const scope of [
+      null,
+      { mode: 'single_activity', targetActivityId: 'unknown' },
+      { mode: 'single_activity', targetActivityId: CURRENT_PLAN.events[0].id, absoluteStartTime: '25:00' },
+      { mode: 'all', targetActivityId: CURRENT_PLAN.events[0].id },
+      { mode: 'single_activity', targetActivityId: CURRENT_PLAN.events[0].id, extra: true },
+    ]) {
+      const body = clone(BODIES.TRIP_UPDATE);
+      body.tripUpdate.editScope = scope;
+      assert.strictEqual(validatePipelineInput('TRIP_UPDATE', body).ok, false);
+    }
+  });
+
   await record('TRIP_UPDATE: 完整 snapshot、tripChanged、旧 event id 与合法 ui', () => {
     const input = BODIES.TRIP_UPDATE.tripUpdate;
     const result = validatePipelineEnvelope(ENVELOPES.TRIP_UPDATE, 'TRIP_UPDATE', input);

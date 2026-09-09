@@ -11,7 +11,9 @@
 // 任何违例一律拒绝，currentPlan 保持旧版本。
 
 import { AIEnvelopeValidationResult } from '../types/ai-envelope';
-import { AITripUpdateEnvelope } from '../types/ai-trip-update';
+import { AITripUpdateEnvelope, TripEditScope } from '../types/ai-trip-update';
+import { diffTripPlans } from './trip-plan-diff';
+import { isDeepStrictEqual } from 'util';
 import { TripPlan } from '../types/trip-plan';
 import { validateAITripSnapshot, buildTripPlanFromSnapshot } from './ai-trip-snapshot-validation';
 import { validateAIUIConfig } from './ai-ui-config-validation';
@@ -28,6 +30,7 @@ export function validateTripUpdateEnvelope(
   value: unknown,
   previousPlan: TripPlan,
   allowRegenerate = false,
+  editScope?: TripEditScope,
 ): AIEnvelopeValidationResult {
   if (!value || typeof value !== 'object') {
     return fail('$', 'NOT_OBJECT');
@@ -88,6 +91,15 @@ export function validateTripUpdateEnvelope(
     previousPlan.updatedAt,
   );
   const newEventIds = new Set(candidate.events.map((event) => event.id));
+  if (editScope) {
+    const applied = buildUpdatedTripPlan(envelope as unknown as AITripUpdateEnvelope, previousPlan, previousPlan.updatedAt);
+    if (!previousEventIds.has(editScope.targetActivityId)
+      || diffTripPlans(previousPlan, applied).some(op => op.type !== 'update' || op.eventId !== editScope.targetActivityId)
+      || applied.events.some(event => event.id !== editScope.targetActivityId
+        && !isDeepStrictEqual(event.alternatives, previousPlan.events.find(old => old.id === event.id)?.alternatives))) {
+      return fail('trip.items', 'ACTIVITY_EDIT_SCOPE_VIOLATION');
+    }
+  }
 
   const ui = validateAIUIConfig(envelope.ui, {
     newEventIds,

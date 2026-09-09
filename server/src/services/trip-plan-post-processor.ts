@@ -14,6 +14,8 @@
 // 本模块是纯逻辑 + 可注入的 Tencent LBS 依赖，便于确定性测试。
 
 import { TripPlan, TripPlanEvent } from '../types/trip-plan';
+import { TripEditScope } from '../types/ai-trip-update';
+import { enforceAppliedEditScope } from './trip-edit-scope';
 import { parseDurationMinutes } from './duration-parser';
 import { buildTimeAnchor, resolvePlanTimes } from './trip-temporal-resolution';
 import {
@@ -70,6 +72,7 @@ export interface PostProcessInput {
   routeMode?: string;
   requestId?: string;
   previousPlan?: TripPlan;
+  editScope?: TripEditScope;
 }
 
 export interface PostProcessResult {
@@ -212,7 +215,7 @@ export async function postProcessTripPlan(
   // 6. 时间不重叠（J/L）：按先后关系 + 真实路线 duration 调整后续活动时间。
   //    event[i+1].start = max(已有硬约束 start, event[i].end + realRouteDuration)；
   //    无真实路线 duration 时 start = previous.end（不伪造 travel）。
-  events = applySequenceTimes(events, realTravelMinutesByEventId);
+  if (!input.editScope) events = applySequenceTimes(events, realTravelMinutesByEventId);
 
   const plan: TripPlan = {
     ...input.plan,
@@ -274,7 +277,8 @@ export async function postProcessTripPlan(
     }),
   };
 
-  return { plan, events };
+  const scopedPlan = enforceAppliedEditScope(plan, input.plan, input.editScope);
+  return { plan: scopedPlan, events: input.editScope ? scopedPlan.events : events };
 }
 
 /** 事件的实际物理坐标：餐厅事件优先用真实餐厅坐标（M 节），其余用解析后的真实地点。 */

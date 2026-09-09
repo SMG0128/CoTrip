@@ -429,7 +429,8 @@ function validatePipelineInput(requestType, body) {
     TRIP_UPDATE: ['aiContext', 'currentPlan', 'triggeringComment', 'commentEvaluation', 'baseVersion'],
   }[requestType];
   const required = [...commonKeys, ...additionalKeys];
-  const allowed = requestType === 'COMMENT_EVALUATION' ? [...required, 'currentPlan'] : required;
+  const allowed = requestType === 'COMMENT_EVALUATION' ? [...required, 'currentPlan']
+    : requestType === 'TRIP_UPDATE' ? [...required, 'editScope'] : required;
   const shape = validateExactKeys(input, allowed, required, property);
   if (requestType === 'COMMENT_EVALUATION' && input.currentPlan) {
     const plan = validateCurrentPlan(input.currentPlan, `${property}.currentPlan`);
@@ -452,6 +453,16 @@ function validatePipelineInput(requestType, body) {
   if (requestType === 'TRIP_UPDATE') {
     const plan = validateCurrentPlan(input.currentPlan, `${property}.currentPlan`);
     if (!plan.ok) return plan;
+    if (input.editScope !== undefined) {
+      const scope = input.editScope;
+      if (!isRecord(scope)) return invalid(`${property}.editScope`, 'ACTIVITY_EDIT_SCOPE_INVALID');
+      const shape = validateExactKeys(scope, ['mode', 'targetActivityId', 'absoluteStartTime'], ['mode', 'targetActivityId'], `${property}.editScope`);
+      if (!shape.ok) return shape;
+      if (scope.mode !== 'single_activity' || !input.currentPlan.events.some(event => event.id === scope.targetActivityId)
+        || (scope.absoluteStartTime !== undefined && (typeof scope.absoluteStartTime !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(scope.absoluteStartTime)))) {
+        return invalid(`${property}.editScope`, 'ACTIVITY_EDIT_SCOPE_INVALID');
+      }
+    }
     if (!Number.isInteger(input.baseVersion) || input.baseVersion !== input.currentPlan.version) {
       return invalid(`${property}.baseVersion`, 'BASE_VERSION_MISMATCH');
     }

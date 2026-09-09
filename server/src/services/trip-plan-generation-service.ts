@@ -64,6 +64,7 @@ import { sanitizePlanForPersist } from './plan-persist-sanitizer';
 import { buildTimeAnchor } from './trip-temporal-resolution';
 import { hasExplicitPlanChangeSignal, judgeShouldForward } from './comment-judge';
 import { diffTripPlans, summarizePlanOperations } from './trip-plan-diff';
+import { resolveTripEditScope, normalizeScopedTripUpdate, enforceAppliedEditScope } from './trip-edit-scope';
 
 export type PlanMutation = 'none' | 'initial_generation' | 'trip_update';
 
@@ -368,6 +369,7 @@ export class TripPlanGenerationService {
         return false;
       }
       const baseVersion = basePlan.version;
+      const editScope = resolveTripEditScope(comment.rawText, basePlan);
 
       const input: TripUpdateAIInput = {
         title: base.title,
@@ -377,6 +379,7 @@ export class TripPlanGenerationService {
         triggeringComment: this.toCommentInput(comment),
         commentEvaluation,
         baseVersion,
+        ...(editScope ? { editScope } : {}),
       };
 
       let envelope;
@@ -389,11 +392,20 @@ export class TripPlanGenerationService {
         return false;
       }
 
-      const validation = validateTripUpdateEnvelope(envelope, basePlan, /重新生成|重做整个|全部重新/.test(comment.rawText));
+      let validation = validateTripUpdateEnvelope(envelope, basePlan, /重新生成|重做整个|全部重新/.test(comment.rawText));
       if (!validation.ok) {
         console.warn(
           `TRIP_UPDATE 响应验证失败（${validation.failureReasonCode} @ ${validation.failurePath}），currentPlan 保持 v${baseVersion}`,
         );
+        return false;
+      }
+
+      const normalized = normalizeScopedTripUpdate(envelope, basePlan, editScope);
+      if (!normalized) return false;
+      envelope = normalized;
+      validation = validateTripUpdateEnvelope(envelope, basePlan, /重新生成|重做整个|全部重新/.test(comment.rawText), editScope);
+      if (!validation.ok) {
+        console.warn(`TRIP_UPDATE 范围验证失败（${validation.failureReasonCode}），保留 v${baseVersion}`);
         return false;
       }
 
@@ -411,6 +423,9 @@ export class TripPlanGenerationService {
 
       const updatedAt = new Date().toISOString();
       let plan = buildUpdatedTripPlan(envelope, latest.currentPlan, updatedAt);
+      const scopedInput = enforceAppliedEditScope(plan, { ...plan, events: basePlan.events.map(event =>
+        event.id === editScope?.targetActivityId ? plan.events.find(candidate => candidate.id === event.id)! : event) }, editScope);
+      if (editScope) plan = scopedInput;
       const requestedOperations = diffTripPlans(basePlan, plan);
       console.info(JSON.stringify({ requestId: comment.id, tripId: base.id, targetActivityId: requestedOperations.map(op => op.eventId), routeInvalidated: basePlan.events.filter(e => e.route).map(e => e.id) }));
       if (requestedOperations.length === 0 && basePlan.status !== 'needs_attention') {
@@ -429,6 +444,7 @@ export class TripPlanGenerationService {
             routeMode: comment.rawText,
             requestId: comment.id,
             previousPlan: basePlan,
+            editScope,
           });
           plan = processed.plan;
         } catch {
@@ -436,11 +452,16 @@ export class TripPlanGenerationService {
           // 后处理失败：保留 AI 意图文本；未验证事实由 sanitizePlanForPersist 剥离
         }
       }
+      plan = enforceAppliedEditScope(plan, scopedInput, editScope);
       // 落库前不变量门禁（fail-closed）：剥离未验证 location/restaurant/时间
       const tripStartDate = buildTimeAnchor(
         latest.timeRange as { start?: string; end?: string; timezone?: string } | undefined,
       )?.startDate;
       plan = sanitizePlanForPersist(plan, tripStartDate, (latest.timeRange as { end?: string } | undefined)?.end?.slice(0, 10));
+      if (editScope && diffTripPlans(basePlan, plan).some(op => op.type !== 'update' || op.eventId !== editScope.targetActivityId)) {
+        console.warn(`TRIP_UPDATE 落库范围越界，保留 v${baseVersion}`);
+        return false;
+      }
       // 可观测性：PlanAgent 操作摘要（ADD/UPDATE/DELETE/MOVE），不写完整 LLM 输出
       const operations = summarizePlanOperations(diffTripPlans(basePlan, plan));
       console.info(

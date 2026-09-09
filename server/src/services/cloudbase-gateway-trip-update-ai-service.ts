@@ -64,6 +64,7 @@ export class CloudBaseGatewayTripUpdateAIService implements TripUpdateAIService 
             triggeringComment: input.triggeringComment,
             commentEvaluation: input.commentEvaluation,
             baseVersion: input.baseVersion,
+            ...(input.editScope ? { editScope: input.editScope } : {}),
           },
         }),
         signal: controller.signal,

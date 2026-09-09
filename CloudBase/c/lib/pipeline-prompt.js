@@ -61,6 +61,7 @@ const PIPELINE_SYSTEM_PROMPTS = {
     '注意 trip 使用 items 字段，不是 events；item 不得有 id；analysis 与 meta 必须是空 object。',
   ].join('\n\n'),
   TRIP_UPDATE: [
+    '若输入包含 editScope.mode=single_activity，只能 UPDATE editScope.targetActivityId。其他活动的属性、ID、顺序必须保持不变，禁止新增、删除、移动或为了避免冲突自动顺延后续活动。absoluteStartTime 是用户明确指定的绝对时刻，保留原活动日期和时长。冲突保留交由服务端 needs_attention/coordination 处理，不得自行扩大修改范围。没有 editScope 时仍按用户明确意图支持多活动编辑和重排。',
     COMMON,
     SNAPSHOT,
     '每个需要前往的活动使用 locationRequirement.query 独立表达具体地点或搜索要求（例如广东省博物馆、附近粤菜）；title 是活动名称。不要输出地图事实。交通偏好使用目标活动 transportPreference: walking/transit/driving，仅对用户指定的那段设置。',

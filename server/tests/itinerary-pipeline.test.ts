@@ -62,7 +62,7 @@ export async function runItineraryPipelineTests(): Promise<void> {
   await record('itinerary HTTP E2E: 生成→换地点→改时间→指定地铁→模糊地点→无法解析→短途比较→重启', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cotrip-itinerary-'));
     const calls: { from: string; to: string; mode: string }[] = [];
-    const inputs: { requestType: string; currentPlan?: TripPlan }[] = [];
+    const inputs: { requestType: string; currentPlan?: TripPlan; editScope?: TripUpdateAIInput['editScope'] }[] = [];
     let transitUnavailable = false;
     const gatewayModule = require(path.resolve(__dirname, '../../../CloudBase/c/lib/gateway.js')) as {
       createGateway(options: { secret: string; aiProvider: { tripPipeline(type: string, input: TripUpdateAIInput): Promise<{ text: string }> } }): {
@@ -71,7 +71,7 @@ export async function runItineraryPipelineTests(): Promise<void> {
     };
     const gateway = gatewayModule.createGateway({ secret: 'integration-secret', aiProvider: {
       async tripPipeline(requestType, input) {
-        inputs.push({ requestType, currentPlan: input.currentPlan });
+        inputs.push({ requestType, currentPlan: input.currentPlan, editScope: input.editScope });
         const base = { schemaVersion: '1.0', requestType, status: 'success', analysis: {}, decision: { tripChanged: true }, ui: emptyAIUIConfig(), meta: {} };
         if (requestType === 'COMMENT_EVALUATION') return { text: JSON.stringify({ ...base, analysis: { commentIntent: '修改行程' }, decision: { relevant: true, usable: true, updateRequired: true, reason: '明确的行程意图' }, trip: null }) };
         let items = initialItems;
@@ -149,8 +149,10 @@ export async function runItineraryPipelineTests(): Promise<void> {
       const timed = await submit('把博物馆推迟到下午两点。');
       assert.equal(timed.events[0].id, initial.events[0].id);
       assert.equal(timed.events[0].time.start, time(14).start);
-      assert.equal(timed.status, 'actionable');
-      assert(Date.parse(timed.events[1].time.start) >= Date.parse(timed.events[0].time.end!));
+      assert.deepStrictEqual(inputs[inputs.length - 1].editScope, { mode: 'single_activity', targetActivityId: initial.events[0].id, absoluteStartTime: '14:00' }, '范围穿过真实 Gateway 契约到达 PlanAgent');
+      assert.equal(timed.status, 'needs_attention');
+      assert(timed.validationIssues?.some(issue => issue.code === 'TIME_CONFLICT'));
+      assert.deepStrictEqual(timed.events.slice(1).map(e => e.time), changed.events.slice(1).map(e => e.time));
       const beforeTransit = calls.length;
       const transit = await submit('去陈家祠这段我想坐地铁。');
       assert.equal(transit.events[2].route!.mode, 'transit');
