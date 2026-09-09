@@ -1,7 +1,0 @@
-{
-  "component": true,
-  "usingComponents": {
-    "plan-event": "../plan-event/index",
-    "price-display": "../price-display/index"
-  }
-}

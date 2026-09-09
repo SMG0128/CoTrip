@@ -1,9 +1,0 @@
-{
-  "navigationBarTitleText": "行程详情",
-  "backgroundColor": "#F7F9FD",
-  "usingComponents": {
-    "plan-board": "../../components/plan-board/index",
-    "route-options": "../../components/route-options/index",
-    "comment-item": "../../components/comment-item/index"
-  }
-}

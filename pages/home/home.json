@@ -1,9 +1,0 @@
-{
-  "navigationBarTitleText": "",
-  "navigationStyle": "custom",
-  "backgroundColor": "#F7F9FD",
-  "usingComponents": {
-    "trip-card": "../../components/trip-card/index",
-    "participant-avatar": "../../components/participant-avatar/index"
-  }
-}
