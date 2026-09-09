@@ -1,4 +1,27 @@
-# CoTrip — AI 协同行程规划微信小程序
+# CoTrip — AI 协同行程规划微信小程序（main 分支）
+
+> **本分支：`main` —— CoTrip 微信小程序前端。** Node.js 服务端代码在 **`Server`** 分支，本分支**不再包含**生产 Node server（`server/` 与 CloudBase 云函数 `CloudBase/c/`）。
+
+本仓库按端拆分到两个长期分支：
+
+| 分支 | 内容 |
+| --- | --- |
+| `Server` | `server/` 后端 + `CloudBase/c/` 云函数网关 + `contracts/` 共享契约 |
+| `main`（本分支） | 微信小程序前端 + `contracts/` 共享契约 |
+
+本分支主要目录（小程序）：`app.ts` / `pages/` / `components/` / `custom-tab-bar/` / `services/` / `utils/` / `core/` / `types/` / `mock/` / `assets/` / `styles/` 与前端 `tests/`。`contracts/` 下为与 **Server** 分支共享的 AI / API 契约 fixture（`ai-comment-analysis-fixtures.json`），保留用于契约一致性校验。
+
+### 前端开发 / 测试 / 构建
+
+```bash
+npm install          # 安装 TypeScript 与小程序类型声明
+npm run typecheck    # 严格类型检查
+npm test             # 编译至临时目录并运行全部前端测试（全部核心逻辑测试模块）
+```
+
+开发预览：用**微信开发者工具**导入仓库根目录即可（TypeScript 由内置编译插件处理，无 CLI 构建）。
+
+> 服务端接口 / 部署（PM2、Node 进程、云函数）请切换至 `Server` 分支查看，不属于本分支正常开发流程。
 
 CoTrip 是一个面向**多人线下活动协调**的微信小程序。参与者的碎片化需求以自然语言表达（"我只有上午有空"、"想在天河打羽毛球"、"预算控制在人均100"），AI 层持续将其转化为结构化约束，并维护一份唯一可执行的共同计划。
 
@@ -13,11 +36,11 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 ```
 
 - 完整产品规格：[`AI_Coexistence_Trip_MiniProgram_V1.md`](./AI_Coexistence_Trip_MiniProgram_V1.md)
-- 后端详细说明：[`server/README.md`](./server/README.md)
+- 服务端说明：见 **`Server`** 分支的 `README.md` 与 `server/README.md`（本分支不含后端代码）
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 318/318、前端全量测试模块全绿）：
+当前已实际实现并通过测试的能力（服务端 326/326 见 `Server` 分支、前端全量测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -172,32 +195,30 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - 后端：37/37 通过（覆盖房间号、公开 Preview、Bearer Join、A/B/C 多用户、幂等、spoof 防护、非 ACTIVE 拒绝与重启持久化）。
 - 前端：27 个测试模块全部通过（覆盖 Real/Mock Join、登录续接、分享归一化、路线门禁、出发地点与成功导航）。
 
-## 项目结构
+## 项目结构（main 分支）
 
 ```
 ├── app.ts / app.json / app.wxss    # 小程序入口
 ├── pages/                          # 页面（四件套 .ts/.json/.wxml/.wxss）
 │   ├── login / home / profile      #   登录、首页、我的
 │   ├── trip-create / trip-detail   #   新建行程、当前行程
-│   ├── join-trip                   #   加入落地页（V0.3 新增）
+│   ├── join-trip                   #   加入落地页
 │   └── trip-history* / place-detail
 ├── components/                     # 共享组件（trip-card、plan-board 等）
+├── custom-tab-bar/                 # 自定义底部导航
 ├── types/                          # 领域模型（Trip、Plan、Event、Constraint…）
 ├── core/                           # 纯规划逻辑（约束解析→冲突检测→规划引擎）
 ├── services/                       # 服务接口 + mock/ 与 real/ 实现
-├── config/auth.ts                  # 后端地址、存储键与示例行程开关
+├── config/auth.ts                  # 后端 baseUrl、存储键与示例行程开关
 ├── config/tencent-map.ts           # 腾讯地图公开配置占位符（禁止提交真实 Key）
 ├── styles/                         # 共享 tokens、排版、工具类与玻璃材质
 ├── utils/                          # 纯函数工具（trip-share、trip-card、route-options-ui、guangzhou-metro…）
 ├── mock/                           # Mock 数据
 ├── tests/                          # 前端单元测试（自研轻量运行器）
-└── server/                         # Node.js + Express 后端
-    ├── src/routes/                 #   /auth /trips 路由
-    ├── src/services/               #   微信登录、token 签发、Trip 业务
-    ├── src/repositories/           #   JSON 文件持久化
-    ├── src/utils/room-code.ts      #   房间号生成与校验（V0.3 新增）
-    └── tests/                      #   后端测试
+└── contracts/                      # 与 Server 分支共享的 AI / API 契约 fixture
 ```
+
+> 服务端（Node.js + Express）代码不在此分支，见 **`Server`** 分支的 `server/` 目录。
 
 ## 架构要点
 
@@ -222,9 +243,11 @@ npm test             # 编译至临时目录并运行全部前端测试
 
 开发预览：用**微信开发者工具**导入仓库根目录即可（TypeScript 由内置编译插件处理，无 CLI 构建）。仓库中的 `project.config.json` 固定使用 `touristappid`；真实 AppID 仅保存在本地配置中，禁止提交。
 
-### 后端
+### 服务端（在 Server 分支运行）
 
 ```bash
+# 服务端代码不在 main 分支。请切换到 Server 分支后：
+git switch Server
 cd server
 npm install
 cp .env.example .env   # 填入 WECHAT_APPID / WECHAT_SECRET / AUTH_TOKEN_SECRET / PORT
@@ -241,6 +264,8 @@ npm run typecheck && npm test
 - `config/auth.ts` 只保存后端 `baseUrl`、本地存储键和 `enableDemoTrip`；示例行程是明确标注的本地样例，不是认证或持久化 fallback。
 
 ## 接口一览
+
+> 以下接口由 **`Server`** 分支实现，本表作为小程序前端对接契约参考。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
