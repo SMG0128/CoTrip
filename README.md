@@ -1,6 +1,37 @@
-# CoTrip — AI 协同行程规划微信小程序
+# CoTrip — AI 协同行程规划（Server 分支）
 
-CoTrip 是一个面向**多人线下活动协调**的微信小程序。参与者的碎片化需求以自然语言表达（"我只有上午有空"、"想在天河打羽毛球"、"预算控制在人均100"），AI 层持续将其转化为结构化约束，并维护一份唯一可执行的共同计划。
+> **本分支：`Server` —— CoTrip 服务端实现。** 微信小程序前端代码在 **`main`** 分支，不要在本分支查找 `pages/`、`components/`、`assets/` 等小程序源码。
+
+本仓库按端拆分到两个长期分支：
+
+| 分支 | 内容 |
+| --- | --- |
+| `Server`（本分支） | `server/` 后端 + `CloudBase/c/` 云函数网关 + `contracts/` 共享契约 |
+| `main` | 微信小程序前端 + `contracts/` 共享契约 |
+
+本分支主要目录：
+
+- **`server/`** —— Node.js + Express 后端：微信登录、Trip / 约束 / 评论服务、AI 行程管线各阶段（Judge / PlanAgent 等）及其确定性校验。
+- **`CloudBase/c/`** —— 腾讯云 CloudBase HTTP Function 网关（服务端 AI 管线的云函数落地端）。
+- **`contracts/`** —— `ai-comment-analysis-fixtures.json` 为前后端**共享的 AI / API 契约 fixture**（服务端 `ai-comment-contract` 测试直接读取），**不应删除**。
+
+### 开发 / 测试 / 构建
+
+```bash
+cd server
+npm install
+cp .env.example .env   # 仅本地；按变量名填写真实值，真实凭据绝不提交
+npm run dev            # 开发模式（ts-node），默认 http://localhost:3000
+npm run typecheck      # 严格类型检查
+npm test               # 单元测试（当前 326/326 通过）
+npm run build && npm start   # 生产模式
+```
+
+环境变量以 `server/.env.example` 中声明的**变量名**为契约（`WECHAT_APPID` / `WECHAT_SECRET` / `AUTH_TOKEN_SECRET` / `PORT` / `AI_*` / `AI_GATEWAY_*` / `TENCENT_MAP_KEY`），真实 Secret 只存在于本地 `.env` 或服务器环境。
+
+> 生产部署跟踪本 `Server` 分支（后端与 `CloudBase/c` 云函数一并发布）。下文保留的历史能力说明用于描述完整 CoTrip 产品（含小程序前端 UI 交互），具体前端源码以 `main` 分支为准。
+
+CoTrip 是一个面向**多人线下活动协调**的微信小程序 + 服务端产品。参与者的碎片化需求以自然语言表达（"我只有上午有空"、"想在天河打羽毛球"、"预算控制在人均100"），AI 层持续将其转化为结构化约束，并维护一份唯一可执行的共同计划。
 
 > **大家负责表达想法，AI 负责把想法变成共同计划。**
 
@@ -17,7 +48,7 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 
 ## Current Capabilities
 
-当前已实际实现并通过测试的能力（后端 318/318、前端全量测试模块全绿）：
+当前已实际实现并通过测试的能力（后端 326/326、前端全量测试模块全绿）：
 
 - **Real WeChat authentication** —— `wx.login` → 后端 `code2Session` → CoTrip 用户 + HMAC token；openid 不出后端。
 - **Real Trip persistence** —— Trip 经 Route → Service → Repository 分层落盘 `server/data/trips.json`（原子写入，重启保留）。
@@ -172,31 +203,26 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 - 后端：37/37 通过（覆盖房间号、公开 Preview、Bearer Join、A/B/C 多用户、幂等、spoof 防护、非 ACTIVE 拒绝与重启持久化）。
 - 前端：27 个测试模块全部通过（覆盖 Real/Mock Join、登录续接、分享归一化、路线门禁、出发地点与成功导航）。
 
-## 项目结构
+## 项目结构（Server 分支）
 
 ```
-├── app.ts / app.json / app.wxss    # 小程序入口
-├── pages/                          # 页面（四件套 .ts/.json/.wxml/.wxss）
-│   ├── login / home / profile      #   登录、首页、我的
-│   ├── trip-create / trip-detail   #   新建行程、当前行程
-│   ├── join-trip                   #   加入落地页（V0.3 新增）
-│   └── trip-history* / place-detail
-├── components/                     # 共享组件（trip-card、plan-board 等）
-├── types/                          # 领域模型（Trip、Plan、Event、Constraint…）
-├── core/                           # 纯规划逻辑（约束解析→冲突检测→规划引擎）
-├── services/                       # 服务接口 + mock/ 与 real/ 实现
-├── config/auth.ts                  # 后端地址、存储键与示例行程开关
-├── config/tencent-map.ts           # 腾讯地图公开配置占位符（禁止提交真实 Key）
-├── styles/                         # 共享 tokens、排版、工具类与玻璃材质
-├── utils/                          # 纯函数工具（trip-share、trip-card、route-options-ui、guangzhou-metro…）
-├── mock/                           # Mock 数据
-├── tests/                          # 前端单元测试（自研轻量运行器）
-└── server/                         # Node.js + Express 后端
-    ├── src/routes/                 #   /auth /trips 路由
-    ├── src/services/               #   微信登录、token 签发、Trip 业务
-    ├── src/repositories/           #   JSON 文件持久化
-    ├── src/utils/room-code.ts      #   房间号生成与校验（V0.3 新增）
-    └── tests/                      #   后端测试
+├── server/                         # CoTrip 后端（Node.js + Express + TypeScript）
+│   ├── src/app.ts                  #   Express 应用入口
+│   ├── src/config/                 #   服务配置（读取环境变量）
+│   ├── src/middleware/             #   auth / error-handler
+│   ├── src/routes/                 #   /auth /trips /comments /coordination 路由
+│   ├── src/services/               #   微信登录、token、Trip/约束/评论、AI 管线服务与确定性校验
+│   ├── src/repositories/           #   JSON 文件持久化（trips/comments/constraints/users）
+│   ├── src/types/                  #   领域模型与 AI 契约类型
+│   ├── src/utils/room-code.ts      #   房间号生成与校验
+│   ├── tests/                      #   后端测试（run-tests.ts 注册，326/326）
+│   ├── data/                       #   运行时 JSON 落盘目录（gitignored）
+│   └── .env.example / package.json / tsconfig*.json
+├── CloudBase/c/                    # 腾讯云 CloudBase HTTP Function 网关
+│   ├── lib/                        #   gateway / pipeline-contract / prompts / parsers
+│   ├── tests/                      #   网关测试（coordinate / pipeline / gateway）
+│   └── index.js / scf_bootstrap    #   云函数入口
+└── contracts/                      # 前后端共享 AI / API 契约 fixture（不应删除）
 ```
 
 ## 架构要点
@@ -211,6 +237,8 @@ CoTrip 不是 AI 聊天机器人。AI 是行程背后的"多人意图协调层"�
 8. **优雅降级**：第三方服务或 AI 失败时保留最近可用计划，未解析评论留存待重解析，不虚构任何数据。
 
 ## 快速开始
+
+> 下方小程序端命令属于 **`main` 分支**（前端）。本 `Server` 分支根目录不包含小程序源码，如要运行前端请在 `main` 分支操作。
 
 ### 小程序端
 
