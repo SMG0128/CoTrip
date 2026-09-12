@@ -30,6 +30,8 @@ import { buildUpdatedTripPlan, validateTripUpdateEnvelope } from '../src/service
 import { postProcessTripPlan } from '../src/services/trip-plan-post-processor';
 import { sanitizePlanForPersist } from '../src/services/plan-persist-sanitizer';
 import { validateAITripSnapshot } from '../src/services/ai-trip-snapshot-validation';
+import { diffTripPlans } from '../src/services/trip-plan-diff';
+import { enforceAppliedEditScope } from '../src/services/trip-edit-scope';
 import { record } from './run-tests';
 
 const time = (hour: number, day = '2026-09-07') => ({ start: `${day}T${hour}:00:00+08:00`, end: `${day}T${hour + 1}:00:00+08:00`, timezone: 'Asia/Shanghai' });
@@ -199,18 +201,30 @@ export async function runItineraryPipelineTests(): Promise<void> {
       providerRefs: [{ provider: 'tencent', externalId: pois[index].id }],
     } })),
   });
-  const resolve = async (plan: TripPlan, previousPlan?: TripPlan) => {
+  const resolve = async (
+    plan: TripPlan,
+    previousPlan?: TripPlan,
+    durationForDestination: (destination: string) => number = () => 6,
+    editScope?: TripUpdateAIInput['editScope'],
+    scopedInput?: TripPlan,
+  ) => {
     const calls: string[] = [];
-    const result = await postProcessTripPlan({ plan, previousPlan, city: '广州市', timeRange: { start: time(9).start, end: time(20, '2026-09-08').end } },
+    const result = await postProcessTripPlan({ plan, previousPlan, editScope, city: '广州市', timeRange: { start: time(9).start, end: time(20, '2026-09-08').end } },
       new TencentLBSService({ key: 'test', fetchImpl: async url => ({ ok: true, json: async () => ({ status: 0, data: pois.filter(poi => poi.title === new URL(url).searchParams.get('keyword')) }) }) }),
-      new TencentDirectionService({ key: 'test', fetchImpl: async url => { const query = new URL(url).searchParams; calls.push(`${query.get('from')}→${query.get('to')}`); return { ok: true, json: async () => ({ status: 0, result: { routes: [{ duration: 6, distance: 398 }] } }) }; } }));
-    return { plan: sanitizePlanForPersist(result.plan, '2026-09-07', '2026-09-08'), calls };
+      new TencentDirectionService({ key: 'test', fetchImpl: async url => {
+        const query = new URL(url).searchParams;
+        const destination = query.get('to')!;
+        calls.push(`${query.get('from')}→${destination}`);
+        return { ok: true, json: async () => ({ status: 0, result: { routes: [{ duration: durationForDestination(destination), distance: 398 }] } }) };
+      } }));
+    const enforced = editScope && scopedInput ? enforceAppliedEditScope(result.plan, scopedInput, editScope) : result.plan;
+    return { plan: sanitizePlanForPersist(enforced, '2026-09-07', '2026-09-08'), calls };
   };
   const proposal = (plan: TripPlan, items: AITripItem[], removedEventIds: string[] = []) => ({ schemaVersion: '1.0', requestType: 'TRIP_UPDATE' as const, status: 'success' as const,
     analysis: {}, decision: { tripChanged: true as const }, trip: { title: '广州一日游', summary: '调整行程', items }, ui: { ...emptyAIUIConfig(), removedEventIds } });
   const intentItems = (plan: TripPlan): AITripItem[] => plan.events.map(event => ({ id: event.id, type: event.type, title: event.title, time: event.time, locationRequirement: event.locationRequirement }));
 
-  await record('itinerary: 替换中间节点同时重算入段/出段，保留无关地点和稳定 ID', async () => {
+  await record('itinerary: single_activity 换地点且路线可行时保持 actionable、稳定 ID 与零无关操作', async () => {
     const base = (await resolve(baseline())).plan;
     const items = intentItems(base);
     items[1] = { ...items[1], type: 'OTHER', title: '参观陈家祠', locationRequirement: { query: '陈家祠' } };
@@ -225,6 +239,37 @@ export async function runItineraryPipelineTests(): Promise<void> {
     assert.equal(plan.events[1].id, base.events[1].id);
     assert.deepEqual(plan.events[0].location, base.events[0].location);
     assert(!JSON.stringify(plan.events.map(e => e.route)).includes('restaurant'));
+    assert.equal(plan.status, 'actionable');
+    assert.deepStrictEqual(diffTripPlans(base, plan).filter(operation => operation.eventId !== base.events[1].id), []);
+  });
+  await record('itinerary: single_activity 换地点后路线超出原时间窗时保留修改并精确返回 TIME_CONFLICT', async () => {
+    const source = baseline();
+    source.events[2].time = {
+      start: '2026-09-07T13:30:00+08:00',
+      end: '2026-09-07T14:30:00+08:00',
+      timezone: 'Asia/Shanghai',
+    };
+    const towerCoordinates = `${pois[2].location.lat},${pois[2].location.lng}`;
+    const chenCoordinates = `${pois[3].location.lat},${pois[3].location.lng}`;
+    const duration = (destination: string): number => destination === chenCoordinates ? 50 : destination === towerCoordinates ? 20 : 6;
+    const base = (await resolve(source, undefined, duration)).plan;
+    assert.equal(base.status, 'actionable', '旧地点 20 分钟路线应能在原时间前到达');
+    const items = intentItems(base);
+    items[2] = { ...items[2], title: '参观陈家祠', locationRequirement: { query: '陈家祠' } };
+    const scope = { mode: 'single_activity' as const, targetActivityId: base.events[2].id };
+    const envelope = proposal(base, items);
+    assert(validateTripUpdateEnvelope(envelope, base, false, scope).ok);
+    const updated = buildUpdatedTripPlan(envelope, base, base.updatedAt);
+    const { plan } = await resolve(updated, base, duration, scope, updated);
+    const target = plan.events.find(event => event.id === base.events[2].id);
+    assert(target);
+    assert.equal(target.location?.id, 'chen');
+    assert.equal(target.route?.destination?.id, 'chen');
+    assert.equal(target.route?.durationMinutes, 50);
+    assert.equal(target.time.start, base.events[2].time.start, '局部换地点不得隐式移动目标时间');
+    assert.equal(plan.status, 'needs_attention');
+    assert.deepStrictEqual(plan.validationIssues, [{ eventId: base.events[2].id, code: 'TIME_CONFLICT' }]);
+    assert.deepStrictEqual(diffTripPlans(base, plan).filter(operation => operation.eventId !== base.events[2].id), []);
   });
   await record('itinerary: 删除中间节点后直连 A→C，插入与重排仍按 ID 对齐路线', async () => {
     const base = (await resolve(baseline())).plan;

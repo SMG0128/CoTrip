@@ -25,6 +25,7 @@ const { commentRouter } = require('../dist/routes/comments');
 const { errorHandler } = require('../dist/middleware/error-handler');
 const { postProcessTripPlan } = require('../dist/services/trip-plan-post-processor');
 const { sanitizePlanForPersist } = require('../dist/services/plan-persist-sanitizer');
+const { diffTripPlans } = require('../dist/services/trip-plan-diff');
 
 const report = { REAL_INITIAL_GENERATION_E2E: 'FAIL', REAL_TRIP_UPDATE_E2E: 'FAIL', cases: {} };
 async function main() {
@@ -55,21 +56,26 @@ async function main() {
     const headers = { Authorization: `Bearer ${tokens.sign('e2e-user')}`, 'Content-Type': 'application/json' };
     const date = new Date(Date.now() + 32 * 3600000).toISOString().slice(0, 10);
     const timeRange = { start: `${date}T09:00:00+08:00`, end: `${date}T23:59:00+08:00`, timezone: 'Asia/Shanghai' };
-    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ title: '广州一日游', initialBrief: '广东省博物馆、粤菜、广州塔', areaConstraint: { city: '广州市' }, timeRange }) });
-    assert.equal(response.status, 201);
-    const { trip } = await response.json();
-    async function submit(rawText) {
-      const response = await fetch(`${url}/${trip.id}/comments`, { method: 'POST', headers, body: JSON.stringify({ rawText }) });
+    async function createTrip() {
+      const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ title: '广州一日游', initialBrief: '广东省博物馆、粤菜、广州塔', areaConstraint: { city: '广州市' }, timeRange }) });
       assert.equal(response.status, 201);
-      const read = await fetch(`${url}/${trip.id}`, { headers });
+      return (await response.json()).trip;
+    }
+    async function submit(tripId, rawText) {
+      const response = await fetch(`${url}/${tripId}/comments`, { method: 'POST', headers, body: JSON.stringify({ rawText }) });
+      assert.equal(response.status, 201);
+      const read = await fetch(`${url}/${tripId}`, { headers });
       const dto = await read.json();
-      const stored = await new JsonTripRepository(file).findById(trip.id);
+      const stored = await new JsonTripRepository(file).findById(tripId);
       assert.deepEqual(dto.trip.currentPlan, stored.currentPlan, 'API/重启 DB 不一致');
       assert(dto.trip.currentPlan, '未生成计划');
       return dto.trip.currentPlan;
     }
     const placeName = event => event.location?.name || event.restaurant?.name || '';
-    const initial = await submit('明天在广州玩一天，上午去广东省博物馆，中午吃粤菜，下午去广州塔。');
+    const initialComment = '明天在广州玩一天，上午去广东省博物馆，中午吃粤菜，下午去广州塔。';
+    // Scenario A：真实换地点。地点修改可以成功落库，同时因保留原时间而精确进入待确认状态。
+    const changeTrip = await createTrip();
+    const initial = await submit(changeTrip.id, initialComment);
     assert.equal(initial.status, 'actionable', '首版仍不可执行');
     const museum = initial.events.find(e => placeName(e).includes('博物馆'));
     const meal = initial.events.find(e => e.type === 'DINING');
@@ -77,26 +83,44 @@ async function main() {
     assert(museum && meal?.restaurant && tower, '三项意图或真实餐厅缺失');
     assert(initial.events.indexOf(museum) < initial.events.indexOf(meal) && initial.events.indexOf(meal) < initial.events.indexOf(tower));
     report.REAL_INITIAL_GENERATION_E2E = 'PASS'; report.cases.initial = 'PASS';
-    const changed = await submit('下午不要去广州塔了，改成陈家祠。');
+    const changed = await submit(changeTrip.id, '下午不要去广州塔了，改成陈家祠。');
     assert.equal(changed.version, initial.version + 1);
-    assert.equal(changed.status, 'actionable');
     const chen = changed.events.find(e => e.id === tower.id);
     assert(chen && /陈家祠|陈氏书院/.test(placeName(chen)), '目标活动未正确修改');
-    assert.deepEqual(changed.events.filter(e => e.id !== tower.id).map(e => e.id), initial.events.filter(e => e.id !== tower.id).map(e => e.id));
+    assert.equal(chen.id, tower.id, '换地点后必须保留目标活动 stable ID');
+    assert.equal(chen.locationStatus, 'resolved', '陈家祠 POI 必须解析成功');
+    assert(chen.route && chen.route.provider === 'tencent', '换地点后必须刷新真实腾讯路线');
+    assert.equal(chen.route.destination?.id, chen.location?.id, '新路线终点必须对应陈家祠 POI');
+    assert.notEqual(chen.route.destination?.id, tower.location.id, '新路线不得继续指向广州塔');
+    const unrelatedChangeOperations = diffTripPlans(initial, changed).filter(operation => operation.eventId !== tower.id);
+    assert.deepEqual(unrelatedChangeOperations, [], 'single_activity 换地点不得产生无关活动操作');
     assert(!changed.events.some(e => e.route?.origin?.id === tower.location.id || e.route?.destination?.id === tower.location.id), '旧路线残留');
+    assert.equal(changed.status, 'needs_attention');
+    assert(changed.validationIssues?.length > 0, '预期的换地点时间冲突未被报告');
+    assert(changed.validationIssues.every(issue => issue.code === 'TIME_CONFLICT' && issue.eventId === tower.id), '换地点仅允许目标活动 TIME_CONFLICT 触发契约通过');
     report.REAL_TRIP_UPDATE_E2E = 'PASS'; report.cases.changePlace = 'PASS';
-    const timed = await submit('把博物馆推迟到下午两点。');
-    assert.equal(timed.version, changed.version + 1);
-    assert(timed.events.find(e => e.id === museum.id)?.time.start.includes('T14:00'), '时间未修改到原活动');
-    assert.equal(timed.status, 'actionable'); report.cases.changeTime = 'PASS';
-    const transit = await submit('去陈家祠这段我想坐地铁。');
+    report.changePlaceContract = { status: changed.status, validationIssue: 'TIME_CONFLICT', unrelatedOperations: unrelatedChangeOperations.length };
+
+    // Scenario B：从独立首版计划验收绝对时间 minimal-edit，避免 Scenario A 的冲突状态污染。
+    const timeTrip = await createTrip();
+    const initialForTime = await submit(timeTrip.id, initialComment);
+    const museumForTime = initialForTime.events.find(e => placeName(e).includes('博物馆'));
+    assert(museumForTime, '独立 minimal-edit 场景缺少博物馆目标');
+    const timed = await submit(timeTrip.id, '把博物馆推迟到下午两点。');
+    assert.equal(timed.version, initialForTime.version + 1);
+    assert(timed.events.find(e => e.id === museumForTime.id)?.time.start.includes('T14:00'), '时间未修改到原活动');
+    const unrelatedTimeOperations = diffTripPlans(initialForTime, timed).filter(operation => operation.eventId !== museumForTime.id);
+    assert.deepEqual(unrelatedTimeOperations, [], 'single_activity 改时间不得产生无关活动操作');
+    report.cases.changeTime = 'PASS';
+
+    const transit = await submit(changeTrip.id, '去陈家祠这段我想坐地铁。');
     const destination = transit.events.find(e => e.id === tower.id);
     assert.equal(destination.transportPreference, 'transit');
     assert(destination.route ? destination.route.mode === 'transit' && destination.route.provider === 'tencent' : destination.routeStatus === 'unavailable');
     report.cases.transport = 'PASS';
-    const nearby = await submit('中午找一家附近的粤菜。');
+    const nearby = await submit(changeTrip.id, '中午找一家附近的粤菜。');
     assert(nearby.events.find(e => e.id === meal.id)?.restaurant?.location); report.cases.nearby = 'PASS';
-    const unresolved = await submit('把陈家祠改成不存在的地点：绝不存在的紫色月球粤穗馆ZXQ987654。');
+    const unresolved = await submit(changeTrip.id, '把陈家祠改成不存在的地点：绝不存在的紫色月球粤穗馆ZXQ987654。');
     assert.equal(unresolved.status, 'needs_attention');
     const missingPlace = unresolved.events.find(e => e.id === tower.id);
     assert(missingPlace && missingPlace.locationStatus !== 'resolved' && !missingPlace.route && !missingPlace.location);
